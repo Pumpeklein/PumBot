@@ -1,33 +1,35 @@
 <!doctype html>
 <html lang="de">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ title or "Ticket Logs" }}</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-  <header class="topbar">
-    <div class="brand">Ticket Logs</div>
-    <div class="nav">
-      {% if username %}
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title or "Ticket Logs" }}</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">Ticket Logs</div>
+      <div class="nav">
+        {% if username %}
         <span class="pill">{{ username }} ({{ role }})</span>
         <a href="{{ url_for('tickets_page') }}">Tickets</a>
         {% if role == "owner" %}
-          <a href="{{ url_for('admin_users') }}">User</a>
+        <a href="{{ url_for('admin_users') }}">User</a>
         {% endif %}
         <a class="danger" href="{{ url_for('logout') }}">Logout</a>
-      {% else %}
+        {% else %}
         <a href="{{ url_for('login') }}">Login</a>
-      {% endif %}
-    </div>
-  </header>
+        {% endif %}
+      </div>
+    </header>
 
-  <main class="container">
-    {% if error %}
+    <main class="container">
+      {% if error %}
       <div class="alert">{{ error }}</div>
-    {% endif %}
-    {% block content %}{% endblock %}
-  </main>
-</body>
+      {% endif %} {% block content %}{% endblock %}
+    </main>
+  </body>
 </html>

@@ -1,12 +1,17 @@
-{% extends "base.html" %}
-{% block content %}
+{% extends "base.html" %} {% block content %}
 <h1>User Verwaltung (Owner)</h1>
 
 <div class="card">
   <h2>Neuen User anlegen</h2>
   <form method="post" action="{{ url_for('admin_users_create') }}" class="row">
-    <input name="username" placeholder="username" required>
-    <input name="password" type="password" placeholder="passwort" required minlength="6">
+    <input name="username" placeholder="username" required />
+    <input
+      name="password"
+      type="password"
+      placeholder="passwort"
+      required
+      minlength="6"
+    />
     <select name="role">
       <option value="discord_mod">discord_mod</option>
       <option value="twitch_mod">twitch_mod</option>
@@ -19,25 +24,49 @@
 <div class="card">
   <h2>Bestehende User</h2>
   {% for u in users %}
-    <div class="row">
-      <div class="pill">{{ u.username }}</div>
-      <div class="muted">{{ u.role }}</div>
+  <div class="row">
+    <div class="pill">{{ u.username }}</div>
+    <div class="muted">{{ u.role }}</div>
 
-      <form method="post" action="{{ url_for('admin_users_role') }}">
-        <input type="hidden" name="user_id" value="{{ u.id }}">
-        <select name="role">
-          <option value="discord_mod" {% if u.role=="discord_mod" %}selected{% endif %}>discord_mod</option>
-          <option value="twitch_mod" {% if u.role=="twitch_mod" %}selected{% endif %}>twitch_mod</option>
-          <option value="owner" {% if u.role=="owner" %}selected{% endif %}>owner</option>
-        </select>
-        <button type="submit">Role</button>
-      </form>
+    <form method="post" action="{{ url_for('admin_users_role') }}">
+      <input type="hidden" name="user_id" value="{{ u.id }}" />
+      <select name="role">
+        <option
+          value="discord_mod"
+          {%
+          if
+          u.role=""
+          ="discord_mod"
+          %}selected{%
+          endif
+          %}
+        >
+          discord_mod
+        </option>
+        <option
+          value="twitch_mod"
+          {%
+          if
+          u.role=""
+          ="twitch_mod"
+          %}selected{%
+          endif
+          %}
+        >
+          twitch_mod
+        </option>
+        <option value="owner" {% if u.role="" ="owner" %}selected{% endif %}>
+          owner
+        </option>
+      </select>
+      <button type="submit">Role</button>
+    </form>
 
-      <form method="post" action="{{ url_for('admin_users_delete') }}">
-        <input type="hidden" name="user_id" value="{{ u.id }}">
-        <button class="danger" type="submit">Delete</button>
-      </form>
-    </div>
+    <form method="post" action="{{ url_for('admin_users_delete') }}">
+      <input type="hidden" name="user_id" value="{{ u.id }}" />
+      <button class="danger" type="submit">Delete</button>
+    </form>
+  </div>
   {% endfor %}
 </div>
 {% endblock %}

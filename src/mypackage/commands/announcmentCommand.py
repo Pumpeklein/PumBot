@@ -1,0 +1,336 @@
+from __future__ import annotations
+
+import os
+import json
+import asyncio
+from pathlib import Path
+from typing import Any, Dict, Optional, List
+from datetime import datetime, timezone
+
+import aiohttp
+import discord
+from discord import app_commands
+from discord.ext import commands, tasks
+
+from src.mypackage.bot import logger
+
+DATA_DIR = Path("data")
+ANNOUNCE_FILE = DATA_DIR / "announcement.json"
+
+ANNOUNCE_STAFF_ROLES = {"Admin", "Team", "Twitch Moderator", "Discord Moderator"}
+
+
+def is_announce_staff(member: discord.Member) -> bool:
+    try:
+        if member.guild_permissions.administrator:
+            return True
+        return any(role.name in ANNOUNCE_STAFF_ROLES for role in member.roles)
+    except Exception:
+        logger.exception("is_announce_staff error")
+        return False
+
+
+def load_data() -> Dict[str, Any]:
+    try:
+        if ANNOUNCE_FILE.exists():
+            with ANNOUNCE_FILE.open("r", encoding="utf-8") as f:
+                return json.load(f)
+    except json.JSONDecodeError:
+        logger.warning("announcement.json ist kaputt/leer -> starte mit {}")
+        return {}
+    except Exception:
+        logger.exception("load_data error")
+        return {}
+    return {}
+
+
+def save_data(data: Dict[str, Any]) -> None:
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        with ANNOUNCE_FILE.open("w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+    except Exception:
+        logger.exception("save_data error")
+
+
+def format_stream_times(started_at_str: str) -> tuple[str, str]:
+    try:
+        dt_utc = datetime.fromisoformat(started_at_str.replace("Z", "+00:00"))
+        if dt_utc.tzinfo is None:
+            dt_utc = dt_utc.replace(tzinfo=timezone.utc)
+
+        dt_local = dt_utc.astimezone()
+        started_display = dt_local.strftime("%d.%m.%y %H:%M")
+
+        now_local = datetime.now(tz=dt_local.tzinfo)
+        delta = now_local - dt_local
+
+        total_seconds = max(0, int(delta.total_seconds()))
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+
+        if hours > 0:
+            duration_display = f"{hours} Std {minutes:02d} Min"
+        else:
+            duration_display = f"{minutes} Min"
+
+        return started_display, duration_display
+    except Exception:
+        logger.exception("format_stream_times error")
+        return started_at_str, "Unbekannt"
+
+
+class AnnouncementCog(commands.Cog):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+
+        self.twitch_client_id = os.getenv("TWITCH_CLIENT_ID")
+        self.twitch_auth_token = os.getenv("TWITCH_AUTH_TOKEN")
+        self.twitch_user_login = os.getenv("TWITCH_USER_LOGIN")
+
+        self.session: Optional[aiohttp.ClientSession] = None
+
+        self.twitch_check_loop.start()
+
+    def cog_unload(self) -> None:
+        try:
+            self.twitch_check_loop.cancel()
+            if self.session and not self.session.closed:
+                asyncio.create_task(self.session.close())
+        except Exception:
+            logger.exception("cog_unload error")
+
+    async def get_session(self) -> aiohttp.ClientSession:
+        try:
+            if self.session is None or self.session.closed:
+                timeout = aiohttp.ClientTimeout(total=15)
+                self.session = aiohttp.ClientSession(timeout=timeout)
+            return self.session
+        except Exception:
+            logger.exception("get_session error")
+            timeout = aiohttp.ClientTimeout(total=15)
+            self.session = aiohttp.ClientSession(timeout=timeout)
+            return self.session
+
+    async def get_twitch_announce_channel(self, guild: discord.Guild) -> Optional[discord.TextChannel]:
+        try:
+            data = load_data()
+            g_id = str(guild.id)
+            cfg = data.get(g_id, {}).get("_twitch", {})
+            channel_id = cfg.get("channel_id")
+            if not channel_id:
+                return None
+            chan = guild.get_channel(channel_id)
+            return chan if isinstance(chan, discord.TextChannel) else None
+        except Exception:
+            logger.exception("get_twitch_announce_channel error")
+            return None
+
+    async def fetch_twitch_stream(self) -> List[Dict[str, Any]]:
+        session = await self.get_session()
+        url = "https://api.twitch.tv/helix/streams"
+
+        headers = {
+            "Client-ID": self.twitch_client_id or "",
+            "Authorization": f"Bearer {self.twitch_auth_token or ''}",
+        }
+        params = {"user_login": self.twitch_user_login or ""}
+
+        try:
+            async with session.get(url, headers=headers, params=params) as resp:
+                if resp.status != 200:
+                    logger.warning("[Twitch] HTTP %s: %s", resp.status, await resp.text())
+                    return []
+                data = await resp.json(content_type=None)
+                return data.get("data", []) or []
+        except (aiohttp.ClientError, asyncio.TimeoutError, json.JSONDecodeError):
+            logger.exception("fetch_twitch_stream error")
+            return []
+        except Exception:
+            logger.exception("fetch_twitch_stream unexpected error")
+            return []
+
+    async def fetch_twitch_game_name(self, game_id: str) -> Optional[str]:
+        if not game_id:
+            return None
+
+        session = await self.get_session()
+        url = "https://api.twitch.tv/helix/games"
+        headers = {
+            "Client-ID": self.twitch_client_id or "",
+            "Authorization": f"Bearer {self.twitch_auth_token or ''}",
+        }
+        params = {"id": game_id}
+
+        try:
+            async with session.get(url, headers=headers, params=params) as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.json(content_type=None)
+                games = data.get("data", [])
+                return games[0].get("name") if games else None
+        except Exception:
+            logger.exception("fetch_twitch_game_name error")
+            return None
+
+    async def build_twitch_embed(self, stream: Dict[str, Any]) -> discord.Embed:
+        try:
+            title = stream.get("title") or "Live auf Twitch"
+            game_name = await self.fetch_twitch_game_name(stream.get("game_id", ""))
+            started_at = stream.get("started_at")
+
+            thumb = (stream.get("thumbnail_url") or "").replace("{width}", "1920").replace("{height}", "1080")
+            url = f"https://twitch.tv/{self.twitch_user_login}"
+
+            embed = discord.Embed(
+                title=f"{self.twitch_user_login} ist live auf Twitch!",
+                description=f"**{title}**\n\nKlicke hier, um zuzuschauen: {url}",
+                color=discord.Color.purple(),
+                url=url,
+            )
+
+            if game_name:
+                embed.add_field(name="Game", value=game_name, inline=True)
+            embed.add_field(name="Status", value="🔴 **Live**", inline=True)
+
+            if started_at:
+                started_display, duration_display = format_stream_times(started_at)
+                embed.add_field(name="Gestartet um", value=started_display, inline=True)
+                embed.add_field(name="Dauer", value=duration_display, inline=True)
+
+            if thumb:
+                embed.set_image(url=thumb)
+
+            embed.set_footer(text="Twitch Announcement")
+            return embed
+        except Exception:
+            logger.exception("build_twitch_embed error")
+            return discord.Embed(
+                title=f"{self.twitch_user_login} ist live auf Twitch!",
+                description="Stream ist live. Klicke hier zum Zuschauen.",
+                color=discord.Color.purple(),
+                url=f"https://twitch.tv/{self.twitch_user_login}",
+            )
+
+    announce_group = app_commands.Group(
+        name="announce",
+        description="Announcement- und Twitch-Settings.",
+    )
+
+    @announce_group.command(name="twitch_channel", description="Setzt den Channel für Twitch-Live-Announcements.")
+    @app_commands.describe(channel="Textkanal")
+    async def set_twitch_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
+        if interaction.guild is None:
+            await interaction.response.send_message("Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True)
+            return
+
+        if not is_announce_staff(interaction.user):
+            await interaction.response.send_message("Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True)
+            return
+
+        data = load_data()
+        g_id = str(interaction.guild.id)
+        data.setdefault(g_id, {})
+
+        cfg = data[g_id].get("_twitch", {})
+        cfg["channel_id"] = channel.id
+        data[g_id]["_twitch"] = cfg
+        save_data(data)
+
+        await interaction.response.send_message(f"Twitch-Announcement-Channel wurde auf {channel.mention} gesetzt.", ephemeral=True)
+
+    @announce_group.command(name="twitch_now", description="Sendet sofort einen Twitch-Live-Announcement, falls du live bist.")
+    async def twitch_announce_now(self, interaction: discord.Interaction):
+        if interaction.guild is None:
+            await interaction.response.send_message("Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True)
+            return
+
+        if not is_announce_staff(interaction.user):
+            await interaction.response.send_message("Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True)
+            return
+
+        if not all([self.twitch_client_id, self.twitch_auth_token, self.twitch_user_login]):
+            await interaction.response.send_message("Twitch API ist nicht korrekt konfiguriert (.env).", ephemeral=True)
+            return
+
+        streams = await self.fetch_twitch_stream()
+        if not streams:
+            await interaction.response.send_message("Du scheinst aktuell nicht live zu sein.", ephemeral=True)
+            return
+
+        stream = streams[0]
+        embed = await self.build_twitch_embed(stream)
+        channel = await self.get_twitch_announce_channel(interaction.guild)
+        if channel is None:
+            await interaction.response.send_message("Es ist kein Twitch-Announcement-Channel gesetzt.", ephemeral=True)
+            return
+
+        try:
+            await channel.send(embed=embed)
+        except (discord.Forbidden, discord.HTTPException):
+            await interaction.response.send_message("Ich konnte im Announcement-Channel nicht senden.", ephemeral=True)
+            return
+
+        await interaction.response.send_message("Twitch-Announcement wurde gesendet.", ephemeral=True)
+
+    @tasks.loop(minutes=2)
+    async def twitch_check_loop(self):
+        await self.bot.wait_until_ready()
+        if not all([self.twitch_client_id, self.twitch_auth_token, self.twitch_user_login]):
+            return
+
+        data = load_data()
+
+        for guild in list(self.bot.guilds):
+            try:
+                g_id = str(guild.id)
+                g_data = data.get(g_id)
+                if not g_data:
+                    continue
+
+                cfg = g_data.get("_twitch", {})
+                channel_id = cfg.get("channel_id")
+                if not channel_id:
+                    continue
+
+                channel = guild.get_channel(channel_id)
+                if not isinstance(channel, discord.TextChannel):
+                    continue
+
+                last_stream_id = cfg.get("last_stream_id")
+
+                streams = await self.fetch_twitch_stream()
+                if not streams:
+                    cfg["last_live"] = False
+                    g_data["_twitch"] = cfg
+                    data[g_id] = g_data
+                    continue
+
+                stream = streams[0]
+                stream_id = stream.get("id")
+
+                if stream_id and stream_id != last_stream_id:
+                    embed = await self.build_twitch_embed(stream)
+                    try:
+                        await channel.send(embed=embed)
+                    except (discord.Forbidden, discord.HTTPException):
+                        logger.exception("Twitch announce send fehlgeschlagen (guild=%s)", guild.id)
+
+                    cfg["last_stream_id"] = stream_id
+                    cfg["last_live"] = True
+                    g_data["_twitch"] = cfg
+                    data[g_id] = g_data
+
+            except Exception:
+                logger.exception("twitch_check_loop guild error (guild=%s)", guild.id)
+                continue
+
+        save_data(data)
+
+    @twitch_check_loop.error
+    async def twitch_check_loop_error(self, error: Exception):
+        logger.exception("Fehler im twitch_check_loop: %r", error)
+
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(AnnouncementCog(bot))

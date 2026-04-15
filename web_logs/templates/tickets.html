@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Tickets</h1>
+
+<form method="get" class="row">
+  <input name="q" placeholder="Suche Ticket-ID / Subject / UserID" value="{{ q }}">
+  <input name="limit" type="number" min="1" max="1000" value="{{ limit }}">
+  <button type="submit">Suchen</button>
+</form>
+
+<div class="table">
+  <div class="thead">
+    <div>Ticket</div><div>Subject</div><div>Status</div><div>UserID</div><div>Updated</div>
+  </div>
+  {% for t in items %}
+  <a class="trow" href="{{ url_for('ticket_detail', ticket_id=t.ticket_id) }}">
+    <div>{{ t.ticket_id }}</div>
+    <div>{{ t.subject }}</div>
+    <div>{{ t.status }}</div>
+    <div>{{ t.creator_user_id }}</div>
+    <div>{{ t.updated_at }}</div>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

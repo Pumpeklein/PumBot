@@ -1,0 +1,29 @@
+{
+    "guilds": {
+        "1441169067326177405": {
+            "channel_id": 1447574095247048784,
+            "last_number": 0,
+            "highscore": 2,
+            "users": {
+                "1145459985132818585": {
+                    "correct": 2,
+                    "fails": 2,
+                    "best_streak": 1,
+                    "current_streak": 0
+                },
+                "921305951636717578": {
+                    "correct": 1,
+                    "fails": 1,
+                    "best_streak": 1,
+                    "current_streak": 0
+                },
+                "447326999929815040": {
+                    "correct": 0,
+                    "fails": 2,
+                    "best_streak": 0,
+                    "current_streak": 0
+                }
+            }
+        }
+    }
+}

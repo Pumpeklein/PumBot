@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Setup (Owner erstellen)</h1>
+<form method="post" class="card">
+  <label>Username</label>
+  <input name="username" required>
+
+  <label>Passwort (min 6 Zeichen)</label>
+  <input name="password" type="password" required minlength="6">
+
+  <button type="submit">Owner erstellen</button>
+</form>
+{% endblock %}

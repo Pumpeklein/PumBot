@@ -1,0 +1,1169 @@
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-14 22:39:11] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-14 22:39:11] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.willkommenCommand
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.willkommenCommand
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-14 22:39:11] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-14 22:39:11] [ERROR] discord_bot: Fehler beim Laden der Extension commands.musicQuizCommand
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 91, in setup_hook
+    await self.load_extension(ext)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 1038, in load_extension
+    raise errors.ExtensionNotFound(name)
+discord.ext.commands.errors.ExtensionNotFound: Extension 'commands.musicQuizCommand' could not be loaded or found.
+[2026-02-14 22:39:11] [ERROR] discord_bot: Fehler beim Laden der Extension commands.musicQuizCommand
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 91, in setup_hook
+    await self.load_extension(ext)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 1038, in load_extension
+    raise errors.ExtensionNotFound(name)
+discord.ext.commands.errors.ExtensionNotFound: Extension 'commands.musicQuizCommand' could not be loaded or found.
+[2026-02-14 22:39:11] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (11 Commands).
+[2026-02-14 22:39:11] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (11 Commands).
+[2026-02-14 22:39:14] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-14 22:39:14] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-14 22:39:14] [INFO] discord_bot: Bot ist bereit.
+[2026-02-14 22:39:14] [INFO] discord_bot: Bot ist bereit.
+[2026-02-14 22:42:22] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-14 22:42:22] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-14 22:42:22] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-14 22:42:22] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-14 22:42:22] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-14 22:42:22] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-14 22:42:22] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-14 22:42:22] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-14 22:42:22] [INFO] discord_bot: Extension geladen: commands.willkommenCommand
+[2026-02-14 22:42:22] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-14 22:42:22] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-14 22:42:22] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-14 22:42:22] [ERROR] discord_bot: Fehler beim Laden der Extension commands.musicQuizCommand
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 96, in setup_hook
+    await self.load_extension(ext)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 1038, in load_extension
+    raise errors.ExtensionNotFound(name)
+discord.ext.commands.errors.ExtensionNotFound: Extension 'commands.musicQuizCommand' could not be loaded or found.
+[2026-02-14 22:42:22] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (11 Commands).
+[2026-02-14 22:42:24] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-14 22:42:24] [INFO] discord_bot: Bot ist bereit.
+[2026-02-14 22:43:05] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-14 22:43:05] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-14 22:43:05] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-14 22:43:05] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-14 22:43:05] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-14 22:43:05] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-14 22:43:05] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-14 22:43:05] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-14 22:43:05] [INFO] discord_bot: Extension geladen: commands.willkommenCommand
+[2026-02-14 22:43:05] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-14 22:43:05] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-14 22:43:05] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-14 22:43:05] [ERROR] discord_bot: Fehler beim Laden der Extension commands.musicQuizCommand
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 96, in setup_hook
+    await self.load_extension(ext)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 1038, in load_extension
+    raise errors.ExtensionNotFound(name)
+discord.ext.commands.errors.ExtensionNotFound: Extension 'commands.musicQuizCommand' could not be loaded or found.
+[2026-02-14 22:43:05] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (11 Commands).
+[2026-02-14 22:43:07] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-14 22:43:07] [INFO] discord_bot: Bot ist bereit.
+[2026-02-14 22:45:49] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-14 22:45:49] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-14 22:45:49] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-14 22:45:49] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-14 22:45:49] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-14 22:45:49] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-14 22:45:49] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-14 22:45:49] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-14 22:45:49] [INFO] discord_bot: Extension geladen: commands.willkommenCommand
+[2026-02-14 22:45:49] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-14 22:45:49] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-14 22:45:49] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-14 22:45:50] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (11 Commands).
+[2026-02-14 22:45:52] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-14 22:45:52] [INFO] discord_bot: Bot ist bereit.
+[2026-02-14 22:47:07] [ERROR] discord_bot: HelpCategorySelect callback error
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 106, in callback
+    await interaction.response.edit_message(embed=embed, view=self.view)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1207, in edit_message
+    response = await adapter.create_interaction_response(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\webhook\async_.py", line 226, in request
+    raise HTTPException(response, data)
+discord.errors.HTTPException: 400 Bad Request (error code: 50035): Invalid Form Body
+In data.embeds.0.fields.0.value: Must be 1024 or fewer in length.
+[2026-02-14 22:47:22] [ERROR] discord_bot: HelpCategorySelect callback error
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 106, in callback
+    await interaction.response.edit_message(embed=embed, view=self.view)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1207, in edit_message
+    response = await adapter.create_interaction_response(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\webhook\async_.py", line 226, in request
+    raise HTTPException(response, data)
+discord.errors.HTTPException: 400 Bad Request (error code: 50035): Invalid Form Body
+In data.embeds.0.fields.0.value: Must be 1024 or fewer in length.
+[2026-02-14 22:56:17] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-14 22:56:17] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-14 22:56:17] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-14 22:56:17] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-14 22:56:17] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-14 22:56:17] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-14 22:56:17] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-14 22:56:17] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-14 22:56:17] [INFO] discord_bot: Extension geladen: commands.willkommenCommand
+[2026-02-14 22:56:17] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-14 22:56:17] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-14 22:56:17] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-14 22:56:17] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (11 Commands).
+[2026-02-14 22:56:20] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-14 22:56:20] [INFO] discord_bot: Bot ist bereit.
+[2026-02-14 23:03:01] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-14 23:03:01] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-14 23:03:01] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-14 23:03:01] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-14 23:03:01] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-14 23:03:01] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-14 23:03:01] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-14 23:03:01] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-14 23:03:01] [INFO] discord_bot: Extension geladen: commands.willkommenCommand
+[2026-02-14 23:03:01] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-14 23:03:01] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-14 23:03:01] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-14 23:03:02] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (11 Commands).
+[2026-02-14 23:03:04] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-14 23:03:04] [INFO] discord_bot: Bot ist bereit.
+[2026-02-14 23:07:19] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-14 23:07:19] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-14 23:07:19] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-14 23:07:19] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-14 23:07:19] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-14 23:07:19] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-14 23:07:19] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-14 23:07:19] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-14 23:07:19] [INFO] discord_bot: Extension geladen: commands.willkommenCommand
+[2026-02-14 23:07:19] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-14 23:07:19] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-14 23:07:19] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-14 23:07:19] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (11 Commands).
+[2026-02-14 23:07:22] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-14 23:07:22] [INFO] discord_bot: Bot ist bereit.
+[2026-02-14 23:41:00] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-14 23:41:00] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-14 23:41:00] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-14 23:41:00] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-14 23:41:00] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-14 23:41:00] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-14 23:41:00] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-14 23:41:00] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-14 23:41:00] [INFO] discord_bot: Extension geladen: commands.willkommenCommand
+[2026-02-14 23:41:00] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-14 23:41:00] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-14 23:41:00] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-14 23:41:00] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (12 Commands).
+[2026-02-14 23:41:03] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-14 23:41:03] [INFO] discord_bot: Bot ist bereit.
+[2026-02-14 23:42:52] [ERROR] discord_bot: faq_cmd error
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 415, in faq_cmd
+    await send_response(interaction, embed=embed, view=None, public=public)
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 44, in send_response
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=ephemeral)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1060, in send_message
+    if view is not MISSING and not view.is_finished():
+                                   ^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'is_finished'
+[2026-02-14 23:42:52] [ERROR] discord_bot: faq_cmd followup error
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 415, in faq_cmd
+    await send_response(interaction, embed=embed, view=None, public=public)
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 44, in send_response
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=ephemeral)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1060, in send_message
+    if view is not MISSING and not view.is_finished():
+                                   ^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'is_finished'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 440, in faq_cmd
+    await interaction.response.send_message("Fehler beim Anzeigen der FAQ.", ephemeral=True)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1051, in send_message
+    response = await adapter.create_interaction_response(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\webhook\async_.py", line 226, in request
+    raise HTTPException(response, data)
+discord.errors.HTTPException: 400 Bad Request (error code: 40060): Interaction has already been acknowledged.
+[2026-02-14 23:43:11] [ERROR] discord_bot: faq_cmd error
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 415, in faq_cmd
+    await send_response(interaction, embed=embed, view=None, public=public)
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 44, in send_response
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=ephemeral)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1060, in send_message
+    if view is not MISSING and not view.is_finished():
+                                   ^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'is_finished'
+[2026-02-14 23:43:11] [ERROR] discord_bot: faq_cmd followup error
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 415, in faq_cmd
+    await send_response(interaction, embed=embed, view=None, public=public)
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 44, in send_response
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=ephemeral)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1060, in send_message
+    if view is not MISSING and not view.is_finished():
+                                   ^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'is_finished'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 440, in faq_cmd
+    await interaction.response.send_message("Fehler beim Anzeigen der FAQ.", ephemeral=True)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1051, in send_message
+    response = await adapter.create_interaction_response(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\webhook\async_.py", line 226, in request
+    raise HTTPException(response, data)
+discord.errors.HTTPException: 400 Bad Request (error code: 40060): Interaction has already been acknowledged.
+[2026-02-14 23:43:20] [ERROR] discord_bot: faq_cmd error
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 415, in faq_cmd
+    await send_response(interaction, embed=embed, view=None, public=public)
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 44, in send_response
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=ephemeral)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1060, in send_message
+    if view is not MISSING and not view.is_finished():
+                                   ^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'is_finished'
+[2026-02-14 23:43:20] [ERROR] discord_bot: faq_cmd followup error
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 415, in faq_cmd
+    await send_response(interaction, embed=embed, view=None, public=public)
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 44, in send_response
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=ephemeral)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1060, in send_message
+    if view is not MISSING and not view.is_finished():
+                                   ^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'is_finished'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 440, in faq_cmd
+    await interaction.response.send_message("Fehler beim Anzeigen der FAQ.", ephemeral=True)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1051, in send_message
+    response = await adapter.create_interaction_response(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\webhook\async_.py", line 226, in request
+    raise HTTPException(response, data)
+discord.errors.HTTPException: 400 Bad Request (error code: 40060): Interaction has already been acknowledged.
+[2026-02-14 23:44:10] [ERROR] discord_bot: faq_cmd error
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 415, in faq_cmd
+    await send_response(interaction, embed=embed, view=None, public=public)
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 44, in send_response
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=ephemeral)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1060, in send_message
+    if view is not MISSING and not view.is_finished():
+                                   ^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'is_finished'
+[2026-02-14 23:44:10] [ERROR] discord_bot: faq_cmd followup error
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 415, in faq_cmd
+    await send_response(interaction, embed=embed, view=None, public=public)
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 44, in send_response
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=ephemeral)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1060, in send_message
+    if view is not MISSING and not view.is_finished():
+                                   ^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'is_finished'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 440, in faq_cmd
+    await interaction.response.send_message("Fehler beim Anzeigen der FAQ.", ephemeral=True)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1051, in send_message
+    response = await adapter.create_interaction_response(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\webhook\async_.py", line 226, in request
+    raise HTTPException(response, data)
+discord.errors.HTTPException: 400 Bad Request (error code: 40060): Interaction has already been acknowledged.
+[2026-02-14 23:44:15] [ERROR] discord_bot: faq_cmd error
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 415, in faq_cmd
+    await send_response(interaction, embed=embed, view=None, public=public)
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 44, in send_response
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=ephemeral)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1060, in send_message
+    if view is not MISSING and not view.is_finished():
+                                   ^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'is_finished'
+[2026-02-14 23:44:16] [ERROR] discord_bot: faq_cmd followup error
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 415, in faq_cmd
+    await send_response(interaction, embed=embed, view=None, public=public)
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 44, in send_response
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=ephemeral)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1060, in send_message
+    if view is not MISSING and not view.is_finished():
+                                   ^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'is_finished'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 440, in faq_cmd
+    await interaction.response.send_message("Fehler beim Anzeigen der FAQ.", ephemeral=True)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1051, in send_message
+    response = await adapter.create_interaction_response(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\webhook\async_.py", line 226, in request
+    raise HTTPException(response, data)
+discord.errors.HTTPException: 400 Bad Request (error code: 40060): Interaction has already been acknowledged.
+[2026-02-14 23:58:04] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-14 23:58:04] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-14 23:58:04] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-14 23:58:04] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-14 23:58:04] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-14 23:58:04] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-14 23:58:04] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-14 23:58:04] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-14 23:58:04] [INFO] discord_bot: Extension geladen: commands.willkommenCommand
+[2026-02-14 23:58:04] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-14 23:58:04] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-14 23:58:04] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-14 23:58:04] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (12 Commands).
+[2026-02-14 23:58:07] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-14 23:58:07] [INFO] discord_bot: Bot ist bereit.
+[2026-02-15 00:09:12] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-15 00:09:12] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-15 00:09:12] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-15 00:09:12] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-15 00:09:12] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-15 00:09:12] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-15 00:09:12] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 00:09:12] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-15 00:09:12] [INFO] discord_bot: Extension geladen: commands.willkommenCommand
+[2026-02-15 00:09:12] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-15 00:09:12] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-15 00:09:12] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-15 00:09:12] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (12 Commands).
+[2026-02-15 00:09:14] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-15 00:09:14] [INFO] discord_bot: Bot ist bereit.
+[2026-02-15 00:20:48] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-15 00:20:48] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-15 00:20:48] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-15 00:20:48] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-15 00:20:48] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-15 00:20:48] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-15 00:20:48] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 00:20:48] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-15 00:20:48] [INFO] discord_bot: Extension geladen: commands.willkommenCommand
+[2026-02-15 00:20:48] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-15 00:20:48] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-15 00:20:48] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-15 00:20:48] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (12 Commands).
+[2026-02-15 00:20:51] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-15 00:20:51] [INFO] discord_bot: Bot ist bereit.
+[2026-02-15 00:26:49] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-15 00:26:49] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-15 00:26:49] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-15 00:26:49] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-15 00:26:49] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-15 00:26:49] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-15 00:26:49] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 00:26:49] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-15 00:26:49] [INFO] discord_bot: Extension geladen: commands.willkommenCommand
+[2026-02-15 00:26:49] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-15 00:26:49] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-15 00:26:49] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-15 00:26:49] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (12 Commands).
+[2026-02-15 00:26:52] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-15 00:26:52] [INFO] discord_bot: Bot ist bereit.
+[2026-02-15 00:47:47] [WARNING] discord_bot: warnings.json ist kaputt/leer -> starte mit {}
+[2026-02-15 01:58:58] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-15 01:58:58] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-15 01:58:58] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-15 01:58:58] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-15 01:58:58] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-15 01:58:58] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-15 01:58:58] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 01:58:58] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-15 01:58:58] [INFO] discord_bot: Extension geladen: commands.willkommenCommand
+[2026-02-15 01:58:58] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-15 01:58:58] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-15 01:58:58] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-15 01:58:58] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (12 Commands).
+[2026-02-15 01:59:00] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-15 01:59:00] [INFO] discord_bot: Bot ist bereit.
+[2026-02-15 02:10:36] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-15 02:10:36] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-15 02:10:36] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-15 02:10:36] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-15 02:10:36] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-15 02:10:36] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-15 02:10:36] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 02:10:36] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-15 02:10:36] [INFO] discord_bot: WelcomeCog geladen.
+[2026-02-15 02:10:36] [INFO] discord_bot: Extension geladen: commands.willkommenCommand
+[2026-02-15 02:10:36] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-15 02:10:36] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-15 02:10:36] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-15 02:10:37] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (12 Commands).
+[2026-02-15 02:10:39] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-15 02:10:39] [INFO] discord_bot: Bot ist bereit.
+[2026-02-15 02:14:29] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-15 02:14:29] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-15 02:14:29] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-15 02:14:29] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-15 02:14:29] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-15 02:14:29] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-15 02:14:29] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 02:14:29] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-15 02:14:29] [ERROR] discord_bot: Fehler beim Laden der Extension commands.willkommenCommand
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 968, in _load_from_module_spec
+    setup = getattr(lib, 'setup')
+            ^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'commands.willkommenCommand' has no attribute 'setup'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 98, in setup_hook
+    await self.load_extension(ext)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 1040, in load_extension
+    await self._load_from_module_spec(spec, name)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 971, in _load_from_module_spec
+    raise errors.NoEntryPointError(key)
+discord.ext.commands.errors.NoEntryPointError: Extension 'commands.willkommenCommand' has no 'setup' function.
+[2026-02-15 02:14:29] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-15 02:14:29] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-15 02:14:29] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-15 02:14:29] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (11 Commands).
+[2026-02-15 02:14:32] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-15 02:14:32] [INFO] discord_bot: Bot ist bereit.
+[2026-02-15 02:15:14] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-15 02:15:14] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-15 02:15:14] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-15 02:15:14] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-15 02:15:14] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-15 02:15:14] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-15 02:15:14] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 02:15:14] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-15 02:15:14] [ERROR] discord_bot: Fehler beim Laden der Extension commands.willkommenCommand
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 968, in _load_from_module_spec
+    setup = getattr(lib, 'setup')
+            ^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'commands.willkommenCommand' has no attribute 'setup'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 98, in setup_hook
+    await self.load_extension(ext)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 1040, in load_extension
+    await self._load_from_module_spec(spec, name)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 971, in _load_from_module_spec
+    raise errors.NoEntryPointError(key)
+discord.ext.commands.errors.NoEntryPointError: Extension 'commands.willkommenCommand' has no 'setup' function.
+[2026-02-15 02:15:14] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-15 02:15:14] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-15 02:15:14] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-15 02:15:14] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (11 Commands).
+[2026-02-15 02:15:16] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-15 02:15:16] [INFO] discord_bot: Bot ist bereit.
+[2026-02-15 02:15:34] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-15 02:15:34] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-15 02:15:34] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-15 02:15:34] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-15 02:15:34] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-15 02:15:34] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-15 02:15:34] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 02:15:34] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-15 02:15:34] [ERROR] discord_bot: Fehler beim Laden der Extension commands.willkommenCommand
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 968, in _load_from_module_spec
+    setup = getattr(lib, 'setup')
+            ^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'commands.willkommenCommand' has no attribute 'setup'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 98, in setup_hook
+    await self.load_extension(ext)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 1040, in load_extension
+    await self._load_from_module_spec(spec, name)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 971, in _load_from_module_spec
+    raise errors.NoEntryPointError(key)
+discord.ext.commands.errors.NoEntryPointError: Extension 'commands.willkommenCommand' has no 'setup' function.
+[2026-02-15 02:15:34] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-15 02:15:34] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-15 02:15:34] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-15 02:15:53] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-15 02:15:53] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-15 02:15:53] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-15 02:15:53] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-15 02:15:53] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-15 02:15:53] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-15 02:15:53] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 02:15:53] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-15 02:15:53] [ERROR] discord_bot: Fehler beim Laden der Extension commands.willkommenCommand
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 968, in _load_from_module_spec
+    setup = getattr(lib, 'setup')
+            ^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'commands.willkommenCommand' has no attribute 'setup'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 98, in setup_hook
+    await self.load_extension(ext)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 1040, in load_extension
+    await self._load_from_module_spec(spec, name)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 971, in _load_from_module_spec
+    raise errors.NoEntryPointError(key)
+discord.ext.commands.errors.NoEntryPointError: Extension 'commands.willkommenCommand' has no 'setup' function.
+[2026-02-15 02:15:53] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-15 02:15:53] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-15 02:15:53] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-15 02:16:20] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-15 02:16:20] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-15 02:16:20] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-15 02:16:20] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-15 02:16:20] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-15 02:16:20] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-15 02:16:20] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 02:16:20] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-15 02:16:20] [INFO] discord_bot: WelcomeCog geladen.
+[2026-02-15 02:16:20] [INFO] discord_bot: Extension geladen: commands.willkommenCommand
+[2026-02-15 02:16:20] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-15 02:16:20] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-15 02:16:20] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-15 02:17:03] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-15 02:17:03] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-15 02:17:03] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-15 02:17:03] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-15 02:17:03] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-15 02:17:03] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-15 02:17:03] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 02:17:03] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-15 02:17:03] [INFO] discord_bot: Extension geladen: commands.willkommenCommand
+[2026-02-15 02:17:03] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-15 02:17:03] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-15 02:17:03] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-15 02:17:44] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (12 Commands).
+[2026-02-15 02:17:46] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-15 02:17:46] [INFO] discord_bot: Bot ist bereit.
+[2026-02-15 02:33:53] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-15 02:33:53] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-15 02:33:53] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-15 02:33:53] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-15 02:33:53] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-15 02:33:53] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-15 02:33:53] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 02:33:53] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-15 02:33:53] [INFO] discord_bot: Extension geladen: commands.willkommenCommand
+[2026-02-15 02:33:53] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-15 02:33:53] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-15 02:33:53] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-15 02:34:53] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (12 Commands).
+[2026-02-15 02:34:55] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-15 02:34:55] [INFO] discord_bot: Bot ist bereit.
+[2026-02-15 02:36:02] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-15 02:36:02] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-15 02:36:02] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-15 02:36:02] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-15 02:36:02] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-15 02:36:02] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-15 02:36:02] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 02:36:02] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-15 02:36:02] [INFO] discord_bot: Extension geladen: commands.willkommenCommand
+[2026-02-15 02:36:02] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-15 02:36:02] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-15 02:36:02] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-15 02:37:02] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (12 Commands).
+[2026-02-15 02:37:04] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-15 02:37:04] [INFO] discord_bot: Bot ist bereit.
+[2026-02-15 02:42:15] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-15 02:42:15] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-15 02:42:15] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-15 02:42:15] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-15 02:42:15] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-15 02:42:15] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-15 02:42:15] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 02:42:15] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-15 02:42:15] [INFO] discord_bot: Extension geladen: commands.willkommenCommand
+[2026-02-15 02:42:15] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-15 02:42:15] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-15 02:42:15] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-15 02:42:15] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (12 Commands).
+[2026-02-15 02:42:18] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-15 02:42:18] [INFO] discord_bot: Bot ist bereit.
+[2026-02-15 02:50:09] [INFO] discord_bot: Extension geladen: commands.announcmentCommand
+[2026-02-15 02:50:09] [INFO] discord_bot: Extension geladen: commands.birthdayCommand
+[2026-02-15 02:50:09] [INFO] discord_bot: Extension geladen: commands.selfrolesCommand
+[2026-02-15 02:50:09] [INFO] discord_bot: Extension geladen: commands.TicketSystemCommand
+[2026-02-15 02:50:09] [INFO] discord_bot: Extension geladen: commands.userManagementCommand
+[2026-02-15 02:50:09] [INFO] discord_bot: Extension geladen: commands.deleteCommand
+[2026-02-15 02:50:09] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 02:50:09] [INFO] discord_bot: Extension geladen: commands.helpCommand
+[2026-02-15 02:50:09] [INFO] discord_bot: Extension geladen: commands.willkommenCommand
+[2026-02-15 02:50:09] [INFO] discord_bot: Extension geladen: commands.autoPublisherCommand
+[2026-02-15 02:50:09] [INFO] discord_bot: Extension geladen: commands.serverStatsCommand
+[2026-02-15 02:50:09] [INFO] discord_bot: Extension geladen: commands.countingCommand
+[2026-02-15 02:50:09] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (12 Commands).
+[2026-02-15 02:50:11] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-15 02:50:11] [INFO] discord_bot: Bot ist bereit.
+[2026-02-15 02:51:46] [ERROR] discord_bot: faq_cmd error
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 485, in faq_cmd
+    await send_or_edit(interaction, content=ping_content, embed=embed, view=None, public=public, edit=False)
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 107, in send_or_edit
+    await interaction.response.send_message(content=content, embed=embed, view=view, ephemeral=ephemeral)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1060, in send_message
+    if view is not MISSING and not view.is_finished():
+                                   ^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'is_finished'
+[2026-02-15 02:51:46] [ERROR] discord_bot: faq_cmd followup error
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 485, in faq_cmd
+    await send_or_edit(interaction, content=ping_content, embed=embed, view=None, public=public, edit=False)
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 107, in send_or_edit
+    await interaction.response.send_message(content=content, embed=embed, view=view, ephemeral=ephemeral)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1060, in send_message
+    if view is not MISSING and not view.is_finished():
+                                   ^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'is_finished'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 509, in faq_cmd
+    await interaction.response.send_message("Fehler beim Anzeigen der FAQ.", ephemeral=True)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1051, in send_message
+    response = await adapter.create_interaction_response(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\webhook\async_.py", line 226, in request
+    raise HTTPException(response, data)
+discord.errors.HTTPException: 400 Bad Request (error code: 40060): Interaction has already been acknowledged.
+[2026-02-15 02:52:21] [ERROR] discord_bot: faq_cmd error
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 485, in faq_cmd
+    await send_or_edit(interaction, content=ping_content, embed=embed, view=None, public=public, edit=False)
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 107, in send_or_edit
+    await interaction.response.send_message(content=content, embed=embed, view=view, ephemeral=ephemeral)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1060, in send_message
+    if view is not MISSING and not view.is_finished():
+                                   ^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'is_finished'
+[2026-02-15 02:52:21] [ERROR] discord_bot: faq_cmd followup error
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 485, in faq_cmd
+    await send_or_edit(interaction, content=ping_content, embed=embed, view=None, public=public, edit=False)
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 107, in send_or_edit
+    await interaction.response.send_message(content=content, embed=embed, view=view, ephemeral=ephemeral)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1060, in send_message
+    if view is not MISSING and not view.is_finished():
+                                   ^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'is_finished'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 509, in faq_cmd
+    await interaction.response.send_message("Fehler beim Anzeigen der FAQ.", ephemeral=True)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1051, in send_message
+    response = await adapter.create_interaction_response(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\webhook\async_.py", line 226, in request
+    raise HTTPException(response, data)
+discord.errors.HTTPException: 400 Bad Request (error code: 40060): Interaction has already been acknowledged.
+[2026-02-15 02:52:48] [ERROR] discord_bot: faq_cmd error
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 485, in faq_cmd
+    await send_or_edit(interaction, content=ping_content, embed=embed, view=None, public=public, edit=False)
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 107, in send_or_edit
+    await interaction.response.send_message(content=content, embed=embed, view=view, ephemeral=ephemeral)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1060, in send_message
+    if view is not MISSING and not view.is_finished():
+                                   ^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'is_finished'
+[2026-02-15 02:52:48] [ERROR] discord_bot: faq_cmd followup error
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 485, in faq_cmd
+    await send_or_edit(interaction, content=ping_content, embed=embed, view=None, public=public, edit=False)
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 107, in send_or_edit
+    await interaction.response.send_message(content=content, embed=embed, view=view, ephemeral=ephemeral)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1060, in send_message
+    if view is not MISSING and not view.is_finished():
+                                   ^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'is_finished'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 509, in faq_cmd
+    await interaction.response.send_message("Fehler beim Anzeigen der FAQ.", ephemeral=True)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1051, in send_message
+    response = await adapter.create_interaction_response(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\webhook\async_.py", line 226, in request
+    raise HTTPException(response, data)
+discord.errors.HTTPException: 400 Bad Request (error code: 40060): Interaction has already been acknowledged.
+[2026-02-15 02:53:15] [ERROR] discord_bot: faq_cmd error
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 485, in faq_cmd
+    await send_or_edit(interaction, content=ping_content, embed=embed, view=None, public=public, edit=False)
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 107, in send_or_edit
+    await interaction.response.send_message(content=content, embed=embed, view=view, ephemeral=ephemeral)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1060, in send_message
+    if view is not MISSING and not view.is_finished():
+                                   ^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'is_finished'
+[2026-02-15 02:53:15] [ERROR] discord_bot: faq_cmd followup error
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 485, in faq_cmd
+    await send_or_edit(interaction, content=ping_content, embed=embed, view=None, public=public, edit=False)
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 107, in send_or_edit
+    await interaction.response.send_message(content=content, embed=embed, view=view, ephemeral=ephemeral)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1060, in send_message
+    if view is not MISSING and not view.is_finished():
+                                   ^^^^^^^^^^^^^^^^
+AttributeError: 'NoneType' object has no attribute 'is_finished'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\helpCommand.py", line 509, in faq_cmd
+    await interaction.response.send_message("Fehler beim Anzeigen der FAQ.", ephemeral=True)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\interactions.py", line 1051, in send_message
+    response = await adapter.create_interaction_response(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\webhook\async_.py", line 226, in request
+    raise HTTPException(response, data)
+discord.errors.HTTPException: 400 Bad Request (error code: 40060): Interaction has already been acknowledged.
+[2026-02-15 03:03:07] [INFO] discord_bot: Extension geladen: src.mypackage.commands.announcmentCommand
+[2026-02-15 03:03:07] [INFO] discord_bot: Extension geladen: src.mypackage.commands.birthdayCommand
+[2026-02-15 03:03:07] [INFO] discord_bot: Extension geladen: src.mypackage.commands.selfrolesCommand
+[2026-02-15 03:03:07] [INFO] discord_bot: Extension geladen: src.mypackage.commands.TicketSystemCommand
+[2026-02-15 03:03:07] [INFO] discord_bot: Extension geladen: src.mypackage.commands.userManagementCommand
+[2026-02-15 03:03:07] [INFO] discord_bot: Extension geladen: src.mypackage.commands.deleteCommand
+[2026-02-15 03:03:07] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 03:03:07] [INFO] discord_bot: Extension geladen: src.mypackage.commands.helpCommand
+[2026-02-15 03:03:07] [INFO] discord_bot: Extension geladen: src.mypackage.commands.willkommenCommand
+[2026-02-15 03:03:07] [INFO] discord_bot: Extension geladen: src.mypackage.commands.autoPublisherCommand
+[2026-02-15 03:03:07] [INFO] discord_bot: Extension geladen: src.mypackage.commands.serverStatsCommand
+[2026-02-15 03:03:07] [INFO] discord_bot: Extension geladen: src.mypackage.commands.countingCommand
+[2026-02-15 03:03:07] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (0 Commands).
+[2026-02-15 03:03:10] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-15 03:03:10] [INFO] discord_bot: Bot ist bereit.
+[2026-02-15 03:06:57] [INFO] discord_bot: Extension geladen: src.mypackage.commands.announcmentCommand
+[2026-02-15 03:06:57] [INFO] discord_bot: Extension geladen: src.mypackage.commands.birthdayCommand
+[2026-02-15 03:06:57] [INFO] discord_bot: Extension geladen: src.mypackage.commands.selfrolesCommand
+[2026-02-15 03:06:57] [INFO] discord_bot: Extension geladen: src.mypackage.commands.TicketSystemCommand
+[2026-02-15 03:06:57] [INFO] discord_bot: Extension geladen: src.mypackage.commands.userManagementCommand
+[2026-02-15 03:06:57] [INFO] discord_bot: Extension geladen: src.mypackage.commands.deleteCommand
+[2026-02-15 03:06:57] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 03:06:57] [INFO] discord_bot: Extension geladen: src.mypackage.commands.helpCommand
+[2026-02-15 03:06:57] [INFO] discord_bot: Extension geladen: src.mypackage.commands.willkommenCommand
+[2026-02-15 03:06:57] [INFO] discord_bot: Extension geladen: src.mypackage.commands.autoPublisherCommand
+[2026-02-15 03:06:57] [INFO] discord_bot: Extension geladen: src.mypackage.commands.serverStatsCommand
+[2026-02-15 03:06:57] [INFO] discord_bot: Extension geladen: src.mypackage.commands.countingCommand
+[2026-02-15 03:06:57] [INFO] discord_bot: Slash-Commands mit Guild 1441169067326177405 synchronisiert (0 Commands).
+[2026-02-15 03:07:00] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-15 03:07:00] [INFO] discord_bot: Bot ist bereit.
+[2026-02-15 03:11:45] [INFO] discord_bot: Globale Slash-Commands entfernt (Cleanup).
+[2026-02-15 03:11:45] [INFO] discord_bot: Extension geladen: src.mypackage.commands.announcmentCommand
+[2026-02-15 03:11:45] [INFO] discord_bot: Extension geladen: src.mypackage.commands.birthdayCommand
+[2026-02-15 03:11:45] [INFO] discord_bot: Extension geladen: src.mypackage.commands.selfrolesCommand
+[2026-02-15 03:11:45] [INFO] discord_bot: Extension geladen: src.mypackage.commands.TicketSystemCommand
+[2026-02-15 03:11:45] [INFO] discord_bot: Extension geladen: src.mypackage.commands.userManagementCommand
+[2026-02-15 03:11:45] [INFO] discord_bot: Extension geladen: src.mypackage.commands.deleteCommand
+[2026-02-15 03:11:45] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 03:11:45] [INFO] discord_bot: Extension geladen: src.mypackage.commands.helpCommand
+[2026-02-15 03:11:45] [INFO] discord_bot: Extension geladen: src.mypackage.commands.willkommenCommand
+[2026-02-15 03:11:45] [INFO] discord_bot: Extension geladen: src.mypackage.commands.autoPublisherCommand
+[2026-02-15 03:11:45] [INFO] discord_bot: Extension geladen: src.mypackage.commands.serverStatsCommand
+[2026-02-15 03:11:45] [INFO] discord_bot: Extension geladen: src.mypackage.commands.countingCommand
+[2026-02-15 03:12:19] [INFO] discord_bot: Globale Slash-Commands entfernt (Cleanup).
+[2026-02-15 03:12:19] [INFO] discord_bot: Extension geladen: src.mypackage.commands.announcmentCommand
+[2026-02-15 03:12:19] [INFO] discord_bot: Extension geladen: src.mypackage.commands.birthdayCommand
+[2026-02-15 03:12:19] [INFO] discord_bot: Extension geladen: src.mypackage.commands.selfrolesCommand
+[2026-02-15 03:12:19] [INFO] discord_bot: Extension geladen: src.mypackage.commands.TicketSystemCommand
+[2026-02-15 03:12:19] [INFO] discord_bot: Extension geladen: src.mypackage.commands.userManagementCommand
+[2026-02-15 03:12:19] [INFO] discord_bot: Extension geladen: src.mypackage.commands.deleteCommand
+[2026-02-15 03:12:19] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 03:12:19] [INFO] discord_bot: Extension geladen: src.mypackage.commands.helpCommand
+[2026-02-15 03:12:19] [INFO] discord_bot: Extension geladen: src.mypackage.commands.willkommenCommand
+[2026-02-15 03:12:19] [INFO] discord_bot: Extension geladen: src.mypackage.commands.autoPublisherCommand
+[2026-02-15 03:12:19] [INFO] discord_bot: Extension geladen: src.mypackage.commands.serverStatsCommand
+[2026-02-15 03:12:19] [INFO] discord_bot: Extension geladen: src.mypackage.commands.countingCommand
+[2026-02-15 03:13:11] [INFO] discord_bot: Globale Slash-Commands entfernt (Cleanup).
+[2026-02-15 03:13:11] [INFO] discord_bot: Extension geladen: src.mypackage.commands.announcmentCommand
+[2026-02-15 03:13:11] [INFO] discord_bot: Extension geladen: src.mypackage.commands.birthdayCommand
+[2026-02-15 03:13:11] [INFO] discord_bot: Extension geladen: src.mypackage.commands.selfrolesCommand
+[2026-02-15 03:13:11] [INFO] discord_bot: Extension geladen: src.mypackage.commands.TicketSystemCommand
+[2026-02-15 03:13:11] [INFO] discord_bot: Extension geladen: src.mypackage.commands.userManagementCommand
+[2026-02-15 03:13:11] [INFO] discord_bot: Extension geladen: src.mypackage.commands.deleteCommand
+[2026-02-15 03:13:11] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 03:13:11] [INFO] discord_bot: Extension geladen: src.mypackage.commands.helpCommand
+[2026-02-15 03:13:11] [INFO] discord_bot: Extension geladen: src.mypackage.commands.willkommenCommand
+[2026-02-15 03:13:11] [INFO] discord_bot: Extension geladen: src.mypackage.commands.autoPublisherCommand
+[2026-02-15 03:13:11] [INFO] discord_bot: Extension geladen: src.mypackage.commands.serverStatsCommand
+[2026-02-15 03:13:11] [INFO] discord_bot: Extension geladen: src.mypackage.commands.countingCommand
+[2026-02-15 03:14:34] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 03:14:35] [INFO] discord_bot: Guild-Sync fertig (12 Commands).
+[2026-02-15 03:14:37] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-15 03:15:56] [WARNING] discord_bot: validate_twitch_username: HTTP 400 – {"error":"Bad Request","status":400,"message":"Invalid username(s), email(s), or ID(s). Bad Identifiers."}
+[2026-02-15 06:27:23] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 06:27:23] [INFO] discord_bot: Guild-Sync fertig (12 Commands).
+[2026-02-15 06:27:26] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-15 07:03:37] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 07:03:37] [INFO] discord_bot: Guild-Sync fertig (13 Commands).
+[2026-02-15 07:03:40] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-15 07:13:12] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-15 07:13:12] [INFO] discord_bot: Guild-Sync fertig (13 Commands).
+[2026-02-15 07:13:15] [INFO] discord_bot: Eingeloggt als PumpeBot#4933 (1362697161598304439)
+[2026-02-16 07:12:21] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-16 07:12:21] [ERROR] discord_bot: Bot-Start fehlgeschlagen
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 135, in main
+    await bot.start(TOKEN)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 846, in start
+    await self.login(token)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 689, in login
+    await self.setup_hook()
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 100, in setup_hook
+    self.add_view(TicketPanelView(self))
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 3148, in add_view
+    raise ValueError('View is not persistent. Items need to have a custom_id set and View must have no timeout')
+ValueError: View is not persistent. Items need to have a custom_id set and View must have no timeout
+[2026-02-16 07:14:32] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-16 07:14:32] [ERROR] discord_bot: Bot-Start fehlgeschlagen
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 135, in main
+    await bot.start(TOKEN)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 846, in start
+    await self.login(token)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 689, in login
+    await self.setup_hook()
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 100, in setup_hook
+    self.add_view(TicketPanelView(self))
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 3148, in add_view
+    raise ValueError('View is not persistent. Items need to have a custom_id set and View must have no timeout')
+ValueError: View is not persistent. Items need to have a custom_id set and View must have no timeout
+[2026-02-16 07:19:35] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-16 07:19:36] [INFO] discord_bot: Guild-Sync fertig (12 Commands).
+[2026-02-16 07:19:36] [ERROR] discord_bot: Bot-Start fehlgeschlagen
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 135, in main
+    await bot.start(TOKEN)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 847, in start
+    await self.connect(reconnect=reconnect)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 771, in connect
+    raise PrivilegedIntentsRequired(exc.shard_id) from None
+discord.errors.PrivilegedIntentsRequired: Shard ID None is requesting privileged intents that have not been explicitly enabled in the developer portal. It is recommended to go to https://discord.com/developers/applications/ and explicitly enable the privileged intents within your application's page. If this is not possible, then consider disabling the privileged intents instead.
+[2026-02-16 07:21:05] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-16 07:21:05] [INFO] discord_bot: Guild-Sync fertig (12 Commands).
+[2026-02-16 07:21:08] [INFO] discord_bot: Eingeloggt als PumBot Tester#3553 (1255557478427394089)
+[2026-02-16 07:21:49] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-16 07:21:50] [INFO] discord_bot: Guild-Sync fertig (12 Commands).
+[2026-02-16 07:21:52] [INFO] discord_bot: Eingeloggt als PumBot Tester#3553 (1255557478427394089)
+[2026-02-16 07:39:22] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-16 07:39:22] [INFO] discord_bot: Guild-Sync fertig (12 Commands).
+[2026-02-16 07:39:25] [INFO] discord_bot: Eingeloggt als PumBot Tester#3553 (1255557478427394089)
+[2026-02-16 08:26:25] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-16 08:26:25] [INFO] discord_bot: Guild-Sync fertig (12 Commands).
+[2026-02-16 08:26:27] [INFO] discord_bot: Eingeloggt als PumBot Tester#3553 (1255557478427394089)
+[2026-02-16 08:34:26] [ERROR] discord_bot: Bot-Start fehlgeschlagen
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 974, in _load_from_module_spec
+    await setup(self)
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\TicketSystemCommand.py", line 467, in setup
+    bot.tree.add_command(cog.ticket_group)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\app_commands\tree.py", line 407, in add_command
+    raise CommandAlreadyRegistered(name, None)
+discord.app_commands.errors.CommandAlreadyRegistered: Command 'ticket' already registered.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 133, in main
+    await bot.start(TOKEN)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 846, in start
+    await self.login(token)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 689, in login
+    await self.setup_hook()
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 95, in setup_hook
+    await self.load_extension(ext)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 1040, in load_extension
+    await self._load_from_module_spec(spec, name)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 979, in _load_from_module_spec
+    raise errors.ExtensionFailed(key, e) from e
+discord.ext.commands.errors.ExtensionFailed: Extension 'src.mypackage.commands.TicketSystemCommand' raised an error: CommandAlreadyRegistered: Command 'ticket' already registered.
+[2026-02-16 08:37:27] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-16 08:37:27] [INFO] discord_bot: Guild-Sync fertig (12 Commands).
+[2026-02-16 08:37:29] [INFO] discord_bot: Eingeloggt als PumBot Tester#3553 (1255557478427394089)
+[2026-02-16 08:41:39] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-16 08:41:39] [INFO] discord_bot: Guild-Sync fertig (12 Commands).
+[2026-02-16 08:41:41] [INFO] discord_bot: Eingeloggt als PumBot Tester#3553 (1255557478427394089)
+[2026-02-16 08:43:27] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-16 08:43:27] [ERROR] discord_bot: Bot-Start fehlgeschlagen
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 133, in main
+    await bot.start(TOKEN)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 846, in start
+    await self.login(token)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 689, in login
+    await self.setup_hook()
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 99, in setup_hook
+    self.add_view(TicketPanelView(self))
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 3148, in add_view
+    raise ValueError('View is not persistent. Items need to have a custom_id set and View must have no timeout')
+ValueError: View is not persistent. Items need to have a custom_id set and View must have no timeout
+[2026-02-16 08:58:37] [ERROR] discord_bot: Bot-Start fehlgeschlagen
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 962, in _load_from_module_spec
+    spec.loader.exec_module(lib)  # type: ignore
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap_external>", line 936, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 1074, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1004, in source_to_code
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\TicketSystemCommand.py", line 606
+    except Exception:
+                     ^
+IndentationError: unindent does not match any outer indentation level
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 133, in main
+    await bot.start(TOKEN)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 846, in start
+    await self.login(token)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 689, in login
+    await self.setup_hook()
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 95, in setup_hook
+    await self.load_extension(ext)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 1040, in load_extension
+    await self._load_from_module_spec(spec, name)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 965, in _load_from_module_spec
+    raise errors.ExtensionFailed(key, e) from e
+discord.ext.commands.errors.ExtensionFailed: Extension 'src.mypackage.commands.TicketSystemCommand' raised an error: IndentationError: unindent does not match any outer indentation level (TicketSystemCommand.py, line 606)
+[2026-02-16 08:59:04] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-16 08:59:04] [ERROR] discord_bot: Bot-Start fehlgeschlagen
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 133, in main
+    await bot.start(TOKEN)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 846, in start
+    await self.login(token)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 689, in login
+    await self.setup_hook()
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 100, in setup_hook
+    self.add_view(TicketCloseView(self))
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 3148, in add_view
+    raise ValueError('View is not persistent. Items need to have a custom_id set and View must have no timeout')
+ValueError: View is not persistent. Items need to have a custom_id set and View must have no timeout
+[2026-02-16 09:07:36] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-16 09:07:36] [INFO] discord_bot: Guild-Sync fertig (12 Commands).
+[2026-02-16 09:07:38] [INFO] discord_bot: Eingeloggt als PumBot Tester#3553 (1255557478427394089)
+[2026-02-16 09:08:49] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-16 09:08:49] [INFO] discord_bot: Guild-Sync fertig (12 Commands).
+[2026-02-16 09:08:52] [INFO] discord_bot: Eingeloggt als PumBot Tester#3553 (1255557478427394089)
+[2026-02-16 14:31:08] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-16 14:31:08] [INFO] discord_bot: Guild-Sync fertig (12 Commands).
+[2026-02-16 14:31:10] [INFO] discord_bot: Eingeloggt als PumBot Tester#3553 (1255557478427394089)
+[2026-02-16 20:58:12] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-16 20:58:12] [ERROR] discord_bot: Bot-Start fehlgeschlagen
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 135, in main
+    await bot.start(TOKEN)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 846, in start
+    await self.login(token)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 689, in login
+    await self.setup_hook()
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 97, in setup_hook
+    await self.load_extension(ext)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 1036, in load_extension
+    spec = importlib.util.find_spec(name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib.util>", line 95, in find_spec
+ModuleNotFoundError: No module named 'src.mypakage'
+[2026-02-16 22:47:27] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-16 22:47:27] [ERROR] discord_bot: Bot-Start fehlgeschlagen
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 135, in main
+    await bot.start(TOKEN)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 846, in start
+    await self.login(token)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 689, in login
+    await self.setup_hook()
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 97, in setup_hook
+    await self.load_extension(ext)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 1036, in load_extension
+    spec = importlib.util.find_spec(name)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib.util>", line 95, in find_spec
+ModuleNotFoundError: No module named 'src.mypakage'
+[2026-02-16 22:51:35] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-16 22:51:35] [ERROR] discord_bot: Bot-Start fehlgeschlagen
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 135, in main
+    await bot.start(TOKEN)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 846, in start
+    await self.login(token)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 689, in login
+    await self.setup_hook()
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 97, in setup_hook
+    await self.load_extension(ext)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 1038, in load_extension
+    raise errors.ExtensionNotFound(name)
+discord.ext.commands.errors.ExtensionNotFound: Extension 'src.mypackage.commands.serverinfoCommand' could not be loaded or found.
+[2026-02-16 22:53:14] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-16 22:53:14] [ERROR] discord_bot: Bot-Start fehlgeschlagen
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 962, in _load_from_module_spec
+    spec.loader.exec_module(lib)  # type: ignore
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\serverinfoCommand.py", line 4, in <module>
+    from disccord import app_commands
+ModuleNotFoundError: No module named 'disccord'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 135, in main
+    await bot.start(TOKEN)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 846, in start
+    await self.login(token)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 689, in login
+    await self.setup_hook()
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 97, in setup_hook
+    await self.load_extension(ext)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 1040, in load_extension
+    await self._load_from_module_spec(spec, name)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 965, in _load_from_module_spec
+    raise errors.ExtensionFailed(key, e) from e
+discord.ext.commands.errors.ExtensionFailed: Extension 'src.mypackage.commands.serverinfoCommand' raised an error: ModuleNotFoundError: No module named 'disccord'
+[2026-02-16 22:53:39] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-16 22:53:39] [ERROR] discord_bot: Bot-Start fehlgeschlagen
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 962, in _load_from_module_spec
+    spec.loader.exec_module(lib)  # type: ignore
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\serverinfoCommand.py", line 4, in <module>
+    from disccord import app_commands
+ModuleNotFoundError: No module named 'disccord'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 135, in main
+    await bot.start(TOKEN)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 846, in start
+    await self.login(token)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 689, in login
+    await self.setup_hook()
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 97, in setup_hook
+    await self.load_extension(ext)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 1040, in load_extension
+    await self._load_from_module_spec(spec, name)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 965, in _load_from_module_spec
+    raise errors.ExtensionFailed(key, e) from e
+discord.ext.commands.errors.ExtensionFailed: Extension 'src.mypackage.commands.serverinfoCommand' raised an error: ModuleNotFoundError: No module named 'disccord'
+[2026-02-16 22:53:58] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-16 22:53:58] [ERROR] discord_bot: Bot-Start fehlgeschlagen
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 974, in _load_from_module_spec
+    await setup(self)
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\serverinfoCommand.py", line 86, in setup
+    await bot.add_cog(ServerInfoCog(bot))
+                      ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\commands\serverinfoCommand.py", line 11, in __init__
+    @app_commands.command(
+     ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\app_commands\commands.py", line 2065, in decorator
+    return Command(
+           ^^^^^^^^
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\app_commands\commands.py", line 688, in __init__
+    self._params: Dict[str, CommandParameter] = _extract_parameters_from_callback(callback, callback.__globals__)
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\app_commands\commands.py", line 384, in _extract_parameters_from_callback
+    param = annotation_to_parameter(resolved, parameter)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\app_commands\transformers.py", line 837, in annotation_to_parameter
+    (inner, default, validate_default) = get_supported_annotation(annotation)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\app_commands\transformers.py", line 796, in get_supported_annotation
+    raise TypeError(f'unsupported type annotation {annotation!r}')
+TypeError: unsupported type annotation <class 'discord.interactions.Interaction'>
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 135, in main
+    await bot.start(TOKEN)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 846, in start
+    await self.login(token)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\client.py", line 689, in login
+    await self.setup_hook()
+  File "C:\Users\Fabienne\PycharmProjects\PythonProject\src\mypackage\bot.py", line 97, in setup_hook
+    await self.load_extension(ext)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 1040, in load_extension
+    await self._load_from_module_spec(spec, name)
+  File "C:\Users\Fabienne\PyCharmMiscProject\.venv\Lib\site-packages\discord\ext\commands\bot.py", line 979, in _load_from_module_spec
+    raise errors.ExtensionFailed(key, e) from e
+discord.ext.commands.errors.ExtensionFailed: Extension 'src.mypackage.commands.serverinfoCommand' raised an error: TypeError: unsupported type annotation <class 'discord.interactions.Interaction'>
+[2026-02-16 22:56:24] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-16 22:56:24] [INFO] discord_bot: Guild-Sync fertig (14 Commands).
+[2026-02-16 22:56:26] [INFO] discord_bot: Eingeloggt als PumBot Tester#3553 (1255557478427394089)
+[2026-02-17 05:31:29] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-17 05:31:29] [INFO] discord_bot: Guild-Sync fertig (14 Commands).
+[2026-02-17 05:31:32] [INFO] discord_bot: Eingeloggt als PumBot Tester#3553 (1255557478427394089)
+[2026-02-17 08:06:50] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-02-17 08:06:50] [INFO] discord_bot: Guild-Sync fertig (14 Commands).
+[2026-02-17 08:06:53] [INFO] discord_bot: Eingeloggt als PumBot Tester#3553 (1255557478427394089)
+[2026-04-16 00:42:52] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-04-16 00:42:53] [INFO] discord_bot: Guild-Sync fertig (14 Commands).
+[2026-04-16 00:42:57] [INFO] discord_bot: Eingeloggt als PumBot Tester#3553 (1255557478427394089)
+[2026-04-16 00:44:13] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-04-16 00:44:13] [INFO] discord_bot: Guild-Sync fertig (14 Commands).
+[2026-04-16 00:44:16] [INFO] discord_bot: Eingeloggt als PumBot Tester#3553 (1255557478427394089)
+[2026-04-16 00:48:13] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-04-16 00:48:13] [INFO] discord_bot: Guild-Sync fertig (14 Commands).
+[2026-04-16 00:48:16] [INFO] discord_bot: Eingeloggt als PumBot Tester#3553 (1255557478427394089)
+[2026-04-16 01:06:21] [INFO] discord_bot: HelpCog (Slash) geladen.
+[2026-04-16 01:06:21] [INFO] discord_bot: Guild-Sync fertig (14 Commands).
+[2026-04-16 01:06:24] [INFO] discord_bot: Eingeloggt als PumBot Tester#3553 (1255557478427394089)

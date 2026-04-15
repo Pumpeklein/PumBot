@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Ticket {{ t.ticket_id }}</h1>
+
+<div class="card">
+  <div><b>Subject:</b> {{ t.subject }}</div>
+  <div><b>Status:</b> {{ t.status }}</div>
+  <div><b>Creator:</b> {{ t.creator_user_id }}</div>
+  <div><b>Closed at:</b> {{ t.closed_at }}</div>
+</div>
+
+{% if t.transcript_path %}
+  <div class="card">
+    <h2>Transcript</h2>
+    <p>Staff sieht es direkt über Datei-Pfad (intern). Public Link kommt per Token.</p>
+    <a href="{{ url_for('public_transcript', ticket_id=t.ticket_id) }}?token=STAFF_TEST_TOKEN">Public (mit Token)</a>
+    <p class="small">(Für echte User kommt der echte Token aus dem Bot.)</p>
+  </div>
+{% endif %}
+
+<h2>Logs</h2>
+<div class="card">
+  {% if logs|length == 0 %}
+    <div class="muted">Keine Logs.</div>
+  {% else %}
+    {% for l in logs %}
+      <div class="logline">
+        <span class="muted">{{ l.created_at }}</span>
+        <b>{{ l.level or "" }}</b>
+        {{ l.message or "" }}
+      </div>
+    {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}

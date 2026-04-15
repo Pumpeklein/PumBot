@@ -7,8 +7,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from src.mypackage import config
-from src.mypackage.bot import logger
+from src.pumbot import config
+from src.pumbot.bot import logger
 
 
 def _find_project_root(start: Path) -> Path:

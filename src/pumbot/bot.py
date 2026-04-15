@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import os
 from pathlib import Path
+from threading import Thread
 from typing import Final, Optional
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 from dotenv import load_dotenv
+from werkzeug.serving import make_server
 
-from src.mypackage import config
+from src.pumbot import config
+from web_logs.app import create_app
+from web_logs.config import Config as WebConfig
 
 
 LOGS_DIR = Path("logs")
@@ -71,19 +76,19 @@ intents.messages = True
 intents.message_content = True
 
 EXTENSIONS: list[str] = [
-    "src.mypackage.commands.announcmentCommand",
-    "src.mypackage.commands.birthdayCommand",
-    "src.mypackage.commands.selfrolesCommand",
-    "src.mypackage.commands.TicketSystemCommand",
-    "src.mypackage.commands.userManagementCommand",
-    "src.mypackage.commands.deleteCommand",
-    "src.mypackage.commands.helpCommand",
-    "src.mypackage.commands.willkommenCommand",
-    "src.mypackage.commands.autoPublisherCommand",
-    "src.mypackage.commands.serverStatsCommand",
-    "src.mypackage.commands.countingCommand",
-    "src.mypackage.commands.serverinfoCommand",
-    "src.mypackage.commands.logsCommand",
+    "src.pumbot.commands.announcmentCommand",
+    "src.pumbot.commands.birthdayCommand",
+    "src.pumbot.commands.selfrolesCommand",
+    "src.pumbot.commands.TicketSystemCommand",
+    "src.pumbot.commands.userManagementCommand",
+    "src.pumbot.commands.deleteCommand",
+    "src.pumbot.commands.helpCommand",
+    "src.pumbot.commands.willkommenCommand",
+    "src.pumbot.commands.autoPublisherCommand",
+    "src.pumbot.commands.serverStatsCommand",
+    "src.pumbot.commands.countingCommand",
+    "src.pumbot.commands.serverinfoCommand",
+    "src.pumbot.commands.logsCommand",
 ]
 
 
@@ -101,7 +106,7 @@ class PumpeBot(commands.Bot):
         for ext in EXTENSIONS:
             await self.load_extension(ext)
 
-        from src.mypackage.commands.TicketSystemCommand import (
+        from src.pumbot.commands.TicketSystemCommand import (
             TicketPanelView,
             TicketCloseView,
         )
@@ -143,15 +148,38 @@ async def on_app_command_error(
     await reply_ephemeral(interaction, "Da ist ein Fehler passiert.")
 
 
+class WebServerThread(Thread):
+    def __init__(self, host: str, port: int):
+        super().__init__(name="flask-web", daemon=True)
+        self.host = host
+        self.port = port
+        self._server = None
+
+    def run(self) -> None:
+        app = create_app()
+        self._server = make_server(self.host, self.port, app, threaded=True)
+        logger.info("Web-Interface gestartet auf http://%s:%s", self.host, self.port)
+        self._server.serve_forever()
+
+    def shutdown(self) -> None:
+        if self._server is not None:
+            self._server.shutdown()
+
+
 async def main() -> None:
+    web_server = WebServerThread("127.0.0.1", WebConfig.PORT)
+    web_server.start()
     try:
         async with bot:
             await bot.start(TOKEN)
     except Exception:
         logger.exception("Bot-Start fehlgeschlagen")
         raise
+    finally:
+        web_server.shutdown()
+        web_server.join(timeout=5)
 
 
-# TODO: Web-Interface mit starten
 if __name__ == "__main__":
-    asyncio.run(main())
+    with contextlib.suppress(KeyboardInterrupt):
+        asyncio.run(main())

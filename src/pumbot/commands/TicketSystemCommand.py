@@ -10,10 +10,8 @@ import discord
 from discord import ButtonStyle, app_commands
 from discord.ext import commands
 
-from src.mypackage.bot import logger
-
-from src.mypackage.services.web_log_service import send_web_log
-from src.mypackage.services.web_log_service import send_ticket_archive
+from src.pumbot.bot import logger
+from src.pumbot.services.web_log_service import send_ticket_archive, send_web_log
 
 
 TICKET_CATEGORY_NAME = "🎫 Tickets"

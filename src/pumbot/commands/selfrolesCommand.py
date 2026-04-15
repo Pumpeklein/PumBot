@@ -9,7 +9,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from src.mypackage.bot import logger
+from src.pumbot.bot import logger
 
 DATA_DIR = Path("data")
 SELFROLES_FILE = DATA_DIR / "selfroles.json"

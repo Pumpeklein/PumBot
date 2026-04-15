@@ -8,8 +8,8 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 
-from src.mypackage import config
-from src.mypackage.bot import logger
+from src.pumbot import config
+from src.pumbot.bot import logger
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATS_FILE = BASE_DIR / "database" / "server_stats.json"

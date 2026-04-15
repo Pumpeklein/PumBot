@@ -6,7 +6,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from src.mypackage.bot import logger
+from src.pumbot.bot import logger
 
 
 TEAM_ROLES = {

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timezone
+from html import escape
 from typing import Optional
 
 import aiohttp
@@ -58,19 +59,24 @@ async def send_ticket_archive(
     transcript_text: str,
 ) -> None:
     url = os.getenv("LOG_ARCHIVE_URL", "http://127.0.0.1:8080/api/tickets/close")
+    transcript_html = f"<pre>{escape(transcript_text)}</pre>" if transcript_text else ""
 
     payload = {
         "ticket_id": ticket_id,
+        "channel_id": ticket_id,
         "channel_name": channel_name,
-        "category_label": category_label,
-        "creator_id": creator_id,
+        "creator_user_id": creator_id,
         "creator_name": creator_name,
         "opened_at": opened_at,
         "closed_at": closed_at,
+        "guild_id": None,
+        "status": "closed",
+        "subject": category_label,
         "closed_by_id": closed_by_id,
         "closed_by_name": closed_by_name,
         "close_reason": close_reason,
         "transcript_url": transcript_url,
+        "transcript_html": transcript_html,
         "transcript_text": transcript_text,
     }
 

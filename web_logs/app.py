@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import os
-from pathlib import Path
 from functools import wraps
+from html import escape
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -20,22 +20,40 @@ from flask import (
 )
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from config import Config, ensure_dirs
-from db import (
-    init_db,
-    user_count,
-    create_user,
-    get_user_by_username,
-    list_users,
-    delete_user,
-    set_user_role,
-    upsert_ticket,
-    get_ticket,
-    list_tickets,
-    insert_log,
-    list_logs_for_ticket,
-)
-from token_utils import verify_transcript_token
+try:
+    from .config import Config, ensure_dirs
+    from .db import (
+        create_user,
+        delete_user,
+        get_ticket,
+        get_user_by_username,
+        init_db,
+        insert_log,
+        list_logs_for_ticket,
+        list_tickets,
+        list_users,
+        set_user_role,
+        upsert_ticket,
+        user_count,
+    )
+    from .token_utils import verify_transcript_token
+except ImportError:
+    from config import Config, ensure_dirs
+    from db import (
+        create_user,
+        delete_user,
+        get_ticket,
+        get_user_by_username,
+        init_db,
+        insert_log,
+        list_logs_for_ticket,
+        list_tickets,
+        list_users,
+        set_user_role,
+        upsert_ticket,
+        user_count,
+    )
+    from token_utils import verify_transcript_token
 
 ensure_dirs()
 
@@ -43,6 +61,29 @@ app = Flask(__name__)
 app.secret_key = Config.FLASK_SECRET_KEY
 
 init_db()
+
+
+def create_app() -> Flask:
+    return app
+
+
+def _resolve_transcript_path(transcript_path: str) -> Path:
+    path = Path(transcript_path)
+    if not path.is_absolute():
+        path = (Path(__file__).resolve().parent / transcript_path).resolve()
+    return path
+
+
+def _render_transcript_html(data: dict) -> str:
+    transcript_html = (data.get("transcript_html") or "").strip()
+    if transcript_html:
+        return transcript_html
+
+    transcript_text = data.get("transcript_text") or ""
+    if transcript_text:
+        return f"<pre>{escape(transcript_text)}</pre>"
+
+    return ""
 
 
 # ---------------- API KEY SECURITY ----------------
@@ -193,6 +234,21 @@ def ticket_detail(ticket_id: str):
     )
 
 
+@app.get("/tickets/<ticket_id>/transcript")
+@login_required
+def ticket_transcript(ticket_id: str):
+    t = get_ticket(ticket_id)
+    if not t or not t.get("transcript_path"):
+        abort(404)
+
+    path = _resolve_transcript_path(t["transcript_path"])
+    if not path.exists():
+        abort(404)
+
+    html = path.read_text(encoding="utf-8")
+    return render_template("transcript.html", ticket_id=ticket_id, html=html)
+
+
 # ---------------- PUBLIC TRANSCRIPT (TOKEN LINK) ----------------
 @app.get("/t/<ticket_id>")
 def public_transcript(ticket_id: str):
@@ -202,6 +258,8 @@ def public_transcript(ticket_id: str):
     """
     token = request.args.get("token") or ""
     if not token:
+        if current_user():
+            return ticket_transcript(ticket_id)
         abort(403)
 
     data = verify_transcript_token(
@@ -225,11 +283,7 @@ def public_transcript(ticket_id: str):
     if not transcript_path:
         abort(404)
 
-    # transcript_path kann relativ gespeichert sein
-    path = Path(transcript_path)
-    if not path.is_absolute():
-        path = (Path(__file__).resolve().parent / transcript_path).resolve()
-
+    path = _resolve_transcript_path(transcript_path)
     if not path.exists():
         abort(404)
 
@@ -317,9 +371,9 @@ def api_ticket_close():
     if not ticket_id:
         return jsonify({"ok": False, "error": "ticket_id missing"}), 400
 
-    transcript_html = data.get("transcript_html") or ""
+    transcript_html = _render_transcript_html(data)
     if not transcript_html:
-        return jsonify({"ok": False, "error": "transcript_html missing"}), 400
+        return jsonify({"ok": False, "error": "transcript content missing"}), 400
 
     # Datei speichern
     transcript_rel = f"data/transcripts/{ticket_id}.html"
@@ -331,10 +385,12 @@ def api_ticket_close():
         {
             "ticket_id": ticket_id,
             "guild_id": data.get("guild_id"),
-            "channel_id": data.get("channel_id"),
-            "creator_user_id": str(data.get("creator_user_id") or ""),
+            "channel_id": data.get("channel_id") or ticket_id,
+            "creator_user_id": str(
+                data.get("creator_user_id") or data.get("creator_id") or ""
+            ),
             "status": data.get("status") or "closed",
-            "subject": data.get("subject") or "",
+            "subject": data.get("subject") or data.get("category_label") or "",
             "closed_at": data.get("closed_at") or "",
             "transcript_path": transcript_rel,  # relativ speichern
         }

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import json
 import sqlite3
-from pathlib import Path
 from typing import Any
 
-from config import Config, ensure_dirs, BASE_DIR
+try:
+    from .config import BASE_DIR, Config, ensure_dirs
+except ImportError:
+    from config import BASE_DIR, Config, ensure_dirs
 
 
 # TODO: Auf MySQL Datenbank umstellen und mit Bot verknüpfen
@@ -135,14 +138,21 @@ def list_tickets(q: str = "", limit: int = 200) -> list[dict[str, Any]]:
 
 # -------- Logs (optional) ----------
 def insert_log(data: dict[str, Any]) -> None:
+    level = data.get("level") or data.get("action") or data.get("event") or "info"
+    message = data.get("message")
+    if not message:
+        user_name = data.get("user_name") or data.get("username") or "system"
+        content = data.get("content") or ""
+        message = f"{user_name}: {content}".strip(": ")
+
     with _connect() as conn:
         conn.execute(
             "INSERT INTO logs (ticket_id, level, message, data_json) VALUES (?, ?, ?, ?)",
             (
                 data.get("ticket_id"),
-                data.get("level"),
-                data.get("message"),
-                data.get("data_json"),
+                level,
+                message,
+                data.get("data_json") or json.dumps(data, ensure_ascii=False),
             ),
         )
         conn.commit()

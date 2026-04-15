@@ -12,7 +12,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from src.mypackage.bot import logger
+from src.pumbot.bot import logger
 
 DATA_DIR = Path("data")
 ANNOUNCE_FILE = DATA_DIR / "announcement.json"

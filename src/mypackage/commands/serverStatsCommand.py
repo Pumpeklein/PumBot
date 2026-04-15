@@ -56,7 +56,6 @@ class ServerStatsCog(commands.Cog):
         description="Verwalte die Server-Statistik-Kanäle.",
     )
 
-
     def _get_guild_config(self, guild_id: int) -> Dict[str, Any]:
         data = _load_data()
         return data.get("guilds", {}).get(str(guild_id), {})
@@ -121,8 +120,9 @@ class ServerStatsCog(commands.Cog):
         )
         return channel
 
-
-    @serverstats.command(name="setup", description="Richtet die Server-Stats in einer Kategorie ein.")
+    @serverstats.command(
+        name="setup", description="Richtet die Server-Stats in einer Kategorie ein."
+    )
     @app_commands.checks.has_permissions(administrator=True)
     async def serverstats_setup(
         self,
@@ -167,7 +167,9 @@ class ServerStatsCog(commands.Cog):
             ephemeral=True,
         )
 
-    @serverstats.command(name="add", description="Fügt einen zusätzlichen Stat-Channel hinzu.")
+    @serverstats.command(
+        name="add", description="Fügt einen zusätzlichen Stat-Channel hinzu."
+    )
     @app_commands.checks.has_permissions(administrator=True)
     @app_commands.describe(stat_type="Welche Statistik soll hinzugefügt werden?")
     @app_commands.choices(
@@ -234,7 +236,9 @@ class ServerStatsCog(commands.Cog):
 
     @serverstats.command(name="remove", description="Entfernt einen Stat-Channel.")
     @app_commands.checks.has_permissions(administrator=True)
-    @app_commands.describe(stat_key="Schlüssel der Statistik (z. B. all, members, bots, channels, roles)")
+    @app_commands.describe(
+        stat_key="Schlüssel der Statistik (z. B. all, members, bots, channels, roles)"
+    )
     async def serverstats_remove(
         self,
         interaction: discord.Interaction,
@@ -271,7 +275,9 @@ class ServerStatsCog(commands.Cog):
             ephemeral=True,
         )
 
-    @serverstats.command(name="list", description="Zeigt die aktuelle Server-Stats-Konfiguration an.")
+    @serverstats.command(
+        name="list", description="Zeigt die aktuelle Server-Stats-Konfiguration an."
+    )
     @app_commands.checks.has_permissions(administrator=True)
     async def serverstats_list(self, interaction: discord.Interaction):
         guild = interaction.guild
@@ -296,14 +302,22 @@ class ServerStatsCog(commands.Cog):
         lines = []
         if category_id:
             category = guild.get_channel(category_id)
-            category_name = category.name if isinstance(category, discord.CategoryChannel) else "Unbekannt"
+            category_name = (
+                category.name
+                if isinstance(category, discord.CategoryChannel)
+                else "Unbekannt"
+            )
             lines.append(f"Kategorie: `{category_name}` (ID: {category_id})")
 
         if stats_cfg:
             lines.append("Aktive Stats:")
             for key, ch_id in stats_cfg.items():
                 ch = guild.get_channel(ch_id)
-                ch_name = ch.name if isinstance(ch, discord.VoiceChannel) else "Unbekannter Kanal"
+                ch_name = (
+                    ch.name
+                    if isinstance(ch, discord.VoiceChannel)
+                    else "Unbekannter Kanal"
+                )
                 lines.append(f"- `{key}` → {ch_name} (ID: {ch_id})")
         else:
             lines.append("Keine Stats eingerichtet.")
@@ -312,7 +326,6 @@ class ServerStatsCog(commands.Cog):
             "\n".join(lines),
             ephemeral=True,
         )
-
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):

@@ -112,7 +112,9 @@ class AnnouncementCog(commands.Cog):
             self.session = aiohttp.ClientSession(timeout=timeout)
             return self.session
 
-    async def get_twitch_announce_channel(self, guild: discord.Guild) -> Optional[discord.TextChannel]:
+    async def get_twitch_announce_channel(
+        self, guild: discord.Guild
+    ) -> Optional[discord.TextChannel]:
         try:
             data = load_data()
             g_id = str(guild.id)
@@ -139,7 +141,9 @@ class AnnouncementCog(commands.Cog):
         try:
             async with session.get(url, headers=headers, params=params) as resp:
                 if resp.status != 200:
-                    logger.warning("[Twitch] HTTP %s: %s", resp.status, await resp.text())
+                    logger.warning(
+                        "[Twitch] HTTP %s: %s", resp.status, await resp.text()
+                    )
                     return []
                 data = await resp.json(content_type=None)
                 return data.get("data", []) or []
@@ -179,7 +183,11 @@ class AnnouncementCog(commands.Cog):
             game_name = await self.fetch_twitch_game_name(stream.get("game_id", ""))
             started_at = stream.get("started_at")
 
-            thumb = (stream.get("thumbnail_url") or "").replace("{width}", "1920").replace("{height}", "1080")
+            thumb = (
+                (stream.get("thumbnail_url") or "")
+                .replace("{width}", "1920")
+                .replace("{height}", "1080")
+            )
             url = f"https://twitch.tv/{self.twitch_user_login}"
 
             embed = discord.Embed(
@@ -217,15 +225,25 @@ class AnnouncementCog(commands.Cog):
         description="Announcement- und Twitch-Settings.",
     )
 
-    @announce_group.command(name="twitch_channel", description="Setzt den Channel für Twitch-Live-Announcements.")
+    @announce_group.command(
+        name="twitch_channel",
+        description="Setzt den Channel für Twitch-Live-Announcements.",
+    )
     @app_commands.describe(channel="Textkanal")
-    async def set_twitch_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
+    async def set_twitch_channel(
+        self, interaction: discord.Interaction, channel: discord.TextChannel
+    ):
         if interaction.guild is None:
-            await interaction.response.send_message("Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
+            )
             return
 
         if not is_announce_staff(interaction.user):
-            await interaction.response.send_message("Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True
+            )
             return
 
         data = load_data()
@@ -237,46 +255,71 @@ class AnnouncementCog(commands.Cog):
         data[g_id]["_twitch"] = cfg
         save_data(data)
 
-        await interaction.response.send_message(f"Twitch-Announcement-Channel wurde auf {channel.mention} gesetzt.", ephemeral=True)
+        await interaction.response.send_message(
+            f"Twitch-Announcement-Channel wurde auf {channel.mention} gesetzt.",
+            ephemeral=True,
+        )
 
-    @announce_group.command(name="twitch_now", description="Sendet sofort einen Twitch-Live-Announcement, falls du live bist.")
+    @announce_group.command(
+        name="twitch_now",
+        description="Sendet sofort einen Twitch-Live-Announcement, falls du live bist.",
+    )
     async def twitch_announce_now(self, interaction: discord.Interaction):
         if interaction.guild is None:
-            await interaction.response.send_message("Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
+            )
             return
 
         if not is_announce_staff(interaction.user):
-            await interaction.response.send_message("Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True
+            )
             return
 
-        if not all([self.twitch_client_id, self.twitch_auth_token, self.twitch_user_login]):
-            await interaction.response.send_message("Twitch API ist nicht korrekt konfiguriert (.env).", ephemeral=True)
+        if not all(
+            [self.twitch_client_id, self.twitch_auth_token, self.twitch_user_login]
+        ):
+            await interaction.response.send_message(
+                "Twitch API ist nicht korrekt konfiguriert (.env).", ephemeral=True
+            )
             return
 
         streams = await self.fetch_twitch_stream()
         if not streams:
-            await interaction.response.send_message("Du scheinst aktuell nicht live zu sein.", ephemeral=True)
+            await interaction.response.send_message(
+                "Du scheinst aktuell nicht live zu sein.", ephemeral=True
+            )
             return
 
         stream = streams[0]
         embed = await self.build_twitch_embed(stream)
         channel = await self.get_twitch_announce_channel(interaction.guild)
         if channel is None:
-            await interaction.response.send_message("Es ist kein Twitch-Announcement-Channel gesetzt.", ephemeral=True)
+            await interaction.response.send_message(
+                "Es ist kein Twitch-Announcement-Channel gesetzt.", ephemeral=True
+            )
             return
 
         try:
             await channel.send(embed=embed)
         except (discord.Forbidden, discord.HTTPException):
-            await interaction.response.send_message("Ich konnte im Announcement-Channel nicht senden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Ich konnte im Announcement-Channel nicht senden.", ephemeral=True
+            )
             return
 
-        await interaction.response.send_message("Twitch-Announcement wurde gesendet.", ephemeral=True)
+        await interaction.response.send_message(
+            "Twitch-Announcement wurde gesendet.", ephemeral=True
+        )
 
     @tasks.loop(minutes=2)
     async def twitch_check_loop(self):
         await self.bot.wait_until_ready()
-        if not all([self.twitch_client_id, self.twitch_auth_token, self.twitch_user_login]):
+        if not all(
+            [self.twitch_client_id, self.twitch_auth_token, self.twitch_user_login]
+        ):
             return
 
         data = load_data()
@@ -314,7 +357,9 @@ class AnnouncementCog(commands.Cog):
                     try:
                         await channel.send(embed=embed)
                     except (discord.Forbidden, discord.HTTPException):
-                        logger.exception("Twitch announce send fehlgeschlagen (guild=%s)", guild.id)
+                        logger.exception(
+                            "Twitch announce send fehlgeschlagen (guild=%s)", guild.id
+                        )
 
                     cfg["last_stream_id"] = stream_id
                     cfg["last_live"] = True

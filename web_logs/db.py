@@ -6,12 +6,14 @@ from typing import Any
 
 from config import Config, ensure_dirs, BASE_DIR
 
+
 # TODO: Auf MySQL Datenbank umstellen und mit Bot verknüpfen
 def _connect() -> sqlite3.Connection:
     ensure_dirs()
     conn = sqlite3.connect(Config.DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
 
 def init_db() -> None:
     schema_path = BASE_DIR / "models.sql"
@@ -20,11 +22,13 @@ def init_db() -> None:
         conn.executescript(sql)
         conn.commit()
 
+
 # -------- Users ----------
 def user_count() -> int:
     with _connect() as conn:
         row = conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()
         return int(row["c"])
+
 
 def create_user(username: str, password_hash: str, role: str) -> None:
     with _connect() as conn:
@@ -34,30 +38,40 @@ def create_user(username: str, password_hash: str, role: str) -> None:
         )
         conn.commit()
 
+
 def get_user_by_username(username: str) -> dict[str, Any] | None:
     with _connect() as conn:
-        row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM users WHERE username = ?", (username,)
+        ).fetchone()
         return dict(row) if row else None
+
 
 def list_users() -> list[dict[str, Any]]:
     with _connect() as conn:
-        rows = conn.execute("SELECT id, username, role, created_at FROM users ORDER BY id ASC").fetchall()
+        rows = conn.execute(
+            "SELECT id, username, role, created_at FROM users ORDER BY id ASC"
+        ).fetchall()
         return [dict(r) for r in rows]
+
 
 def delete_user(user_id: int) -> None:
     with _connect() as conn:
         conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
         conn.commit()
 
+
 def set_user_role(user_id: int, role: str) -> None:
     with _connect() as conn:
         conn.execute("UPDATE users SET role = ? WHERE id = ?", (role, user_id))
         conn.commit()
 
+
 def get_user_by_id(user_id: int) -> dict[str, Any] | None:
     with _connect() as conn:
         row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
         return dict(row) if row else None
+
 
 # -------- Tickets ----------
 def upsert_ticket(ticket: dict[str, Any]) -> None:
@@ -95,10 +109,14 @@ def upsert_ticket(ticket: dict[str, Any]) -> None:
         )
         conn.commit()
 
+
 def get_ticket(ticket_id: str) -> dict[str, Any] | None:
     with _connect() as conn:
-        row = conn.execute("SELECT * FROM tickets WHERE ticket_id = ?", (ticket_id,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM tickets WHERE ticket_id = ?", (ticket_id,)
+        ).fetchone()
         return dict(row) if row else None
+
 
 def list_tickets(q: str = "", limit: int = 200) -> list[dict[str, Any]]:
     q_like = f"%{q}%"
@@ -114,6 +132,7 @@ def list_tickets(q: str = "", limit: int = 200) -> list[dict[str, Any]]:
         ).fetchall()
         return [dict(r) for r in rows]
 
+
 # -------- Logs (optional) ----------
 def insert_log(data: dict[str, Any]) -> None:
     with _connect() as conn:
@@ -127,6 +146,7 @@ def insert_log(data: dict[str, Any]) -> None:
             ),
         )
         conn.commit()
+
 
 def list_logs_for_ticket(ticket_id: str, limit: int = 200) -> list[dict[str, Any]]:
     with _connect() as conn:

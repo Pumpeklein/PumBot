@@ -47,7 +47,9 @@ def save_warnings(data: dict) -> None:
         logger.exception("save_warnings error")
 
 
-def add_warning(guild_id: int, user_id: int, moderator_id: int, reason: str | None) -> int:
+def add_warning(
+    guild_id: int, user_id: int, moderator_id: int, reason: str | None
+) -> int:
     try:
         data = load_warnings()
         g_id = str(guild_id)
@@ -189,15 +191,24 @@ class UserManagementCog(commands.Cog):
         description="Moderations-Commands (Warn, Timeout, Ban, Userinfo, etc.).",
     )
 
-    @moderation_group.command(name="profile", description="Zeigt Infos über einen Nutzer.")
+    @moderation_group.command(
+        name="profile", description="Zeigt Infos über einen Nutzer."
+    )
     @app_commands.describe(user="User (optional)")
-    async def profile(self, interaction: discord.Interaction, user: Optional[discord.Member] = None):
+    async def profile(
+        self, interaction: discord.Interaction, user: Optional[discord.Member] = None
+    ):
         if interaction.guild is None:
-            await interaction.response.send_message("Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
+            )
             return
 
         if not is_allowed(interaction.user):
-            await interaction.response.send_message("Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True
+            )
             return
 
         member = user or interaction.user
@@ -206,14 +217,20 @@ class UserManagementCog(commands.Cog):
         roles = [role.mention for role in member.roles if role != guild.default_role]
         roles_text = ", ".join(roles) if roles else "Keine Rollen"
 
-        perms = [name.replace("_", " ") for name, value in member.guild_permissions if value]
+        perms = [
+            name.replace("_", " ") for name, value in member.guild_permissions if value
+        ]
         perms_text = ", ".join(perms) if perms else "Keine besonderen Rechte"
 
         birthday_text = get_birthday_text(guild.id, member.id)
 
         embed = discord.Embed(
             title=f"Benutzerinfo – {member}",
-            color=member.color if isinstance(member, discord.Member) else discord.Color.blurple(),
+            color=(
+                member.color
+                if isinstance(member, discord.Member)
+                else discord.Color.blurple()
+            ),
         )
 
         try:
@@ -252,23 +269,43 @@ class UserManagementCog(commands.Cog):
 
         await interaction.response.send_message(embed=embed, ephemeral=False)
 
-    @moderation_group.command(name="warn", description="Verwarnt einen Nutzer und speichert den Grund.")
+    @moderation_group.command(
+        name="warn", description="Verwarnt einen Nutzer und speichert den Grund."
+    )
     @app_commands.describe(user="User", grund="Grund (optional)")
-    async def warn(self, interaction: discord.Interaction, user: discord.Member, grund: Optional[str] = None):
+    async def warn(
+        self,
+        interaction: discord.Interaction,
+        user: discord.Member,
+        grund: Optional[str] = None,
+    ):
         if interaction.guild is None:
-            await interaction.response.send_message("Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
+            )
             return
 
         if not is_allowed(interaction.user):
-            await interaction.response.send_message("Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True
+            )
             return
 
         if user.id == interaction.user.id:
-            await interaction.response.send_message("Du kannst dich nicht selbst verwarnen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Du kannst dich nicht selbst verwarnen.", ephemeral=True
+            )
             return
 
-        if user.top_role >= interaction.user.top_role and interaction.user != interaction.guild.owner:
-            await interaction.response.send_message("Du kannst keinen User verwarnen, der gleich- oder höhergestellt ist als du.", ephemeral=True)
+        if (
+            user.top_role >= interaction.user.top_role
+            and interaction.user != interaction.guild.owner
+        ):
+            await interaction.response.send_message(
+                "Du kannst keinen User verwarnen, der gleich- oder höhergestellt ist als du.",
+                ephemeral=True,
+            )
             return
 
         count = add_warning(interaction.guild.id, user.id, interaction.user.id, grund)
@@ -280,27 +317,38 @@ class UserManagementCog(commands.Cog):
         )
 
         try:
-            await user.send(f"Du wurdest auf **{interaction.guild.name}** verwarnt.\nGrund: {reason_text}")
+            await user.send(
+                f"Du wurdest auf **{interaction.guild.name}** verwarnt.\nGrund: {reason_text}"
+            )
         except discord.Forbidden:
             pass
         except discord.HTTPException:
             logger.exception("warn DM HTTPException")
 
-    @moderation_group.command(name="warnings", description="Zeigt alle Verwarnungen eines Nutzers an.")
+    @moderation_group.command(
+        name="warnings", description="Zeigt alle Verwarnungen eines Nutzers an."
+    )
     @app_commands.describe(user="User")
     async def warnings(self, interaction: discord.Interaction, user: discord.Member):
         if interaction.guild is None:
-            await interaction.response.send_message("Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
+            )
             return
 
         if not is_allowed(interaction.user):
-            await interaction.response.send_message("Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True
+            )
             return
 
         warns = get_warnings(interaction.guild.id, user.id)
 
         if not warns:
-            await interaction.response.send_message(f"{user.mention} hat bisher keine Verwarnungen.", ephemeral=True)
+            await interaction.response.send_message(
+                f"{user.mention} hat bisher keine Verwarnungen.", ephemeral=True
+            )
             return
 
         embed = discord.Embed(
@@ -315,7 +363,11 @@ class UserManagementCog(commands.Cog):
             ts_iso = entry.get("timestamp")
 
             try:
-                ts = discord.utils.parse_time(ts_iso) if hasattr(discord.utils, "parse_time") else None
+                ts = (
+                    discord.utils.parse_time(ts_iso)
+                    if hasattr(discord.utils, "parse_time")
+                    else None
+                )
             except Exception:
                 ts = None
 
@@ -329,19 +381,40 @@ class UserManagementCog(commands.Cog):
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @moderation_group.command(name="clearwarnings", description="Löscht Verwarnungen eines Users (ohne Index: alle).")
-    @app_commands.describe(user="User", index="Index (1-basiert) einer einzelnen Verwarnung (optional)")
-    async def clearwarnings(self, interaction: discord.Interaction, user: discord.Member, index: Optional[int] = None):
+    @moderation_group.command(
+        name="clearwarnings",
+        description="Löscht Verwarnungen eines Users (ohne Index: alle).",
+    )
+    @app_commands.describe(
+        user="User", index="Index (1-basiert) einer einzelnen Verwarnung (optional)"
+    )
+    async def clearwarnings(
+        self,
+        interaction: discord.Interaction,
+        user: discord.Member,
+        index: Optional[int] = None,
+    ):
         if interaction.guild is None:
-            await interaction.response.send_message("Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
+            )
             return
 
         if not is_allowed(interaction.user):
-            await interaction.response.send_message("Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True
+            )
             return
 
-        if user.top_role >= interaction.user.top_role and interaction.user != interaction.guild.owner:
-            await interaction.response.send_message("Du kannst keine Verwarnungen von Usern löschen, die gleich- oder höhergestellt sind als du.", ephemeral=True)
+        if (
+            user.top_role >= interaction.user.top_role
+            and interaction.user != interaction.guild.owner
+        ):
+            await interaction.response.send_message(
+                "Du kannst keine Verwarnungen von Usern löschen, die gleich- oder höhergestellt sind als du.",
+                ephemeral=True,
+            )
             return
 
         if index is not None:
@@ -354,12 +427,18 @@ class UserManagementCog(commands.Cog):
                 )
                 return
 
-            await interaction.response.send_message(f"✅ Verwarnung #{index} von {user.mention} wurde gelöscht.", ephemeral=True)
+            await interaction.response.send_message(
+                f"✅ Verwarnung #{index} von {user.mention} wurde gelöscht.",
+                ephemeral=True,
+            )
             return
 
         count = clear_warnings_all(interaction.guild.id, user.id)
         if count <= 0:
-            await interaction.response.send_message(f"{user.mention} hat keine Verwarnungen, die gelöscht werden können.", ephemeral=True)
+            await interaction.response.send_message(
+                f"{user.mention} hat keine Verwarnungen, die gelöscht werden können.",
+                ephemeral=True,
+            )
             return
 
         await interaction.response.send_message(
@@ -369,27 +448,47 @@ class UserManagementCog(commands.Cog):
 
     @moderation_group.command(name="ban", description="Bannt einen Nutzer vom Server.")
     @app_commands.describe(user="User", grund="Grund (optional)")
-    async def ban(self, interaction: discord.Interaction, user: discord.Member, grund: Optional[str] = None):
+    async def ban(
+        self,
+        interaction: discord.Interaction,
+        user: discord.Member,
+        grund: Optional[str] = None,
+    ):
         if interaction.guild is None:
-            await interaction.response.send_message("Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
+            )
             return
 
         if not is_allowed(interaction.user):
-            await interaction.response.send_message("Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True
+            )
             return
 
         if user.id == interaction.user.id:
-            await interaction.response.send_message("Du kannst dich nicht selbst bannen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Du kannst dich nicht selbst bannen.", ephemeral=True
+            )
             return
 
-        if user.top_role >= interaction.user.top_role and interaction.user != interaction.guild.owner:
-            await interaction.response.send_message("Du kannst keinen User bannen, der gleich- oder höhergestellt ist als du.", ephemeral=True)
+        if (
+            user.top_role >= interaction.user.top_role
+            and interaction.user != interaction.guild.owner
+        ):
+            await interaction.response.send_message(
+                "Du kannst keinen User bannen, der gleich- oder höhergestellt ist als du.",
+                ephemeral=True,
+            )
             return
 
         reason_text = grund or "Kein Grund angegeben"
 
         try:
-            await user.send(f"Du wurdest von **{interaction.guild.name}** gebannt.\nGrund: {reason_text}")
+            await user.send(
+                f"Du wurdest von **{interaction.guild.name}** gebannt.\nGrund: {reason_text}"
+            )
         except discord.Forbidden:
             pass
         except discord.HTTPException:
@@ -398,17 +497,27 @@ class UserManagementCog(commands.Cog):
         try:
             await user.ban(reason=reason_text)
         except discord.Forbidden:
-            await interaction.response.send_message("Ich habe keine Berechtigung, diesen User zu bannen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Ich habe keine Berechtigung, diesen User zu bannen.", ephemeral=True
+            )
             return
         except discord.HTTPException as e:
             logger.exception("ban HTTPException: %r", e)
-            await interaction.response.send_message(f"Beim Bannen ist ein Fehler aufgetreten: `{e}`", ephemeral=True)
+            await interaction.response.send_message(
+                f"Beim Bannen ist ein Fehler aufgetreten: `{e}`", ephemeral=True
+            )
             return
 
-        await interaction.response.send_message(f"{user} wurde gebannt.\nGrund: {reason_text}", ephemeral=False)
+        await interaction.response.send_message(
+            f"{user} wurde gebannt.\nGrund: {reason_text}", ephemeral=False
+        )
 
-    @moderation_group.command(name="timeout", description="Gibt einem Nutzer einen Timeout (in Minuten).")
-    @app_commands.describe(user="User", minuten="Dauer in Minuten", grund="Grund (optional)")
+    @moderation_group.command(
+        name="timeout", description="Gibt einem Nutzer einen Timeout (in Minuten)."
+    )
+    @app_commands.describe(
+        user="User", minuten="Dauer in Minuten", grund="Grund (optional)"
+    )
     async def timeout(
         self,
         interaction: discord.Interaction,
@@ -417,28 +526,46 @@ class UserManagementCog(commands.Cog):
         grund: Optional[str] = None,
     ):
         if interaction.guild is None:
-            await interaction.response.send_message("Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
+            )
             return
 
         if not is_allowed(interaction.user):
-            await interaction.response.send_message("Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True
+            )
             return
 
         if minuten <= 0:
-            await interaction.response.send_message("Die Minuten müssen größer als 0 sein.", ephemeral=True)
+            await interaction.response.send_message(
+                "Die Minuten müssen größer als 0 sein.", ephemeral=True
+            )
             return
 
         if user.id == interaction.user.id:
-            await interaction.response.send_message("Du kannst dich nicht selbst timeouten.", ephemeral=True)
+            await interaction.response.send_message(
+                "Du kannst dich nicht selbst timeouten.", ephemeral=True
+            )
             return
 
-        if user.top_role >= interaction.user.top_role and interaction.user != interaction.guild.owner:
-            await interaction.response.send_message("Du kannst keinen User timeouten, der gleich- oder höhergestellt ist als du.", ephemeral=True)
+        if (
+            user.top_role >= interaction.user.top_role
+            and interaction.user != interaction.guild.owner
+        ):
+            await interaction.response.send_message(
+                "Du kannst keinen User timeouten, der gleich- oder höhergestellt ist als du.",
+                ephemeral=True,
+            )
             return
 
         me = interaction.guild.me
         if me and user.top_role >= me.top_role:
-            await interaction.response.send_message("Ich kann diesen User nicht timeouten (meine Rolle ist zu niedrig).", ephemeral=True)
+            await interaction.response.send_message(
+                "Ich kann diesen User nicht timeouten (meine Rolle ist zu niedrig).",
+                ephemeral=True,
+            )
             return
 
         duration = timedelta(minutes=minuten)
@@ -451,11 +578,16 @@ class UserManagementCog(commands.Cog):
                 until = discord.utils.utcnow() + duration
                 await user.edit(timed_out_until=until, reason=reason_text)
         except discord.Forbidden:
-            await interaction.response.send_message("Ich habe keine Berechtigung, diesen User zu timeouten.", ephemeral=True)
+            await interaction.response.send_message(
+                "Ich habe keine Berechtigung, diesen User zu timeouten.", ephemeral=True
+            )
             return
         except discord.HTTPException as e:
             logger.exception("timeout HTTPException: %r", e)
-            await interaction.response.send_message(f"Beim Setzen des Timeouts ist ein Fehler aufgetreten: `{e}`", ephemeral=True)
+            await interaction.response.send_message(
+                f"Beim Setzen des Timeouts ist ein Fehler aufgetreten: `{e}`",
+                ephemeral=True,
+            )
             return
 
         await interaction.response.send_message(
@@ -464,7 +596,9 @@ class UserManagementCog(commands.Cog):
         )
 
         try:
-            await user.send(f"Du wurdest auf **{interaction.guild.name}** für {minuten} Minuten in Timeout gesetzt.\nGrund: {reason_text}")
+            await user.send(
+                f"Du wurdest auf **{interaction.guild.name}** für {minuten} Minuten in Timeout gesetzt.\nGrund: {reason_text}"
+            )
         except discord.Forbidden:
             pass
         except discord.HTTPException:

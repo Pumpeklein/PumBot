@@ -41,7 +41,9 @@ def parse_birthday(date_str: str) -> tuple[int, int, Optional[int]]:
     date_str = date_str.strip()
     match = re.fullmatch(r"(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?", date_str)
     if not match:
-        raise ValueError("Ungültiges Datumsformat. Nutze TT.MM oder TT.MM.JJ/TT.MM.JJJJ.")
+        raise ValueError(
+            "Ungültiges Datumsformat. Nutze TT.MM oder TT.MM.JJ/TT.MM.JJJJ."
+        )
 
     day = int(match.group(1))
     month = int(match.group(2))
@@ -129,7 +131,9 @@ class BirthdayCog(commands.Cog):
             return None
 
         guild_data = data[g_id]
-        by_month: Dict[int, list[tuple[int, str, Optional[int]]]] = {m: [] for m in range(1, 13)}
+        by_month: Dict[int, list[tuple[int, str, Optional[int]]]] = {
+            m: [] for m in range(1, 13)
+        }
 
         for user_id_str, info in guild_data.items():
             if user_id_str == "_config":
@@ -158,7 +162,9 @@ class BirthdayCog(commands.Cog):
                 entries.sort(key=lambda x: x[0])
                 lines = []
                 for day, name, year in entries:
-                    lines.append(f"**{day:02d}.** – {name} ({format_birthday(day, month, year)})")
+                    lines.append(
+                        f"**{day:02d}.** – {name} ({format_birthday(day, month, year)})"
+                    )
 
                 value = "\n".join(lines)
                 if len(value) > 1024:
@@ -213,11 +219,17 @@ class BirthdayCog(commands.Cog):
         description="Geburtstage verwalten und anzeigen.",
     )
 
-    @birthdays_group.command(name="set", description="Speichere oder ändere deinen Geburtstag (TT.MM oder TT.MM.JJ).")
+    @birthdays_group.command(
+        name="set",
+        description="Speichere oder ändere deinen Geburtstag (TT.MM oder TT.MM.JJ).",
+    )
     @app_commands.describe(datum="Geburtstag im Format TT.MM oder TT.MM.JJ/TT.MM.JJJJ")
     async def birthdays_set(self, interaction: discord.Interaction, datum: str):
         if interaction.guild is None:
-            await interaction.response.send_message("Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
+            )
             return
 
         try:
@@ -251,10 +263,15 @@ class BirthdayCog(commands.Cog):
 
         await self._update_birthday_list_message(interaction.guild)
 
-    @birthdays_group.command(name="remove", description="Entferne deinen gespeicherten Geburtstag.")
+    @birthdays_group.command(
+        name="remove", description="Entferne deinen gespeicherten Geburtstag."
+    )
     async def birthdays_remove(self, interaction: discord.Interaction):
         if interaction.guild is None:
-            await interaction.response.send_message("Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
+            )
             return
 
         data = load_birthdays()
@@ -264,16 +281,26 @@ class BirthdayCog(commands.Cog):
         if g_id in data and u_id in data[g_id]:
             del data[g_id][u_id]
             save_birthdays(data)
-            await interaction.response.send_message("Dein Geburtstag wurde entfernt.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dein Geburtstag wurde entfernt.", ephemeral=True
+            )
             await self._update_birthday_list_message(interaction.guild)
         else:
-            await interaction.response.send_message("Für dich ist kein Geburtstag gespeichert.", ephemeral=True)
+            await interaction.response.send_message(
+                "Für dich ist kein Geburtstag gespeichert.", ephemeral=True
+            )
 
-    @birthdays_group.command(name="list", description="Zeigt die Geburtstagsliste an und speichert diese Nachricht als Liste.")
+    @birthdays_group.command(
+        name="list",
+        description="Zeigt die Geburtstagsliste an und speichert diese Nachricht als Liste.",
+    )
     async def birthdays_list(self, interaction: discord.Interaction):
         guild = interaction.guild
         if guild is None:
-            await interaction.response.send_message("Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
+            )
             return
 
         embed = self._build_birthday_embed(guild)
@@ -298,15 +325,26 @@ class BirthdayCog(commands.Cog):
         data[g_id]["_config"] = config
         save_birthdays(data)
 
-    @birthdays_group.command(name="set_user", description="Setzt den Geburtstag eines Users (Staff).")
-    @app_commands.describe(user="User", datum="Geburtstag im Format TT.MM oder TT.MM.JJ/TT.MM.JJJJ")
-    async def birthdays_set_user(self, interaction: discord.Interaction, user: discord.Member, datum: str):
+    @birthdays_group.command(
+        name="set_user", description="Setzt den Geburtstag eines Users (Staff)."
+    )
+    @app_commands.describe(
+        user="User", datum="Geburtstag im Format TT.MM oder TT.MM.JJ/TT.MM.JJJJ"
+    )
+    async def birthdays_set_user(
+        self, interaction: discord.Interaction, user: discord.Member, datum: str
+    ):
         if interaction.guild is None:
-            await interaction.response.send_message("Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
+            )
             return
 
         if not is_birthday_staff(interaction.user):
-            await interaction.response.send_message("Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True
+            )
             return
 
         try:
@@ -340,15 +378,25 @@ class BirthdayCog(commands.Cog):
 
         await self._update_birthday_list_message(interaction.guild)
 
-    @birthdays_group.command(name="set_channel", description="Setzt den Channel für automatische Geburtstags-Gratulationen (Staff).")
+    @birthdays_group.command(
+        name="set_channel",
+        description="Setzt den Channel für automatische Geburtstags-Gratulationen (Staff).",
+    )
     @app_commands.describe(channel="Textkanal für Gratulationen")
-    async def birthdays_set_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
+    async def birthdays_set_channel(
+        self, interaction: discord.Interaction, channel: discord.TextChannel
+    ):
         if interaction.guild is None:
-            await interaction.response.send_message("Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
+            )
             return
 
         if not is_birthday_staff(interaction.user):
-            await interaction.response.send_message("Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True
+            )
             return
 
         data = load_birthdays()
@@ -363,7 +411,9 @@ class BirthdayCog(commands.Cog):
 
         save_birthdays(data)
 
-        await interaction.response.send_message(f"Birthday-Channel wurde auf {channel.mention} gesetzt.", ephemeral=True)
+        await interaction.response.send_message(
+            f"Birthday-Channel wurde auf {channel.mention} gesetzt.", ephemeral=True
+        )
 
     @tasks.loop(minutes=1)
     async def birthday_check_loop(self):

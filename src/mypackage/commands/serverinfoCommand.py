@@ -22,14 +22,14 @@ class ServerInfoCog(commands.Cog):
             )
             return
 
-
         owner = guild.owner
         if owner is None:
             try:
-                owner = await guild.fetch_member(guild.owner_id) if guild.owner_id else None
+                owner = (
+                    await guild.fetch_member(guild.owner_id) if guild.owner_id else None
+                )
             except Exception:
                 owner = None
-
 
         is_community = "COMMUNITY" in guild.features
         community_text = "Community ✅" if is_community else "Privat 🔒"
@@ -38,7 +38,6 @@ class ServerInfoCog(commands.Cog):
         roles_count = max(0, len(guild.roles) - 1)  # -1 für @everyone
         text_channels_count = len(guild.text_channels)
         voice_channels_count = len(guild.voice_channels)
-
 
         team_count: str | int
         if guild.members:
@@ -74,20 +73,29 @@ class ServerInfoCog(commands.Cog):
             color=discord.Color.blurple(),
         )
 
-
         if guild.icon:
             embed.set_thumbnail(url=guild.icon.url)
 
-        embed.add_field(name="📅 Erstellt am", value=f"{created}\n({created_rel})", inline=True)
-        embed.add_field(name="👑 Owner", value=(owner.mention if owner else "Unbekannt"), inline=True)
+        embed.add_field(
+            name="📅 Erstellt am", value=f"{created}\n({created_rel})", inline=True
+        )
+        embed.add_field(
+            name="👑 Owner",
+            value=(owner.mention if owner else "Unbekannt"),
+            inline=True,
+        )
         embed.add_field(name="🆔 Server ID", value=str(guild.id), inline=True)
 
         embed.add_field(name="👥 Member", value=str(member_count), inline=True)
         embed.add_field(name="🔖 Rollen", value=str(roles_count), inline=True)
         embed.add_field(name="🛡️ Teamler", value=str(team_count), inline=True)
 
-        embed.add_field(name="💬 Textkanäle", value=str(text_channels_count), inline=True)
-        embed.add_field(name="🔊 Sprachkanäle", value=str(voice_channels_count), inline=True)
+        embed.add_field(
+            name="💬 Textkanäle", value=str(text_channels_count), inline=True
+        )
+        embed.add_field(
+            name="🔊 Sprachkanäle", value=str(voice_channels_count), inline=True
+        )
 
         embed.set_footer(text="PumpBot | ServerInfo")
 

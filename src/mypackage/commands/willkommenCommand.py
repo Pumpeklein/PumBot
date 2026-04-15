@@ -56,14 +56,19 @@ class WelcomeCog(commands.Cog):
                 color=discord.Color.red(),
             )
 
-    async def _get_welcome_channel(self, guild: discord.Guild) -> Optional[discord.abc.Messageable]:
+    async def _get_welcome_channel(
+        self, guild: discord.Guild
+    ) -> Optional[discord.abc.Messageable]:
         channel = guild.get_channel(config.WELCOME_CHANNEL_ID)
         if channel is not None:
             return channel
         try:
             return await guild.fetch_channel(config.WELCOME_CHANNEL_ID)
         except Exception:
-            logger.exception("Welcome-Channel konnte nicht geladen werden (ID: %s)", config.WELCOME_CHANNEL_ID)
+            logger.exception(
+                "Welcome-Channel konnte nicht geladen werden (ID: %s)",
+                config.WELCOME_CHANNEL_ID,
+            )
             return None
 
     async def _send_welcome_message(self, member: discord.Member) -> None:
@@ -125,8 +130,12 @@ class WelcomeCog(commands.Cog):
                 try:
                     target = await guild.fetch_member(interaction.user.id)
                 except Exception:
-                    logger.exception("Konnte Member nicht laden (ID: %s)", interaction.user.id)
-                    await interaction.followup.send("Konnte das Mitglied nicht laden.", ephemeral=True)
+                    logger.exception(
+                        "Konnte Member nicht laden (ID: %s)", interaction.user.id
+                    )
+                    await interaction.followup.send(
+                        "Konnte das Mitglied nicht laden.", ephemeral=True
+                    )
                     return
 
         await self._send_welcome_message(target)

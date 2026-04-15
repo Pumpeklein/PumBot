@@ -67,7 +67,11 @@ def _set_log_channel(guild_id: int, log_type: str, channel_id: int) -> None:
 def _get_log_channel_id(guild_id: int, log_type: str) -> Optional[int]:
     cfg = _get_guild_cfg(guild_id)
     ch = cfg.get("channels", {}).get(log_type)
-    return int(ch) if isinstance(ch, int) or (isinstance(ch, str) and str(ch).isdigit()) else None
+    return (
+        int(ch)
+        if isinstance(ch, int) or (isinstance(ch, str) and str(ch).isdigit())
+        else None
+    )
 
 
 def _staff_role_ids() -> set[int]:
@@ -89,7 +93,9 @@ def _is_staff(member: discord.Member) -> bool:
     return any(r.name in names for r in member.roles)
 
 
-async def _safe_fetch_channel(guild: discord.Guild, channel_id: int) -> Optional[discord.abc.Messageable]:
+async def _safe_fetch_channel(
+    guild: discord.Guild, channel_id: int
+) -> Optional[discord.abc.Messageable]:
     ch = guild.get_channel(channel_id)
     if ch is not None:
         return ch
@@ -123,7 +129,9 @@ def _count_label(voice: discord.VoiceChannel) -> str:
     return f"{len(voice.members)}/{limit}"
 
 
-def _embed_base(title: str, color: discord.Color, thumb_url: Optional[str] = None) -> discord.Embed:
+def _embed_base(
+    title: str, color: discord.Color, thumb_url: Optional[str] = None
+) -> discord.Embed:
     e = discord.Embed(title=title, color=color, timestamp=_utcnow())
     if thumb_url:
         e.set_thumbnail(url=thumb_url)
@@ -175,7 +183,9 @@ class LogsCog(commands.Cog):
             return False
         return _is_staff(interaction.user)
 
-    async def _send_log(self, guild: discord.Guild, log_type: str, embed: discord.Embed) -> None:
+    async def _send_log(
+        self, guild: discord.Guild, log_type: str, embed: discord.Embed
+    ) -> None:
         channel_id = _get_log_channel_id(guild.id, log_type)
         if not channel_id:
             return
@@ -185,19 +195,35 @@ class LogsCog(commands.Cog):
         try:
             await channel.send(embed=embed)
         except Exception:
-            logger.exception("Konnte Log nicht senden (%s) in Guild %s", log_type, guild.id)
+            logger.exception(
+                "Konnte Log nicht senden (%s) in Guild %s", log_type, guild.id
+            )
 
-    async def _audit_hint_voice(self, guild: discord.Guild, target_id: int) -> AuditHint:
+    async def _audit_hint_voice(
+        self, guild: discord.Guild, target_id: int
+    ) -> AuditHint:
         try:
             async for entry in guild.audit_logs(limit=6):
-                if entry.target is None or getattr(entry.target, "id", None) != target_id:
+                if (
+                    entry.target is None
+                    or getattr(entry.target, "id", None) != target_id
+                ):
                     continue
-                if entry.action in (discord.AuditLogAction.member_move, discord.AuditLogAction.member_disconnect):
+                if entry.action in (
+                    discord.AuditLogAction.member_move,
+                    discord.AuditLogAction.member_disconnect,
+                ):
                     if entry.created_at is None:
                         continue
-                    age = (_utcnow() - entry.created_at.replace(tzinfo=timezone.utc)).total_seconds()
+                    age = (
+                        _utcnow() - entry.created_at.replace(tzinfo=timezone.utc)
+                    ).total_seconds()
                     if age <= 15:
-                        actor = entry.user if isinstance(entry.user, discord.Member) else None
+                        actor = (
+                            entry.user
+                            if isinstance(entry.user, discord.Member)
+                            else None
+                        )
                         return AuditHint(action=entry.action, actor=actor)
         except Exception:
             return AuditHint()
@@ -226,7 +252,9 @@ class LogsCog(commands.Cog):
 
         me = guild.me
         if me is not None:
-            overwrites[me] = discord.PermissionOverwrite(view_channel=True, send_messages=True, embed_links=True)
+            overwrites[me] = discord.PermissionOverwrite(
+                view_channel=True, send_messages=True, embed_links=True
+            )
 
         try:
             await channel.edit(overwrites=overwrites)
@@ -237,7 +265,10 @@ class LogsCog(commands.Cog):
             logger.exception("Fehler beim Setzen der Channel-Overwrites")
             return False, "Unbekannter Fehler beim Setzen der Rechte."
 
-    @logs.command(name="set", description="Setzt einen Log-Channel (voice/user/server/message/welcome).")
+    @logs.command(
+        name="set",
+        description="Setzt einen Log-Channel (voice/user/server/message/welcome).",
+    )
     @app_commands.describe(
         log_type="voice/user/server/message/welcome",
         channel="Channel, in den geloggt werden soll",
@@ -251,12 +282,16 @@ class LogsCog(commands.Cog):
         lock: Optional[bool] = False,
     ) -> None:
         if not self._check_staff(interaction):
-            await interaction.response.send_message("Dafür hast du keine Berechtigung.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dafür hast du keine Berechtigung.", ephemeral=True
+            )
             return
 
         guild = interaction.guild
         if guild is None:
-            await interaction.response.send_message("Nur auf einem Server nutzbar.", ephemeral=True)
+            await interaction.response.send_message(
+                "Nur auf einem Server nutzbar.", ephemeral=True
+            )
             return
 
         log_type = log_type.lower().strip()
@@ -280,7 +315,9 @@ class LogsCog(commands.Cog):
     async def logs_show(self, interaction: discord.Interaction) -> None:
         guild = interaction.guild
         if guild is None:
-            await interaction.response.send_message("Nur auf einem Server nutzbar.", ephemeral=True)
+            await interaction.response.send_message(
+                "Nur auf einem Server nutzbar.", ephemeral=True
+            )
             return
 
         cfg = _get_guild_cfg(guild.id).get("channels", {})
@@ -295,16 +332,22 @@ class LogsCog(commands.Cog):
 
         await interaction.response.send_message("\n".join(lines), ephemeral=True)
 
-    @logs.command(name="test", description="Sendet einen Test-Log in den gewünschten Typ.")
+    @logs.command(
+        name="test", description="Sendet einen Test-Log in den gewünschten Typ."
+    )
     @app_commands.describe(log_type="voice/user/server/message/welcome")
     async def logs_test(self, interaction: discord.Interaction, log_type: str) -> None:
         if not self._check_staff(interaction):
-            await interaction.response.send_message("Dafür hast du keine Berechtigung.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dafür hast du keine Berechtigung.", ephemeral=True
+            )
             return
 
         guild = interaction.guild
         if guild is None:
-            await interaction.response.send_message("Nur auf einem Server nutzbar.", ephemeral=True)
+            await interaction.response.send_message(
+                "Nur auf einem Server nutzbar.", ephemeral=True
+            )
             return
 
         log_type = log_type.lower().strip()
@@ -326,8 +369,12 @@ class LogsCog(commands.Cog):
         if member.guild is None:
             return
 
-        embed = _embed_base("User joined", _green(), thumb_url=member.display_avatar.url)
-        created = f"<t:{int(member.created_at.replace(tzinfo=timezone.utc).timestamp())}:R>"
+        embed = _embed_base(
+            "User joined", _green(), thumb_url=member.display_avatar.url
+        )
+        created = (
+            f"<t:{int(member.created_at.replace(tzinfo=timezone.utc).timestamp())}:R>"
+        )
         embed.description = _kv_block(
             [
                 ("User", _fmt_name_and_tag(member)),
@@ -347,7 +394,9 @@ class LogsCog(commands.Cog):
         if member.joined_at:
             joined = f"<t:{int(member.joined_at.replace(tzinfo=timezone.utc).timestamp())}:R>"
 
-        roles = [r.mention for r in getattr(member, "roles", []) if r.name != "@everyone"]
+        roles = [
+            r.mention for r in getattr(member, "roles", []) if r.name != "@everyone"
+        ]
         roles_text = " → ".join(roles) if roles else "—"
 
         embed = _embed_base("User left", _red(), thumb_url=member.display_avatar.url)
@@ -363,7 +412,12 @@ class LogsCog(commands.Cog):
         await self._send_log(member.guild, "welcome", embed)
 
     @commands.Cog.listener()
-    async def on_voice_state_update(self, member: discord.Member, before: discord.VoiceState, after: discord.VoiceState) -> None:
+    async def on_voice_state_update(
+        self,
+        member: discord.Member,
+        before: discord.VoiceState,
+        after: discord.VoiceState,
+    ) -> None:
         guild = member.guild
         if guild is None or member.bot:
             return
@@ -375,7 +429,9 @@ class LogsCog(commands.Cog):
             return
 
         if bch is None and ach is not None:
-            embed = _embed_base("User joined channel", _green(), thumb_url=member.display_avatar.url)
+            embed = _embed_base(
+                "User joined channel", _green(), thumb_url=member.display_avatar.url
+            )
             embed.description = _kv_block(
                 [
                     ("User", _fmt_name_and_tag(member)),
@@ -410,7 +466,9 @@ class LogsCog(commands.Cog):
         if bch is not None and ach is not None and bch.id != ach.id:
             hint = await self._audit_hint_voice(guild, member.id)
 
-            embed = _embed_base("User switched channel", _blue(), thumb_url=member.display_avatar.url)
+            embed = _embed_base(
+                "User switched channel", _blue(), thumb_url=member.display_avatar.url
+            )
             lines = [
                 ("User", _fmt_name_and_tag(member)),
                 ("Channel", _fmt_channel_label(ach)),
@@ -426,7 +484,9 @@ class LogsCog(commands.Cog):
             return
 
     @commands.Cog.listener()
-    async def on_member_update(self, before: discord.Member, after: discord.Member) -> None:
+    async def on_member_update(
+        self, before: discord.Member, after: discord.Member
+    ) -> None:
         guild = after.guild
         if guild is None or after.bot:
             return
@@ -435,14 +495,30 @@ class LogsCog(commands.Cog):
 
         if before.nick != after.nick:
             blocks.append(
-                ("User nick update", [("User", _fmt_name_and_tag(after)), ("Before", before.nick or "—"), ("After", after.nick or "—")], _yellow())
+                (
+                    "User nick update",
+                    [
+                        ("User", _fmt_name_and_tag(after)),
+                        ("Before", before.nick or "—"),
+                        ("After", after.nick or "—"),
+                    ],
+                    _yellow(),
+                )
             )
 
         if before.roles != after.roles:
             before_set = {r.id for r in before.roles}
             after_set = {r.id for r in after.roles}
-            added = [r.mention for r in after.roles if r.id not in before_set and r.name != "@everyone"]
-            removed = [r.mention for r in before.roles if r.id not in after_set and r.name != "@everyone"]
+            added = [
+                r.mention
+                for r in after.roles
+                if r.id not in before_set and r.name != "@everyone"
+            ]
+            removed = [
+                r.mention
+                for r in before.roles
+                if r.id not in after_set and r.name != "@everyone"
+            ]
 
             if added or removed:
                 lines = [("User", _fmt_name_and_tag(after))]
@@ -468,7 +544,9 @@ class LogsCog(commands.Cog):
             await self._send_log(guild, "user", embed)
 
     @commands.Cog.listener()
-    async def on_guild_update(self, before: discord.Guild, after: discord.Guild) -> None:
+    async def on_guild_update(
+        self, before: discord.Guild, after: discord.Guild
+    ) -> None:
         changes = []
         if before.name != after.name:
             changes.append(("Name", before.name, after.name))
@@ -480,7 +558,9 @@ class LogsCog(commands.Cog):
         if not changes:
             return
 
-        embed = _embed_base("Server updated", _blue(), thumb_url=after.icon.url if after.icon else None)
+        embed = _embed_base(
+            "Server updated", _blue(), thumb_url=after.icon.url if after.icon else None
+        )
         lines = [("Server", f"{after.name} (`{after.id}`)")]
         for n, b, a in changes:
             lines.append((n, f"{b} → {a}"))
@@ -512,14 +592,22 @@ class LogsCog(commands.Cog):
         await self._send_log(channel.guild, "server", embed)
 
     @commands.Cog.listener()
-    async def on_guild_channel_update(self, before: discord.abc.GuildChannel, after: discord.abc.GuildChannel) -> None:
+    async def on_guild_channel_update(
+        self, before: discord.abc.GuildChannel, after: discord.abc.GuildChannel
+    ) -> None:
         changes = []
         if before.name != after.name:
             changes.append(("Name", before.name, after.name))
 
         if hasattr(before, "topic") and hasattr(after, "topic"):
             if getattr(before, "topic", None) != getattr(after, "topic", None):
-                changes.append(("Topic", getattr(before, "topic", None) or "—", getattr(after, "topic", None) or "—"))
+                changes.append(
+                    (
+                        "Topic",
+                        getattr(before, "topic", None) or "—",
+                        getattr(after, "topic", None) or "—",
+                    )
+                )
 
         if not changes:
             return
@@ -543,11 +631,15 @@ class LogsCog(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_role_delete(self, role: discord.Role) -> None:
         embed = _embed_base("Role deleted", _red())
-        embed.description = _kv_block([("Role", f"`{role.name}`"), ("ID", str(role.id))])
+        embed.description = _kv_block(
+            [("Role", f"`{role.name}`"), ("ID", str(role.id))]
+        )
         await self._send_log(role.guild, "server", embed)
 
     @commands.Cog.listener()
-    async def on_guild_role_update(self, before: discord.Role, after: discord.Role) -> None:
+    async def on_guild_role_update(
+        self, before: discord.Role, after: discord.Role
+    ) -> None:
         changes = []
         if before.name != after.name:
             changes.append(("Name", before.name, after.name))
@@ -573,13 +665,18 @@ class LogsCog(commands.Cog):
         if message.author is None or message.author.bot:
             return
 
-        embed = _embed_base("Message deleted", _red(), thumb_url=message.author.display_avatar.url)
+        embed = _embed_base(
+            "Message deleted", _red(), thumb_url=message.author.display_avatar.url
+        )
         created = "—"
         if message.created_at:
             created = f"<t:{int(message.created_at.replace(tzinfo=timezone.utc).timestamp())}:R>"
 
         lines = [
-            ("Channel", f"{message.channel.mention if hasattr(message.channel, 'mention') else f'`{message.channel.id}`'}"),
+            (
+                "Channel",
+                f"{message.channel.mention if hasattr(message.channel, 'mention') else f'`{message.channel.id}`'}",
+            ),
             ("Message ID", str(message.id)),
             ("Message author", _fmt_name_and_tag(message.author)),
             ("Message created", created),
@@ -601,7 +698,9 @@ class LogsCog(commands.Cog):
         await self._send_log(message.guild, "message", embed)
 
     @commands.Cog.listener()
-    async def on_message_edit(self, before: discord.Message, after: discord.Message) -> None:
+    async def on_message_edit(
+        self, before: discord.Message, after: discord.Message
+    ) -> None:
         if after.guild is None:
             return
         if after.author is None or after.author.bot:
@@ -609,13 +708,18 @@ class LogsCog(commands.Cog):
         if before.content == after.content:
             return
 
-        embed = _embed_base("Message edited", _yellow(), thumb_url=after.author.display_avatar.url)
+        embed = _embed_base(
+            "Message edited", _yellow(), thumb_url=after.author.display_avatar.url
+        )
         created = "—"
         if after.created_at:
             created = f"<t:{int(after.created_at.replace(tzinfo=timezone.utc).timestamp())}:R>"
 
         lines = [
-            ("Channel", f"{after.channel.mention if hasattr(after.channel, 'mention') else f'`{after.channel.id}`'}"),
+            (
+                "Channel",
+                f"{after.channel.mention if hasattr(after.channel, 'mention') else f'`{after.channel.id}`'}",
+            ),
             ("Message ID", str(after.id)),
             ("Message author", _fmt_name_and_tag(after.author)),
             ("Message created", created),

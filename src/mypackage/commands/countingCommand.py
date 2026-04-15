@@ -85,7 +85,13 @@ class CountingCog(commands.Cog):
         if role_ids:
             return _has_any_role(user, role_ids)
 
-        role_names = set(getattr(config, "COUNTING_STAFF_ROLE_NAMES", ["Twitch Moderator", "Discord Moderator", "Team"]))
+        role_names = set(
+            getattr(
+                config,
+                "COUNTING_STAFF_ROLE_NAMES",
+                ["Twitch Moderator", "Discord Moderator", "Team"],
+            )
+        )
         return any(r.name in role_names for r in user.roles)
 
     def _get_channel_id(self, guild_id: int) -> Optional[int]:
@@ -135,7 +141,9 @@ class CountingCog(commands.Cog):
         stats.update({k: int(raw.get(k, v)) for k, v in stats.items()})
         return stats
 
-    def _set_user_stats(self, guild_id: int, user_id: int, stats: Dict[str, int]) -> None:
+    def _set_user_stats(
+        self, guild_id: int, user_id: int, stats: Dict[str, int]
+    ) -> None:
         cfg = _get_guild_cfg(guild_id)
         users = cfg.setdefault("users", {})
         users[str(user_id)] = {
@@ -161,7 +169,9 @@ class CountingCog(commands.Cog):
         stats["current_streak"] = 0
         self._set_user_stats(guild_id, user_id, stats)
 
-    async def _handle_correct_number(self, message: discord.Message, current_number: int) -> None:
+    async def _handle_correct_number(
+        self, message: discord.Message, current_number: int
+    ) -> None:
         try:
             guild_id = message.guild.id  # type: ignore
 
@@ -170,12 +180,16 @@ class CountingCog(commands.Cog):
                 self._set_highscore(guild_id, current_number)
 
             self._update_user_correct(guild_id, message.author.id)
-            self._set_state(guild_id, message.channel.id, current_number, message.author.id)
+            self._set_state(
+                guild_id, message.channel.id, current_number, message.author.id
+            )
             await message.add_reaction("✅")
         except Exception:
             logger.exception("Fehler beim Verarbeiten einer korrekten Zahl")
 
-    async def _handle_wrong_number(self, message: discord.Message, expected: int, reason: str) -> None:
+    async def _handle_wrong_number(
+        self, message: discord.Message, expected: int, reason: str
+    ) -> None:
         try:
             guild_id = message.guild.id  # type: ignore
 
@@ -195,9 +209,13 @@ class CountingCog(commands.Cog):
         name="setchannel",
         description="Legt den Channel fest, in dem gezählt werden soll.",
     )
-    async def counting_setchannel(self, interaction: discord.Interaction, channel: discord.TextChannel):
+    async def counting_setchannel(
+        self, interaction: discord.Interaction, channel: discord.TextChannel
+    ):
         if not self._is_allowed_staff(interaction):
-            await interaction.response.send_message("Dafür hast du keine Berechtigung.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dafür hast du keine Berechtigung.", ephemeral=True
+            )
             return
 
         guild = interaction.guild
@@ -222,7 +240,9 @@ class CountingCog(commands.Cog):
     )
     async def counting_reset(self, interaction: discord.Interaction):
         if not self._is_allowed_staff(interaction):
-            await interaction.response.send_message("Dafür hast du keine Berechtigung.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dafür hast du keine Berechtigung.", ephemeral=True
+            )
             return
 
         guild = interaction.guild
@@ -332,8 +352,12 @@ class CountingCog(commands.Cog):
                             pass
             entries.append((user_id_int, stats))
 
-        top_by_correct = sorted(entries, key=lambda e: e[1]["correct"], reverse=True)[:10]
-        top_by_streak = sorted(entries, key=lambda e: e[1]["best_streak"], reverse=True)[:10]
+        top_by_correct = sorted(entries, key=lambda e: e[1]["correct"], reverse=True)[
+            :10
+        ]
+        top_by_streak = sorted(
+            entries, key=lambda e: e[1]["best_streak"], reverse=True
+        )[:10]
 
         embed = discord.Embed(
             title="📊 Counting Leaderboard",
@@ -401,7 +425,9 @@ class CountingCog(commands.Cog):
             number = int(content)
             if number <= 0:
                 expected = self._get_last_number(guild_id) + 1
-                await self._handle_wrong_number(message, expected, "Zahl muss positiv sein")
+                await self._handle_wrong_number(
+                    message, expected, "Zahl muss positiv sein"
+                )
                 return
 
             last_number = self._get_last_number(guild_id)
@@ -409,7 +435,9 @@ class CountingCog(commands.Cog):
 
             last_user_id = self._get_last_user(guild_id)
             if last_user_id == message.author.id:
-                await self._handle_wrong_number(message, expected, "Du darfst nicht zweimal hintereinander zählen")
+                await self._handle_wrong_number(
+                    message, expected, "Du darfst nicht zweimal hintereinander zählen"
+                )
                 return
 
             if number != expected:

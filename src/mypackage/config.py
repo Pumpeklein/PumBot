@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Final
+
 # Haupt-server ID
 GUILD_ID: Final[int] = 1441169067326177405
 # willkommen channel ID

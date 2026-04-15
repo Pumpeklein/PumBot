@@ -10,11 +10,13 @@ DB_PATH = DATA_DIR / "logs.db"
 
 load_dotenv()
 
+
 def get_env(name: str, default: str | None = None) -> str:
     val = os.getenv(name, default)
     if val is None or val.strip() == "":
         raise RuntimeError(f"Missing required env var: {name}")
     return val
+
 
 class Config:
     FLASK_SECRET_KEY: str = os.getenv("FLASK_SECRET_KEY", "dev-secret-change-me")
@@ -25,6 +27,7 @@ class Config:
     DB_PATH = DB_PATH
     DATA_DIR = DATA_DIR
     TRANSCRIPTS_DIR = TRANSCRIPTS_DIR
+
 
 def ensure_dirs() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)

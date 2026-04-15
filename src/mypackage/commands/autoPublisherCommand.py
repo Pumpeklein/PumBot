@@ -16,7 +16,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 AUTO_PUB_FILE = BASE_DIR / "database" / "auto_publisher.json"
 
 
-
 def _load_data() -> Dict[str, Any]:
     try:
         if not AUTO_PUB_FILE.exists():
@@ -96,8 +95,6 @@ class AutoPublisherCog(commands.Cog):
         self._set_channels(guild_id, channels)
         return True
 
-
-
     @autopublisher.command(
         name="add",
         description="Fügt einen Announcement-Channel zum Auto-Publisher hinzu.",
@@ -114,7 +111,6 @@ class AutoPublisherCog(commands.Cog):
                 "Dieser Befehl kann nur auf einem Server verwendet werden.",
                 ephemeral=True,
             )
-
 
         is_news = False
         try:
@@ -201,8 +197,6 @@ class AutoPublisherCog(commands.Cog):
             ephemeral=True,
         )
 
-
-
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
 
@@ -221,17 +215,19 @@ class AutoPublisherCog(commands.Cog):
 
             channel = message.channel
 
-
             is_news = False
             try:
-                if hasattr(channel, "is_news") and callable(getattr(channel, "is_news")):
+                if hasattr(channel, "is_news") and callable(
+                    getattr(channel, "is_news")
+                ):
                     is_news = channel.is_news()
             except Exception:
-                logger.exception("Fehler bei der Prüfung, ob Channel ein News-Channel ist")
+                logger.exception(
+                    "Fehler bei der Prüfung, ob Channel ein News-Channel ist"
+                )
 
             if not is_news:
                 return
-
 
             try:
                 await message.publish()
@@ -266,4 +262,3 @@ async def setup(bot: commands.Bot):
 
     guild_obj = discord.Object(id=config.GUILD_ID)
     bot.tree.add_command(cog.autopublisher, guild=guild_obj)
-

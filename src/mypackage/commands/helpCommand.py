@@ -9,7 +9,14 @@ from discord.ext import commands
 from src.mypackage.bot import logger
 
 
-TEAM_ROLES = {"Admin", "Team", "Twitch Moderator", "Discord Moderator", "Twitch Moderation", "Discord Moderation"}
+TEAM_ROLES = {
+    "Admin",
+    "Team",
+    "Twitch Moderator",
+    "Discord Moderator",
+    "Twitch Moderation",
+    "Discord Moderation",
+}
 
 HELP_LINKS: List[Tuple[str, str, str]] = [
     ("Instagram", "https://www.instagram.com/pumpeklein", "📸"),
@@ -24,7 +31,9 @@ def is_team_member(member: discord.Member) -> bool:
     return any(r.name in TEAM_ROLES for r in member.roles)
 
 
-def _iter_all_app_commands(tree: app_commands.CommandTree) -> List[app_commands.Command]:
+def _iter_all_app_commands(
+    tree: app_commands.CommandTree,
+) -> List[app_commands.Command]:
     out: List[app_commands.Command] = []
     for cmd in tree.get_commands():
         out.append(cmd)
@@ -79,7 +88,12 @@ def _split_lines_into_fields(
             cur_len += add_len
 
     if buf:
-        fields.append((f"{base_field_name} ({idx})" if idx > 1 else base_field_name, "\n".join(buf)[:max_len]))
+        fields.append(
+            (
+                f"{base_field_name} ({idx})" if idx > 1 else base_field_name,
+                "\n".join(buf)[:max_len],
+            )
+        )
 
     return fields
 
@@ -97,20 +111,30 @@ async def send_or_edit(
 
     if edit:
         try:
-            await interaction.response.edit_message(content=content, embed=embed, view=view)
+            await interaction.response.edit_message(
+                content=content, embed=embed, view=view
+            )
             return
         except discord.InteractionResponded:
-            await interaction.followup.send(content=content, embed=embed, view=view, ephemeral=ephemeral)
+            await interaction.followup.send(
+                content=content, embed=embed, view=view, ephemeral=ephemeral
+            )
             return
 
     try:
-        await interaction.response.send_message(content=content, embed=embed, view=view, ephemeral=ephemeral)
+        await interaction.response.send_message(
+            content=content, embed=embed, view=view, ephemeral=ephemeral
+        )
     except discord.InteractionResponded:
-        await interaction.followup.send(content=content, embed=embed, view=view, ephemeral=ephemeral)
+        await interaction.followup.send(
+            content=content, embed=embed, view=view, ephemeral=ephemeral
+        )
 
 
 class CategoryDef:
-    def __init__(self, key: str, label: str, desc: str, emoji: str, groups: Iterable[str]):
+    def __init__(
+        self, key: str, label: str, desc: str, emoji: str, groups: Iterable[str]
+    ):
         self.key = key
         self.label = label
         self.desc = desc
@@ -228,7 +252,11 @@ def _build_category_embed(
     bot: commands.Bot,
     category: CategoryDef,
 ) -> discord.Embed:
-    all_cmds = [c for c in _iter_all_app_commands(bot.tree) if not isinstance(c, app_commands.Group)]
+    all_cmds = [
+        c
+        for c in _iter_all_app_commands(bot.tree)
+        if not isinstance(c, app_commands.Group)
+    ]
 
     filtered: List[app_commands.Command] = []
     for c in all_cmds:
@@ -305,7 +333,9 @@ class HelpCategorySelect(discord.ui.Select):
             selected_key = self.values[0]
             cat = next((c for c in CATEGORIES if c.key == selected_key), None)
             if cat is None:
-                await interaction.response.send_message("Kategorie nicht gefunden.", ephemeral=True)
+                await interaction.response.send_message(
+                    "Kategorie nicht gefunden.", ephemeral=True
+                )
                 return
 
             embed = _build_category_embed(bot=self.bot, category=cat)
@@ -314,7 +344,9 @@ class HelpCategorySelect(discord.ui.Select):
         except Exception:
             logger.exception("HelpCategorySelect callback error")
             if not interaction.response.is_done():
-                await interaction.response.send_message("Fehler beim Laden der Kategorie.", ephemeral=True)
+                await interaction.response.send_message(
+                    "Fehler beim Laden der Kategorie.", ephemeral=True
+                )
 
 
 class HelpView(discord.ui.View):
@@ -333,7 +365,9 @@ class HelpView(discord.ui.View):
             )
 
 
-def _command_detail_embed(cmd: app_commands.Command, *, title_prefix: str) -> discord.Embed:
+def _command_detail_embed(
+    cmd: app_commands.Command, *, title_prefix: str
+) -> discord.Embed:
     qn = _qualified_name(cmd)
     desc = (cmd.description or "Keine Beschreibung verfügbar.").strip()
 
@@ -353,7 +387,9 @@ def _command_detail_embed(cmd: app_commands.Command, *, title_prefix: str) -> di
             req = "Pflicht" if preq else "Optional"
             plines.append(f"• **{pname}** ({req}) – {pdesc}".strip())
 
-        for name, value in _split_lines_into_fields(plines, base_field_name="🧾 Parameter"):
+        for name, value in _split_lines_into_fields(
+            plines, base_field_name="🧾 Parameter"
+        ):
             embed.add_field(name=name, value=value, inline=False)
 
     return embed
@@ -371,7 +407,11 @@ class HelpCog(commands.Cog):
         current_l = (current or "").lower()
         out: List[app_commands.Choice[str]] = []
 
-        cmds = [c for c in _iter_all_app_commands(self.bot.tree) if not isinstance(c, app_commands.Group)]
+        cmds = [
+            c
+            for c in _iter_all_app_commands(self.bot.tree)
+            if not isinstance(c, app_commands.Group)
+        ]
         cmds.sort(key=lambda x: _qualified_name(x).lower())
 
         for c in cmds:
@@ -383,7 +423,10 @@ class HelpCog(commands.Cog):
 
         return out
 
-    @app_commands.command(name="help", description="Zeigt Hilfe mit Kategorien oder Details zu einem Command.")
+    @app_commands.command(
+        name="help",
+        description="Zeigt Hilfe mit Kategorien oder Details zu einem Command.",
+    )
     @app_commands.describe(
         user="Optional: Person, die gepingt werden soll",
         command="Optional: Command-Name, z.B. 'ticket close'",
@@ -399,8 +442,14 @@ class HelpCog(commands.Cog):
         try:
             public = bool(sichtbar)
             if public:
-                if not interaction.guild or not isinstance(interaction.user, discord.Member) or not is_team_member(interaction.user):
-                    await interaction.response.send_message("Öffentliche Hilfe dürfen nur Teamler posten.", ephemeral=True)
+                if (
+                    not interaction.guild
+                    or not isinstance(interaction.user, discord.Member)
+                    or not is_team_member(interaction.user)
+                ):
+                    await interaction.response.send_message(
+                        "Öffentliche Hilfe dürfen nur Teamler posten.", ephemeral=True
+                    )
                     return
 
             ping_content = user.mention if user else None
@@ -418,11 +467,20 @@ class HelpCog(commands.Cog):
                         break
 
                 if target is None:
-                    await interaction.response.send_message("Command nicht gefunden.", ephemeral=True)
+                    await interaction.response.send_message(
+                        "Command nicht gefunden.", ephemeral=True
+                    )
                     return
 
                 embed = _command_detail_embed(target, title_prefix="❓ Hilfe –")
-                await send_or_edit(interaction, content=ping_content, embed=embed, view=view, public=public, edit=False)
+                await send_or_edit(
+                    interaction,
+                    content=ping_content,
+                    embed=embed,
+                    view=view,
+                    public=public,
+                    edit=False,
+                )
                 return
 
             embed = discord.Embed(
@@ -431,22 +489,39 @@ class HelpCog(commands.Cog):
                 color=discord.Color.blurple(),
             )
 
-            all_cmds = [c for c in _iter_all_app_commands(self.bot.tree) if not isinstance(c, app_commands.Group)]
+            all_cmds = [
+                c
+                for c in _iter_all_app_commands(self.bot.tree)
+                if not isinstance(c, app_commands.Group)
+            ]
             embed.set_footer(text=f"Gesamt: {len(all_cmds)} Slash-Commands")
 
-            await send_or_edit(interaction, content=ping_content, embed=embed, view=view, public=public, edit=False)
+            await send_or_edit(
+                interaction,
+                content=ping_content,
+                embed=embed,
+                view=view,
+                public=public,
+                edit=False,
+            )
 
         except Exception:
             logger.exception("help_cmd error")
             try:
                 if interaction.response.is_done():
-                    await interaction.followup.send("Fehler beim Anzeigen der Hilfe.", ephemeral=True)
+                    await interaction.followup.send(
+                        "Fehler beim Anzeigen der Hilfe.", ephemeral=True
+                    )
                 else:
-                    await interaction.response.send_message("Fehler beim Anzeigen der Hilfe.", ephemeral=True)
+                    await interaction.response.send_message(
+                        "Fehler beim Anzeigen der Hilfe.", ephemeral=True
+                    )
             except Exception:
                 logger.exception("help_cmd followup error")
 
-    @app_commands.command(name="faq", description="FAQ / Erklärung zu Commands (für alle Slash-Commands).")
+    @app_commands.command(
+        name="faq", description="FAQ / Erklärung zu Commands (für alle Slash-Commands)."
+    )
     @app_commands.describe(
         user="Optional: Person, die gepingt werden soll",
         command="Optional: Command-Name, z.B. 'counting setchannel'",
@@ -462,8 +537,14 @@ class HelpCog(commands.Cog):
         try:
             public = bool(sichtbar)
             if public:
-                if not interaction.guild or not isinstance(interaction.user, discord.Member) or not is_team_member(interaction.user):
-                    await interaction.response.send_message("Öffentliche FAQ dürfen nur Teamler posten.", ephemeral=True)
+                if (
+                    not interaction.guild
+                    or not isinstance(interaction.user, discord.Member)
+                    or not is_team_member(interaction.user)
+                ):
+                    await interaction.response.send_message(
+                        "Öffentliche FAQ dürfen nur Teamler posten.", ephemeral=True
+                    )
                     return
 
             ping_content = user.mention if user else None
@@ -480,11 +561,20 @@ class HelpCog(commands.Cog):
                         break
 
                 if target is None:
-                    await interaction.response.send_message("Command nicht gefunden.", ephemeral=True)
+                    await interaction.response.send_message(
+                        "Command nicht gefunden.", ephemeral=True
+                    )
                     return
 
                 embed = _command_detail_embed(target, title_prefix="📌 FAQ –")
-                await send_or_edit(interaction, content=ping_content, embed=embed, view=None, public=public, edit=False)
+                await send_or_edit(
+                    interaction,
+                    content=ping_content,
+                    embed=embed,
+                    view=None,
+                    public=public,
+                    edit=False,
+                )
                 return
 
             embed = discord.Embed(
@@ -493,22 +583,42 @@ class HelpCog(commands.Cog):
                 color=discord.Color.blurple(),
             )
 
-            cmds = [c for c in _iter_all_app_commands(self.bot.tree) if not isinstance(c, app_commands.Group)]
+            cmds = [
+                c
+                for c in _iter_all_app_commands(self.bot.tree)
+                if not isinstance(c, app_commands.Group)
+            ]
             cmds.sort(key=lambda x: _qualified_name(x).lower())
 
-            lines = [f"• **/{_qualified_name(c)}** – {(c.description or 'Keine Beschreibung verfügbar.').strip()}" for c in cmds]
-            for name, value in _split_lines_into_fields(lines, base_field_name="📌 Commands"):
+            lines = [
+                f"• **/{_qualified_name(c)}** – {(c.description or 'Keine Beschreibung verfügbar.').strip()}"
+                for c in cmds
+            ]
+            for name, value in _split_lines_into_fields(
+                lines, base_field_name="📌 Commands"
+            ):
                 embed.add_field(name=name, value=value, inline=False)
 
-            await send_or_edit(interaction, content=ping_content, embed=embed, view=None, public=public, edit=False)
+            await send_or_edit(
+                interaction,
+                content=ping_content,
+                embed=embed,
+                view=None,
+                public=public,
+                edit=False,
+            )
 
         except Exception:
             logger.exception("faq_cmd error")
             try:
                 if interaction.response.is_done():
-                    await interaction.followup.send("Fehler beim Anzeigen der FAQ.", ephemeral=True)
+                    await interaction.followup.send(
+                        "Fehler beim Anzeigen der FAQ.", ephemeral=True
+                    )
                 else:
-                    await interaction.response.send_message("Fehler beim Anzeigen der FAQ.", ephemeral=True)
+                    await interaction.response.send_message(
+                        "Fehler beim Anzeigen der FAQ.", ephemeral=True
+                    )
             except Exception:
                 logger.exception("faq_cmd followup error")
 

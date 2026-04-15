@@ -48,7 +48,9 @@ def save_selfroles(data: Dict[str, Any]) -> None:
 class SelfRolesCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._role_queue: asyncio.Queue[Tuple[int, int, str, List[int], Optional[int]]] = asyncio.Queue()
+        self._role_queue: asyncio.Queue[
+            Tuple[int, int, str, List[int], Optional[int]]
+        ] = asyncio.Queue()
         self._role_worker_task: asyncio.Task | None = None
 
     async def cog_load(self) -> None:
@@ -73,14 +75,18 @@ class SelfRolesCog(commands.Cog):
         channel_id: Optional[int] = None,
     ) -> None:
         try:
-            await self._role_queue.put((guild_id, member_id, action, role_ids, channel_id))
+            await self._role_queue.put(
+                (guild_id, member_id, action, role_ids, channel_id)
+            )
         except Exception:
             logger.exception("_enqueue_role_change error")
 
     async def _role_worker(self):
         try:
             while True:
-                guild_id, member_id, action, role_ids, channel_id = await self._role_queue.get()
+                guild_id, member_id, action, role_ids, channel_id = (
+                    await self._role_queue.get()
+                )
                 try:
                     guild = self.bot.get_guild(guild_id)
                     if guild is None:
@@ -101,7 +107,9 @@ class SelfRolesCog(commands.Cog):
 
                     if action == "add":
                         try:
-                            await member.add_roles(*roles, reason="Self-Role per Reaktion hinzugefügt")
+                            await member.add_roles(
+                                *roles, reason="Self-Role per Reaktion hinzugefügt"
+                            )
                         except discord.Forbidden:
                             pass
                         except discord.HTTPException as e:
@@ -111,7 +119,9 @@ class SelfRolesCog(commands.Cog):
 
                     elif action == "remove":
                         try:
-                            await member.remove_roles(*roles, reason="Self-Role per Reaktion entfernt")
+                            await member.remove_roles(
+                                *roles, reason="Self-Role per Reaktion entfernt"
+                            )
                         except discord.Forbidden:
                             pass
                         except discord.HTTPException as e:
@@ -147,15 +157,22 @@ class SelfRolesCog(commands.Cog):
         rollen_und_emojis: str,
     ):
         if interaction.guild is None:
-            await interaction.response.send_message("Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
+            )
             return
 
         if not is_selfrole_staff(interaction.user):
-            await interaction.response.send_message("Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True
+            )
             return
 
         if limit < 0:
-            await interaction.response.send_message("Das Limit muss >= 0 sein.", ephemeral=True)
+            await interaction.response.send_message(
+                "Das Limit muss >= 0 sein.", ephemeral=True
+            )
             return
 
         guild = interaction.guild
@@ -202,7 +219,9 @@ class SelfRolesCog(commands.Cog):
             )
             return
 
-        description = "Reagiere, um Rollen zu erhalten oder zu entfernen.\n\n" + "\n".join(lines)
+        description = (
+            "Reagiere, um Rollen zu erhalten oder zu entfernen.\n\n" + "\n".join(lines)
+        )
 
         embed = discord.Embed(
             title=f"{titel} (Limit: {limit if limit > 0 else '∞'})",
@@ -235,7 +254,9 @@ class SelfRolesCog(commands.Cog):
 
         save_selfroles(data)
 
-    @selfroles_group.command(name="edit", description="Bearbeitet ein bestehendes Self-Role Panel.")
+    @selfroles_group.command(
+        name="edit", description="Bearbeitet ein bestehendes Self-Role Panel."
+    )
     @app_commands.describe(
         panel_titel="Titel des Panels",
         aktion="add oder remove",
@@ -251,18 +272,26 @@ class SelfRolesCog(commands.Cog):
         emoji: str,
     ):
         if interaction.guild is None:
-            await interaction.response.send_message("Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
+            )
             return
 
         if not is_selfrole_staff(interaction.user):
-            await interaction.response.send_message("Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True
+            )
             return
 
         data = load_selfroles()
         g_id = str(interaction.guild.id)
         g_data = data.get(g_id)
         if not g_data:
-            await interaction.response.send_message("Für diesen Server existieren noch keine Self-Role Panels.", ephemeral=True)
+            await interaction.response.send_message(
+                "Für diesen Server existieren noch keine Self-Role Panels.",
+                ephemeral=True,
+            )
             return
 
         panel_title_lower = panel_titel.lower()
@@ -278,26 +307,40 @@ class SelfRolesCog(commands.Cog):
                 break
 
         if target_msg_id is None or config is None:
-            await interaction.response.send_message(f"Kein Self-Role Panel mit dem Titel **{panel_titel}** gefunden.", ephemeral=True)
+            await interaction.response.send_message(
+                f"Kein Self-Role Panel mit dem Titel **{panel_titel}** gefunden.",
+                ephemeral=True,
+            )
             return
 
         channel_id = config.get("channel_id")
         if channel_id is None:
-            await interaction.response.send_message("Für dieses Self-Role Panel ist kein Channel gespeichert.", ephemeral=True)
+            await interaction.response.send_message(
+                "Für dieses Self-Role Panel ist kein Channel gespeichert.",
+                ephemeral=True,
+            )
             return
 
         channel = interaction.guild.get_channel(channel_id)
         if not isinstance(channel, discord.TextChannel):
-            await interaction.response.send_message("Der Kanal für dieses Self-Role Panel konnte nicht gefunden werden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Der Kanal für dieses Self-Role Panel konnte nicht gefunden werden.",
+                ephemeral=True,
+            )
             return
 
         try:
             message = await channel.fetch_message(target_msg_id)
         except discord.NotFound:
-            await interaction.response.send_message("Die Panel-Nachricht wurde nicht gefunden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Die Panel-Nachricht wurde nicht gefunden.", ephemeral=True
+            )
             return
         except discord.HTTPException:
-            await interaction.response.send_message("Beim Abrufen der Panel-Nachricht ist ein Fehler aufgetreten.", ephemeral=True)
+            await interaction.response.send_message(
+                "Beim Abrufen der Panel-Nachricht ist ein Fehler aufgetreten.",
+                ephemeral=True,
+            )
             return
 
         roles_map: Dict[str, int] = config.get("roles", {})
@@ -306,7 +349,10 @@ class SelfRolesCog(commands.Cog):
 
         if aktion == "add":
             if emoji_key in roles_map:
-                await interaction.response.send_message("Für dieses Emoji ist bereits eine Rolle in diesem Panel eingetragen.", ephemeral=True)
+                await interaction.response.send_message(
+                    "Für dieses Emoji ist bereits eine Rolle in diesem Panel eingetragen.",
+                    ephemeral=True,
+                )
                 return
 
             roles_map[emoji_key] = rolle.id
@@ -318,7 +364,10 @@ class SelfRolesCog(commands.Cog):
             try:
                 await message.add_reaction(emoji_key)
             except discord.HTTPException:
-                await interaction.response.send_message("Rolle gespeichert, Emoji konnte nicht hinzugefügt werden.", ephemeral=True)
+                await interaction.response.send_message(
+                    "Rolle gespeichert, Emoji konnte nicht hinzugefügt werden.",
+                    ephemeral=True,
+                )
                 return
 
             await interaction.response.send_message(
@@ -329,11 +378,17 @@ class SelfRolesCog(commands.Cog):
         elif aktion == "remove":
             existing_role_id = roles_map.get(emoji_key)
             if not existing_role_id:
-                await interaction.response.send_message("Für dieses Emoji ist keine Rolle in diesem Panel eingetragen.", ephemeral=True)
+                await interaction.response.send_message(
+                    "Für dieses Emoji ist keine Rolle in diesem Panel eingetragen.",
+                    ephemeral=True,
+                )
                 return
 
             if existing_role_id != rolle.id:
-                await interaction.response.send_message("Die Kombination aus Rolle und Emoji passt nicht zu diesem Panel.", ephemeral=True)
+                await interaction.response.send_message(
+                    "Die Kombination aus Rolle und Emoji passt nicht zu diesem Panel.",
+                    ephemeral=True,
+                )
                 return
 
             roles_map.pop(emoji_key, None)
@@ -352,7 +407,9 @@ class SelfRolesCog(commands.Cog):
                 ephemeral=True,
             )
         else:
-            await interaction.response.send_message("Unbekannte Aktion. Nutze `add` oder `remove`.", ephemeral=True)
+            await interaction.response.send_message(
+                "Unbekannte Aktion. Nutze `add` oder `remove`.", ephemeral=True
+            )
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
@@ -414,7 +471,9 @@ class SelfRolesCog(commands.Cog):
                         channel = guild.get_channel(payload.channel_id)
                         if isinstance(channel, discord.TextChannel):
                             try:
-                                message = await channel.fetch_message(payload.message_id)
+                                message = await channel.fetch_message(
+                                    payload.message_id
+                                )
                                 await message.remove_reaction(payload.emoji, member)
                             except discord.HTTPException:
                                 pass

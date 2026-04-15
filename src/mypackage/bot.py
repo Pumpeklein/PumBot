@@ -45,14 +45,19 @@ load_dotenv(dotenv_path=BASE_DIR / ".env")
 TOKEN_ENV_NAME = getattr(config, "DISCORD_TOKEN_ENV", "DISCORD_TOKEN")
 TOKEN: Final[str | None] = os.getenv(TOKEN_ENV_NAME) or os.getenv("DISCORD_TOKEN")
 if not TOKEN:
-    raise RuntimeError("Discord Token fehlt (.env: DISCORD_TOKEN oder DISCORD_TOKEN_ENV)")
+    raise RuntimeError(
+        "Discord Token fehlt (.env: DISCORD_TOKEN oder DISCORD_TOKEN_ENV)"
+    )
 
 GUILD_ID_ENV_RAW = os.getenv("DISCORD_GUILD_ID")
-GUILD_ID_ENV = int(GUILD_ID_ENV_RAW) if GUILD_ID_ENV_RAW and GUILD_ID_ENV_RAW.isdigit() else None
+GUILD_ID_ENV = (
+    int(GUILD_ID_ENV_RAW) if GUILD_ID_ENV_RAW and GUILD_ID_ENV_RAW.isdigit() else None
+)
 GUILD_ID_CFG = getattr(config, "GUILD_ID", None)
 GUILD_ID: Optional[int] = GUILD_ID_ENV or (
     int(GUILD_ID_CFG)
-    if isinstance(GUILD_ID_CFG, int) or (isinstance(GUILD_ID_CFG, str) and str(GUILD_ID_CFG).isdigit())
+    if isinstance(GUILD_ID_CFG, int)
+    or (isinstance(GUILD_ID_CFG, str) and str(GUILD_ID_CFG).isdigit())
     else None
 )
 
@@ -96,8 +101,11 @@ class PumpeBot(commands.Bot):
         for ext in EXTENSIONS:
             await self.load_extension(ext)
 
+        from src.mypackage.commands.TicketSystemCommand import (
+            TicketPanelView,
+            TicketCloseView,
+        )
 
-        from src.mypackage.commands.TicketSystemCommand import TicketPanelView, TicketCloseView
         self.add_view(TicketPanelView(self))
         self.add_view(TicketCloseView(self))
 
@@ -110,7 +118,11 @@ class PumpeBot(commands.Bot):
             logger.info("Global-Sync fertig (%d Commands).", len(synced))
 
     async def on_ready(self) -> None:
-        logger.info("Eingeloggt als %s (%s)", self.user, self.user.id if self.user else "unbekannt")
+        logger.info(
+            "Eingeloggt als %s (%s)",
+            self.user,
+            self.user.id if self.user else "unbekannt",
+        )
 
 
 bot = PumpeBot(
@@ -121,7 +133,9 @@ bot = PumpeBot(
 
 
 @bot.tree.error
-async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+async def on_app_command_error(
+    interaction: discord.Interaction, error: app_commands.AppCommandError
+):
     if isinstance(error, app_commands.MissingPermissions):
         await reply_ephemeral(interaction, "Dafür hast du keine Berechtigung.")
         return
@@ -141,4 +155,3 @@ async def main() -> None:
 # TODO: Web-Interface mit starten
 if __name__ == "__main__":
     asyncio.run(main())
-

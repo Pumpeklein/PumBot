@@ -30,33 +30,49 @@ class DeleteCog(commands.Cog):
         description="Nachrichten löschen (Staff).",
     )
 
-    @delete_group.command(name="clear", description="Löscht eine bestimmte Anzahl Nachrichten im Channel.")
+    @delete_group.command(
+        name="clear", description="Löscht eine bestimmte Anzahl Nachrichten im Channel."
+    )
     @app_commands.describe(amount="Anzahl (1-200)")
     async def clear(self, interaction: discord.Interaction, amount: int):
         if interaction.guild is None:
-            await interaction.response.send_message("Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
+            )
             return
 
         member = interaction.user
         if not isinstance(member, discord.Member):
-            await interaction.response.send_message("Konnte deine Mitgliedsdaten nicht lesen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Konnte deine Mitgliedsdaten nicht lesen.", ephemeral=True
+            )
             return
 
         if not is_delete_staff(member) or not member.guild_permissions.manage_messages:
-            await interaction.response.send_message("Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True
+            )
             return
 
         channel = interaction.channel
         if not isinstance(channel, discord.TextChannel):
-            await interaction.response.send_message("Dieser Befehl kann nur in Text-Channels verwendet werden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur in Text-Channels verwendet werden.",
+                ephemeral=True,
+            )
             return
 
         if amount <= 0:
-            await interaction.response.send_message("Die Anzahl muss größer als 0 sein.", ephemeral=True)
+            await interaction.response.send_message(
+                "Die Anzahl muss größer als 0 sein.", ephemeral=True
+            )
             return
 
         if amount > 200:
-            await interaction.response.send_message("Maximal 200 Nachrichten auf einmal löschen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Maximal 200 Nachrichten auf einmal löschen.", ephemeral=True
+            )
             return
 
         await interaction.response.defer(ephemeral=True)
@@ -64,46 +80,74 @@ class DeleteCog(commands.Cog):
         try:
             deleted = await channel.purge(limit=amount)
         except discord.Forbidden:
-            await interaction.followup.send("Ich habe keine Berechtigung, Nachrichten zu löschen.", ephemeral=True)
+            await interaction.followup.send(
+                "Ich habe keine Berechtigung, Nachrichten zu löschen.", ephemeral=True
+            )
             return
         except discord.HTTPException as e:
             logger.exception("clear purge HTTPException: %r", e)
-            await interaction.followup.send("Beim Löschen der Nachrichten ist ein Fehler aufgetreten.", ephemeral=True)
+            await interaction.followup.send(
+                "Beim Löschen der Nachrichten ist ein Fehler aufgetreten.",
+                ephemeral=True,
+            )
             return
         except Exception as e:
             logger.exception("clear purge unexpected error: %r", e)
-            await interaction.followup.send("Beim Löschen der Nachrichten ist ein unerwarteter Fehler aufgetreten.", ephemeral=True)
+            await interaction.followup.send(
+                "Beim Löschen der Nachrichten ist ein unerwarteter Fehler aufgetreten.",
+                ephemeral=True,
+            )
             return
 
-        await interaction.followup.send(f"✅ {len(deleted)} Nachricht(en) gelöscht.", ephemeral=True)
+        await interaction.followup.send(
+            f"✅ {len(deleted)} Nachricht(en) gelöscht.", ephemeral=True
+        )
 
-    @delete_group.command(name="clearuser", description="Löscht Nachrichten von einem bestimmten Nutzer.")
+    @delete_group.command(
+        name="clearuser", description="Löscht Nachrichten von einem bestimmten Nutzer."
+    )
     @app_commands.describe(user="User", amount="Anzahl (1-200)")
-    async def clear_user(self, interaction: discord.Interaction, user: discord.Member, amount: int):
+    async def clear_user(
+        self, interaction: discord.Interaction, user: discord.Member, amount: int
+    ):
         if interaction.guild is None:
-            await interaction.response.send_message("Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
+            )
             return
 
         member = interaction.user
         if not isinstance(member, discord.Member):
-            await interaction.response.send_message("Konnte deine Mitgliedsdaten nicht lesen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Konnte deine Mitgliedsdaten nicht lesen.", ephemeral=True
+            )
             return
 
         if not is_delete_staff(member) or not member.guild_permissions.manage_messages:
-            await interaction.response.send_message("Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True
+            )
             return
 
         channel = interaction.channel
         if not isinstance(channel, discord.TextChannel):
-            await interaction.response.send_message("Dieser Befehl kann nur in Text-Channels verwendet werden.", ephemeral=True)
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur in Text-Channels verwendet werden.",
+                ephemeral=True,
+            )
             return
 
         if amount <= 0:
-            await interaction.response.send_message("Die Anzahl muss größer als 0 sein.", ephemeral=True)
+            await interaction.response.send_message(
+                "Die Anzahl muss größer als 0 sein.", ephemeral=True
+            )
             return
 
         if amount > 200:
-            await interaction.response.send_message("Maximal 200 Nachrichten auf einmal löschen.", ephemeral=True)
+            await interaction.response.send_message(
+                "Maximal 200 Nachrichten auf einmal löschen.", ephemeral=True
+            )
             return
 
         await interaction.response.defer(ephemeral=True)
@@ -117,24 +161,36 @@ class DeleteCog(commands.Cog):
                     if len(to_delete) >= amount:
                         break
         except discord.Forbidden:
-            await interaction.followup.send("Ich habe keine Berechtigung, Channel-History zu lesen.", ephemeral=True)
+            await interaction.followup.send(
+                "Ich habe keine Berechtigung, Channel-History zu lesen.", ephemeral=True
+            )
             return
         except discord.HTTPException as e:
             logger.exception("clear_user history HTTPException: %r", e)
-            await interaction.followup.send("Beim Lesen der Nachrichten ist ein Fehler aufgetreten.", ephemeral=True)
+            await interaction.followup.send(
+                "Beim Lesen der Nachrichten ist ein Fehler aufgetreten.", ephemeral=True
+            )
             return
         except Exception as e:
             logger.exception("clear_user history unexpected error: %r", e)
-            await interaction.followup.send("Beim Lesen der Nachrichten ist ein unerwarteter Fehler aufgetreten.", ephemeral=True)
+            await interaction.followup.send(
+                "Beim Lesen der Nachrichten ist ein unerwarteter Fehler aufgetreten.",
+                ephemeral=True,
+            )
             return
 
         if not to_delete:
-            await interaction.followup.send("Es wurden keine passenden Nachrichten gefunden.", ephemeral=True)
+            await interaction.followup.send(
+                "Es wurden keine passenden Nachrichten gefunden.", ephemeral=True
+            )
             return
 
         try:
             await channel.delete_messages(to_delete)
-            await interaction.followup.send(f"✅ {len(to_delete)} Nachricht(en) von {user.mention} gelöscht.", ephemeral=True)
+            await interaction.followup.send(
+                f"✅ {len(to_delete)} Nachricht(en) von {user.mention} gelöscht.",
+                ephemeral=True,
+            )
             return
         except discord.HTTPException as e:
             logger.exception("clear_user bulk delete HTTPException: %r", e)

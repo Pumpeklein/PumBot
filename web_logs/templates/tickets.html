@@ -49,7 +49,7 @@
           </td>
           <td class="whitespace-nowrap px-4 py-3 text-slate-300">{{ t.creator_username or t.creator_user_id or "-" }}</td>
           <td class="whitespace-nowrap px-4 py-3 text-slate-400">{{ t.category or "-" }}</td>
-          <td class="whitespace-nowrap px-4 py-3 text-slate-500">{{ t.updated_at or "-" }}</td>
+          <td class="whitespace-nowrap px-4 py-3 text-slate-500">{{ t.updated_at|datetime_de if t.updated_at else "-" }}</td>
         </tr>
         {% endfor %}
       </tbody>

@@ -53,7 +53,7 @@
           <td class="px-3 py-2.5 font-mono text-xs text-slate-300">{{ w.user_id }}</td>
           <td class="px-3 py-2.5 font-mono text-xs text-slate-400">{{ w.moderator_id }}</td>
           <td class="px-3 py-2.5 text-white max-w-xs truncate">{{ w.reason or "Kein Grund" }}</td>
-          <td class="px-3 py-2.5 text-slate-500 text-xs whitespace-nowrap">{{ w.created_at }}</td>
+          <td class="px-3 py-2.5 text-slate-500 text-xs whitespace-nowrap">{{ w.created_at|datetime_de if w.created_at else "-" }}</td>
           <td class="px-3 py-2.5 text-right">
             <form method="post" action="{{ url_for('warnings_delete', warning_id=w.id) }}" class="inline"
               onsubmit="return confirm('Verwarnung #{{ w.id }} wirklich löschen?')">

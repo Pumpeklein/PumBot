@@ -10,6 +10,7 @@ from discord.ext import commands
 
 from src.pumbot import config
 from src.pumbot.bot import logger
+from src.pumbot.utils.datetime_format import format_berlin_datetime
 
 LOG_TYPES = ("voice", "user", "server", "message", "welcome")
 
@@ -351,9 +352,7 @@ class LogsCog(commands.Cog):
         embed = _embed_base(
             "User joined", _green(), thumb_url=member.display_avatar.url
         )
-        created = (
-            f"<t:{int(member.created_at.replace(tzinfo=timezone.utc).timestamp())}:R>"
-        )
+        created = format_berlin_datetime(member.created_at, fallback="—")
         embed.description = _kv_block(
             [
                 ("User", _fmt_name_and_tag(member)),
@@ -371,7 +370,7 @@ class LogsCog(commands.Cog):
 
         joined = "\u2014"
         if member.joined_at:
-            joined = f"<t:{int(member.joined_at.replace(tzinfo=timezone.utc).timestamp())}:R>"
+            joined = format_berlin_datetime(member.joined_at, fallback="—")
 
         roles = [
             r.mention for r in getattr(member, "roles", []) if r.name != "@everyone"
@@ -649,7 +648,7 @@ class LogsCog(commands.Cog):
         )
         created = "\u2014"
         if message.created_at:
-            created = f"<t:{int(message.created_at.replace(tzinfo=timezone.utc).timestamp())}:R>"
+            created = format_berlin_datetime(message.created_at, fallback="—")
 
         lines = [
             (
@@ -692,7 +691,7 @@ class LogsCog(commands.Cog):
         )
         created = "\u2014"
         if after.created_at:
-            created = f"<t:{int(after.created_at.replace(tzinfo=timezone.utc).timestamp())}:R>"
+            created = format_berlin_datetime(after.created_at, fallback="—")
 
         lines = [
             (

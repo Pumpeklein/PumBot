@@ -8,6 +8,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from src.pumbot.bot import logger
+from src.pumbot.utils.datetime_format import format_berlin_datetime
 
 ALLOWED_ROLES = {"Admin", "Team", "Twitch Moderator", "Discord Moderator"}
 
@@ -32,10 +33,7 @@ def format_birthday(day: int, month: int, year: int | None) -> str:
 
 def format_dt(dt) -> str:
     try:
-        if dt is None:
-            return "Unbekannt"
-        ts = int(dt.timestamp())
-        return f"<t:{ts}:F> (<t:{ts}:R>)"
+        return format_berlin_datetime(dt, fallback="Unbekannt")
     except Exception:
         logger.exception("format_dt error")
         return "Unbekannt"
@@ -263,7 +261,7 @@ class UserManagementCog(commands.Cog):
             mod_id = entry.get("moderator_id")
             mod_mention = f"<@{mod_id}>" if mod_id else "Unbekannt"
             reason = entry.get("reason", "Kein Grund angegeben")
-            created_at = entry.get("created_at", "Unbekannt")
+            created_at = format_dt(entry.get("created_at"))
             warning_id = entry.get("id", "?")
 
             embed.add_field(

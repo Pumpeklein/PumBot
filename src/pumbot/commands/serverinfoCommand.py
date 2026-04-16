@@ -4,6 +4,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from src.pumbot.utils.datetime_format import format_berlin_datetime
+
 
 class ServerInfoCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
@@ -64,8 +66,7 @@ class ServerInfoCog(commands.Cog):
         else:
             team_count = "Nicht verfügbar"
 
-        created = discord.utils.format_dt(guild.created_at, style="F")
-        created_rel = discord.utils.format_dt(guild.created_at, style="R")
+        created = format_berlin_datetime(guild.created_at, fallback="Unbekannt")
 
         embed = discord.Embed(
             title=f"Server Info — {guild.name}",
@@ -77,7 +78,7 @@ class ServerInfoCog(commands.Cog):
             embed.set_thumbnail(url=guild.icon.url)
 
         embed.add_field(
-            name="📅 Erstellt am", value=f"{created}\n({created_rel})", inline=True
+            name="📅 Erstellt am", value=created, inline=True
         )
         embed.add_field(
             name="👑 Owner",

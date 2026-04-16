@@ -11,6 +11,7 @@ from discord import ButtonStyle, app_commands
 from discord.ext import commands
 
 from src.pumbot.bot import logger
+from src.pumbot.utils.datetime_format import format_berlin_datetime
 
 
 TICKET_CATEGORY_NAME = "🎫 Tickets"
@@ -29,12 +30,9 @@ def is_ticket_staff(member: discord.Member) -> bool:
         return False
 
 
-def format_dt(dt: Optional[discord.utils.datetime.datetime]) -> str:
+def format_dt(dt) -> str:
     try:
-        if dt is None:
-            return "Unbekannt"
-        ts = int(dt.timestamp())
-        return f"<t:{ts}:F> (<t:{ts}:R>)"
+        return format_berlin_datetime(dt, fallback="Unbekannt")
     except Exception:
         logger.exception("format_dt error")
         return "Unbekannt"
@@ -44,7 +42,7 @@ async def create_transcript_text(channel: discord.TextChannel) -> str:
     try:
         buffer = io.StringIO()
         async for msg in channel.history(limit=None, oldest_first=True):
-            timestamp = msg.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            timestamp = format_dt(msg.created_at)
             author = f"{msg.author} ({msg.author.id})"
             content = msg.content.replace("\n", "\\n") if msg.content else ""
             buffer.write(f"[{timestamp}] {author}: {content}\n")
@@ -332,7 +330,7 @@ class TicketSystemCog(commands.Cog):
             twitch_name = topic_data.get("twitch_name")
             twitch_verified_flag = topic_data.get("twitch_verified")
 
-            created_at_str = created_at_iso or "Unbekannt"
+            created_at_str = format_dt(created_at_iso)
             closed_at = discord.utils.utcnow()
 
             transcript_text = await create_transcript_text(channel)
@@ -427,7 +425,7 @@ class TicketSystemCog(commands.Cog):
                     )
                     dm.add_field(name="Ticket", value=f"{ticket_click} (`{channel.id}`)", inline=False)
                     dm.add_field(name="Tickettyp", value=category_label or "Unbekannt", inline=True)
-                    dm.add_field(name="Geöffnet am", value=created_at_iso or "Unbekannt", inline=True)
+                    dm.add_field(name="Geöffnet am", value=created_at_str, inline=True)
                     dm.add_field(name="Bearbeitet/Geschlossen von", value=f"{closer} (`{closer.id}`)", inline=False)
                     dm.add_field(name="Geschlossen am", value=format_dt(closed_at), inline=False)
                     dm.add_field(name="Grund", value=reason or "Per Button/Command geschlossen.", inline=False)

@@ -2,13 +2,14 @@
 
 import json
 import sqlite3
-from datetime import datetime, timezone
 from typing import Any
 
 try:
     from .config import BASE_DIR, Config, ensure_dirs, DEFAULT_GUILD_ID, DEFAULT_ADMIN_ROLE_ID
+    from .datetime_format import berlin_today
 except ImportError:
     from config import BASE_DIR, Config, ensure_dirs, DEFAULT_GUILD_ID, DEFAULT_ADMIN_ROLE_ID
+    from datetime_format import berlin_today
 
 
 def _connect() -> sqlite3.Connection:
@@ -254,7 +255,7 @@ def delete_birthday(guild_id: str, user_id: str) -> None:
 
 
 def get_birthdays_today(guild_id: str) -> list[dict]:
-    now = datetime.now(timezone.utc)
+    now = berlin_today()
     with _connect() as conn:
         rows = conn.execute(
             "SELECT * FROM birthdays WHERE guild_id = ? AND month = ? AND day = ?",
@@ -264,7 +265,7 @@ def get_birthdays_today(guild_id: str) -> list[dict]:
 
 
 def mark_birthday_congrats(guild_id: str, user_id: str) -> None:
-    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    now_iso = berlin_today().isoformat()
     with _connect() as conn:
         conn.execute(
             "UPDATE birthdays SET last_congrats = ? WHERE guild_id = ? AND user_id = ?",

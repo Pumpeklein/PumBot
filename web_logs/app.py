@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 from datetime import datetime, timezone
 from functools import wraps
 from html import escape
@@ -89,6 +90,7 @@ try:
         permission_required,
     )
     from .token_utils import verify_transcript_token
+    from .datetime_format import format_berlin_date, format_berlin_datetime
 except ImportError:
     from config import Config, DEFAULT_GUILD_ID, ensure_dirs
     from db import (
@@ -156,11 +158,14 @@ except ImportError:
         permission_required,
     )
     from token_utils import verify_transcript_token
+    from datetime_format import format_berlin_date, format_berlin_datetime
 
 ensure_dirs()
 
 app = Flask(__name__)
 app.secret_key = Config.FLASK_SECRET_KEY
+app.jinja_env.filters["date_de"] = format_berlin_date
+app.jinja_env.filters["datetime_de"] = format_berlin_datetime
 
 init_db()
 
@@ -190,11 +195,34 @@ def _resolve_transcript_path(transcript_path: str) -> Path:
 def _render_transcript_html(data: dict) -> str:
     transcript_html = (data.get("transcript_html") or "").strip()
     if transcript_html:
-        return transcript_html
+        return _format_transcript_dates(transcript_html)
     transcript_text = data.get("transcript_text") or ""
     if transcript_text:
-        return f"<pre>{escape(transcript_text)}</pre>"
+        return _format_transcript_dates(f"<pre>{escape(transcript_text)}</pre>")
     return ""
+
+
+_TRANSCRIPT_DATETIME_RE = re.compile(
+    r"\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?"
+)
+
+
+def _format_transcript_dates(html: str) -> str:
+    return _TRANSCRIPT_DATETIME_RE.sub(
+        lambda m: format_berlin_datetime(m.group(0), fallback=m.group(0)),
+        html,
+    )
+
+
+def _format_date_fields(rows: list[dict], *fields: str) -> list[dict]:
+    formatted = []
+    for row in rows:
+        item = dict(row)
+        for field in fields:
+            if item.get(field):
+                item[field] = format_berlin_datetime(item[field], fallback=item[field])
+        formatted.append(item)
+    return formatted
 
 
 # ════════════════ API KEY SECURITY ════════════════
@@ -284,7 +312,8 @@ def ticket_detail(ticket_id: str):
     messages = get_ticket_messages(ticket_id)
     close_reasons = list_close_reasons(DEFAULT_GUILD_ID)
     return render_template(
-        "ticket_detail.html", t=t, logs=logs, messages=messages,
+        "ticket_detail.html", t=t, logs=logs,
+        messages=_format_date_fields(messages, "created_at"),
         close_reasons=close_reasons, active_page="tickets", **ctx,
     )
 
@@ -298,7 +327,7 @@ def ticket_transcript(ticket_id: str):
     path = _resolve_transcript_path(t["transcript_path"])
     if not path.exists():
         abort(404)
-    html = path.read_text(encoding="utf-8")
+    html = _format_transcript_dates(path.read_text(encoding="utf-8"))
     ctx = _ctx()
     return render_template(
         "transcript.html", ticket_id=ticket_id, html=html, **ctx,
@@ -326,7 +355,7 @@ def public_transcript(ticket_id: str):
     path = _resolve_transcript_path(transcript_path)
     if not path.exists():
         abort(404)
-    html = path.read_text(encoding="utf-8")
+    html = _format_transcript_dates(path.read_text(encoding="utf-8"))
     ctx = _ctx()
     return render_template(
         "transcript.html", ticket_id=ticket_id, html=html, **ctx,
@@ -380,7 +409,7 @@ def roles_delete(role_id: int):
 @login_required
 def ticket_messages_json(ticket_id: str):
     messages = get_ticket_messages(ticket_id)
-    return jsonify(messages)
+    return jsonify(_format_date_fields(messages, "created_at"))
 
 
 # ── Ticket Reply from Web ──
@@ -446,7 +475,7 @@ def ticket_close_web(ticket_id: str):
     upsert_ticket({
         "ticket_id": ticket_id,
         "status": "closed",
-        "closed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
+        "closed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "closed_by_id": u["discord_id"],
         "closed_by_name": u["username"],
         "close_reason": reason,

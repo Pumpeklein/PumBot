@@ -8,6 +8,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
+from src.pumbot.utils.datetime_format import berlin_today
+
 BIRTHDAY_STAFF_ROLES = {"Admin", "Team", "Twitch Moderator", "Discord Moderator"}
 
 MONTH_NAMES_DE = {
@@ -68,7 +70,7 @@ def calculate_age(day: int, month: int, year: Optional[int]) -> Optional[int]:
         year = 2000 + year
     if year < 1900:
         return None
-    today = date.today()
+    today = berlin_today()
     age = today.year - year
     if (month, day) > (today.month, today.day):
         age -= 1
@@ -286,7 +288,7 @@ class BirthdayCog(commands.Cog):
     async def birthday_check_loop(self):
         await self.bot.wait_until_ready()
 
-        today = discord.utils.utcnow().date()
+        today = berlin_today()
         today_iso = today.isoformat()
 
         for guild in self.bot.guilds:

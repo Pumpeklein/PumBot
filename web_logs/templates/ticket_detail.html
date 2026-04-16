@@ -33,7 +33,7 @@
     </div>
     <div class="rounded-lg border border-white/5 bg-white/[0.02] p-3">
       <div class="text-xs uppercase tracking-wider text-slate-500">Geschlossen am</div>
-      <div class="mt-1 text-sm text-white">{{ t.closed_at or "-" }}</div>
+      <div class="mt-1 text-sm text-white">{{ t.closed_at|datetime_de if t.closed_at else "-" }}</div>
       {% if t.closed_by_name %}
       <div class="mt-0.5 text-xs text-slate-500">von {{ t.closed_by_name }}</div>
       {% endif %}
@@ -250,7 +250,7 @@
     {% for l in logs %}
     <div class="rounded-lg border border-white/5 bg-white/[0.02] p-3">
       <div class="flex items-center justify-between gap-2">
-        <span class="text-xs text-slate-500">{{ l.created_at or "-" }}</span>
+        <span class="text-xs text-slate-500">{{ l.created_at|datetime_de if l.created_at else "-" }}</span>
         {% set lvl = (l.level or "")|lower %}
         {{ badge(l.level or "info", "danger" if lvl in ["error", "critical"] else ("warning" if lvl in ["warn", "warning"] else "success")) }}
       </div>

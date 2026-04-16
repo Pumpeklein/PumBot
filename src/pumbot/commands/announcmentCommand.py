@@ -12,6 +12,7 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from src.pumbot.bot import logger
+from src.pumbot.utils.datetime_format import format_berlin_datetime
 
 ANNOUNCE_STAFF_ROLES = {"Admin", "Team", "Twitch Moderator", "Discord Moderator"}
 
@@ -32,11 +33,8 @@ def format_stream_times(started_at_str: str) -> tuple[str, str]:
         if dt_utc.tzinfo is None:
             dt_utc = dt_utc.replace(tzinfo=timezone.utc)
 
-        dt_local = dt_utc.astimezone()
-        started_display = dt_local.strftime("%d.%m.%y %H:%M")
-
-        now_local = datetime.now(tz=dt_local.tzinfo)
-        delta = now_local - dt_local
+        started_display = format_berlin_datetime(dt_utc, fallback=started_at_str)
+        delta = datetime.now(timezone.utc) - dt_utc.astimezone(timezone.utc)
 
         total_seconds = max(0, int(delta.total_seconds()))
         hours = total_seconds // 3600

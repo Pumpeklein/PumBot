@@ -175,7 +175,7 @@ class WebServerThread(Thread):
 
 
 async def main() -> None:
-    web_server = WebServerThread("0.0.0.0", WebConfig.PORT, discord_bot=bot)
+    web_server = WebServerThread("127.0.0.1", WebConfig.PORT, discord_bot=bot)
     web_server.start()
     try:
         async with bot:

@@ -25,7 +25,12 @@ class CountingCog(commands.Cog):
         if guild_id in self._state_cache:
             return self._state_cache[guild_id]
         raw = await self.api.get_counting(str(guild_id))
-        state = raw or {"channel_id": None, "last_number": 0, "last_user_id": None, "highscore": 0}
+        state = raw or {
+            "channel_id": None,
+            "last_number": 0,
+            "last_user_id": None,
+            "highscore": 0,
+        }
         self._state_cache[guild_id] = state
         return state
 
@@ -53,7 +58,9 @@ class CountingCog(commands.Cog):
                 stats[k] = int(raw[k])
         return stats
 
-    async def _save_user_stats(self, guild_id: int, user_id: int, stats: Dict[str, int]) -> None:
+    async def _save_user_stats(
+        self, guild_id: int, user_id: int, stats: Dict[str, int]
+    ) -> None:
         await self.api.set_counting_stats(str(guild_id), str(user_id), **stats)
 
     async def _update_user_correct(self, guild_id: int, user_id: int) -> None:
@@ -82,22 +89,28 @@ class CountingCog(commands.Cog):
         role_names = {"Twitch Moderator", "Discord Moderator", "Team", "Admin"}
         return any(r.name in role_names for r in user.roles)
 
-    async def _handle_correct_number(self, message: discord.Message, current_number: int) -> None:
+    async def _handle_correct_number(
+        self, message: discord.Message, current_number: int
+    ) -> None:
         try:
             guild_id = message.guild.id
             state = await self._get_state(guild_id)
             highscore = int(state.get("highscore", 0))
             new_hs = max(highscore, current_number)
             await self._save_state(
-                guild_id, last_number=current_number,
-                last_user_id=message.author.id, highscore=new_hs,
+                guild_id,
+                last_number=current_number,
+                last_user_id=message.author.id,
+                highscore=new_hs,
             )
             await self._update_user_correct(guild_id, message.author.id)
             await message.add_reaction("\u2705")
         except Exception:
             logger.exception("Fehler beim Verarbeiten einer korrekten Zahl")
 
-    async def _handle_wrong_number(self, message: discord.Message, expected: int, reason: str) -> None:
+    async def _handle_wrong_number(
+        self, message: discord.Message, expected: int, reason: str
+    ) -> None:
         try:
             guild_id = message.guild.id
             await self._update_user_fail(guild_id, message.author.id)
@@ -112,11 +125,13 @@ class CountingCog(commands.Cog):
             logger.exception("Fehler beim Verarbeiten einer falschen Zahl")
 
     counting = app_commands.Group(
-        name="counting", description="Zähl-Channel konfigurieren und verwalten.",
+        name="counting",
+        description="Zähl-Channel konfigurieren und verwalten.",
     )
 
     @counting.command(
-        name="setchannel", description="Legt den Channel fest, in dem gezählt werden soll.",
+        name="setchannel",
+        description="Legt den Channel fest, in dem gezählt werden soll.",
     )
     async def counting_setchannel(
         self, interaction: discord.Interaction, channel: discord.TextChannel
@@ -128,10 +143,13 @@ class CountingCog(commands.Cog):
         guild = interaction.guild
         if guild is None:
             return await interaction.response.send_message(
-                "Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True,
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
             )
 
-        await self._save_state(guild.id, channel_id=str(channel.id), last_number=0, last_user_id=None)
+        await self._save_state(
+            guild.id, channel_id=str(channel.id), last_number=0, last_user_id=None
+        )
         self._channel_cache[guild.id] = channel.id
         self._state_cache.pop(guild.id, None)
 
@@ -150,20 +168,23 @@ class CountingCog(commands.Cog):
         guild = interaction.guild
         if guild is None:
             return await interaction.response.send_message(
-                "Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True,
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
             )
 
         channel_id = await self._get_channel_id(guild.id)
         if channel_id is None:
             return await interaction.response.send_message(
-                "Es ist kein Counting-Channel gesetzt.", ephemeral=True,
+                "Es ist kein Counting-Channel gesetzt.",
+                ephemeral=True,
             )
 
         await self._save_state(guild.id, last_number=0, last_user_id=None)
         self._state_cache.pop(guild.id, None)
 
         await interaction.response.send_message(
-            "Der Zähler wurde zurückgesetzt. Nächste Zahl ist **1**.", ephemeral=True,
+            "Der Zähler wurde zurückgesetzt. Nächste Zahl ist **1**.",
+            ephemeral=True,
         )
 
     @counting.command(name="info", description="Zeigt Zählerstand und Stats.")
@@ -171,14 +192,16 @@ class CountingCog(commands.Cog):
         guild = interaction.guild
         if guild is None:
             return await interaction.response.send_message(
-                "Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True,
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
             )
 
         state = await self._get_state(guild.id)
         channel_id = int(state["channel_id"]) if state.get("channel_id") else None
         if channel_id is None:
             return await interaction.response.send_message(
-                "Es ist aktuell **kein** Counting-Channel gesetzt.", ephemeral=True,
+                "Es ist aktuell **kein** Counting-Channel gesetzt.",
+                ephemeral=True,
             )
 
         last = int(state.get("last_number", 0))
@@ -208,13 +231,15 @@ class CountingCog(commands.Cog):
         guild = interaction.guild
         if guild is None:
             return await interaction.response.send_message(
-                "Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True,
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
             )
 
         entries = await self.api.get_counting_leaderboard(str(guild.id), limit=10)
         if not entries:
             return await interaction.response.send_message(
-                "Es gibt noch keine Statistiken.", ephemeral=True,
+                "Es gibt noch keine Statistiken.",
+                ephemeral=True,
             )
 
         embed = discord.Embed(
@@ -228,10 +253,12 @@ class CountingCog(commands.Cog):
             member = guild.get_member(int(e["user_id"]))
             name = member.mention if member else f"`{e['user_id']}`"
             lines.append(
-                f"**#{rank}** {name} \u2013 \u2705 {e.get('correct', 0)} | Bestreak: {e.get('best_streak', 0)}"
+                f"**#{rank}** {name} \u2013 \u2705 {e.get('correct', 0)} | Best-Streak: {e.get('best_streak', 0)}"
             )
 
-        embed.add_field(name="Top 10 \u2013 Korrekte Zahlen", value="\n".join(lines), inline=False)
+        embed.add_field(
+            name="Top 10 \u2013 Korrekte Zahlen", value="\n".join(lines), inline=False
+        )
         await interaction.response.send_message(embed=embed)
 
     @commands.Cog.listener()
@@ -256,7 +283,9 @@ class CountingCog(commands.Cog):
 
             number = int(content)
             if number <= 0:
-                await self._handle_wrong_number(message, expected, "Zahl muss positiv sein")
+                await self._handle_wrong_number(
+                    message, expected, "Zahl muss positiv sein"
+                )
                 return
 
             last_user_id = state.get("last_user_id")

@@ -9,7 +9,7 @@ except ImportError:  # pragma: no cover - Python < 3.9 fallback
     ZoneInfo = None  # type: ignore[assignment]
 
 
-DATETIME_DISPLAY_FORMAT = "%d.%m.%Y %H:%M Uhr"
+DATETIME_DISPLAY_FORMAT = "%d.%m.%Y • %H:%M Uhr"
 DATE_DISPLAY_FORMAT = "%d.%m.%Y"
 
 

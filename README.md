@@ -192,21 +192,44 @@ Das Web-Panel arbeitet mit einem zweistufigen Rechtekonzept:
 2. App-Berechtigungen
 
 - In der Tabelle `roles` werden Discord-Rollen internen Rechten zugeordnet.
-- Beispiele:
-  - `admin`
-  - `tickets.view`
-  - `tickets.reply`
-  - `tickets.close`
-  - `users.view`
-  - `users.warn`
-  - `users.ban`
-  - `users.timeout`
-  - `roles.manage`
-  - `config.manage`
-  - `logs.view`
-  - `logs.manage`
+- Die vollständige Liste der aktuell definierten Rechte liegt in `web_logs/db.py` als `ALL_PERMISSIONS`.
 
 Die Rechteprüfung erfolgt in [web_logs/auth.py](./web_logs/auth.py) und [web_logs/app.py](./web_logs/app.py).
+
+### Permission-Tabelle
+
+| Permission | Bedeutung | Wirkung im aktuellen System |
+| --- | --- | --- |
+| `admin` | Vollzugriff auf alle App-Berechtigungen. | Überschreibt alle Einzelrechte. In `get_permissions_for_discord_roles()` wird bei `admin` automatisch auf alle bekannten Rechte erweitert. Sinnvoll für Owner, Admins oder leitende Staff-Rollen. |
+| `tickets.view` | Darf Tickets grundsätzlich sehen. | Aktuell im Web-Panel noch nicht als separates Gate an die Ticket-Seiten gehängt. Das Recht ist im Modell vorhanden und sollte für reine Ticket-Lesezugriffe verwendet werden. |
+| `tickets.reply` | Darf in Tickets antworten. | Steuert im Web-Panel die Antwortfunktion auf der Ticket-Detailseite sowie den POST auf `/tickets/<ticket_id>/reply`. |
+| `tickets.close` | Darf Tickets schließen. | Steuert im Web-Panel die Schließen-Aktion auf der Ticket-Detailseite sowie den POST auf `/tickets/<ticket_id>/close`. |
+| `users.view` | Darf Nutzerdaten bzw. Moderationsdaten lesen. | Aktuell als vorbereitetes Recht im Modell vorhanden, im Web-Panel aber noch nicht separat verdrahtet. Kann künftig für Profil- oder Moderationsübersichten genutzt werden. |
+| `users.warn` | Darf Verwarnungen sehen und verwalten. | Schaltet die Verwarnungsseite in der Navigation frei und schützt die Routen für Warnungsübersicht und Löschen von Warnungen. |
+| `users.ban` | Darf Bann-bezogene Moderationsfunktionen nutzen. | Im Rechtemodell vorhanden und passend für Moderations-Workflows im Bot gedacht. Im Web-Panel derzeit noch nicht separat verwendet. |
+| `users.timeout` | Darf Timeouts verhängen oder verwalten. | Ebenfalls im Rechtemodell vorhanden; vor allem für Moderations-Features des Bots relevant. Im Web-Panel derzeit noch nicht separat genutzt. |
+| `roles.manage` | Darf Rollen-/Rechtezuordnungen im Panel verwalten. | Schaltet die Rollen-Seite frei und schützt Create-, Update- und Delete-Routen für App-Rollen. |
+| `config.manage` | Darf serverweite Feature-Konfigurationen ändern. | Das zentrale Konfigurationsrecht für Counting, Geburtstage, Log-Channels, Auto Publisher, Server Stats und Schließungsgründe. Blendet mehrere Seiten im Panel ein und schützt deren Änderungsrouten. |
+| `logs.view` | Darf Logs lesen. | Aktuell als vorbereitetes Recht im Modell vorhanden, aber noch nicht als eigenes Lese-Gate im Web-Panel genutzt. |
+| `logs.manage` | Darf Log-Konfigurationen oder Log-bezogene Verwaltungsaktionen durchführen. | Ebenfalls vorbereitet. Derzeit werden die Log-Channel-Seiten über `config.manage` geschützt, nicht über `logs.manage`. |
+
+### Praktische Zuordnung
+
+Ein pragmatisches Setup für Rollen könnte so aussehen:
+
+| Discord-Rolle | Empfohlene Permissions |
+| --- | --- |
+| Server-Admin | `admin` |
+| Support-Team | `tickets.view`, `tickets.reply`, `tickets.close` |
+| Moderation | `users.warn`, optional `users.ban`, `users.timeout` |
+| Konfig-Team | `config.manage`, optional `roles.manage` |
+| Audit / Einsicht | später z. B. `tickets.view`, `logs.view`, `users.view` ohne Schreibrechte |
+
+### Wichtig für die Weiterentwicklung
+
+- Nicht jedes definierte Recht ist schon vollständig an alle Seiten oder Bot-Kommandos angebunden.
+- Einige Rechte sind bereits produktiv im Panel aktiv: `admin`, `tickets.reply`, `tickets.close`, `users.warn`, `roles.manage`, `config.manage`.
+- Andere Rechte sind derzeit vor allem Teil des Berechtigungsmodells und eignen sich als Grundlage für eine feinere Trennung in späteren Ausbaustufen: `tickets.view`, `users.view`, `users.ban`, `users.timeout`, `logs.view`, `logs.manage`.
 
 ## Interne API
 

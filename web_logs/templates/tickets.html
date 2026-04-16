@@ -1,32 +1,83 @@
 {% extends "base.html" %} {% block content %}
-<h1>Tickets</h1>
-
-<form method="get" class="row">
-  <input
-    name="q"
-    placeholder="Suche Ticket-ID / Subject / UserID"
-    value="{{ q }}"
-  />
-  <input name="limit" type="number" min="1" max="1000" value="{{ limit }}" />
-  <button type="submit">Suchen</button>
-</form>
-
-<div class="table">
-  <div class="thead">
-    <div>Ticket</div>
-    <div>Subject</div>
-    <div>Status</div>
-    <div>UserID</div>
-    <div>Updated</div>
+<section class="hero">
+  <div class="hero-copy">
+    <span class="eyebrow">Ticket Center</span>
+    <h1>Alle Tickets an einem Ort.</h1>
+    <p>
+      Durchsuche Ticket-IDs, Themen und User schneller und spring direkt in
+      Verlauf, Status und Transkript.
+    </p>
   </div>
+
+  <div class="hero-meta">
+    <div class="stat">
+      <span class="stat-label">Ansicht</span>
+      <span class="stat-value">Tickets</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Limit</span>
+      <span class="stat-value">{{ limit }}</span>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h2 class="section-title">Suche & Filter</h2>
+  <form method="get" class="toolbar-form">
+    <div class="field">
+      <label for="q">Suche</label>
+      <input
+        id="q"
+        name="q"
+        placeholder="Ticket-ID, Betreff oder User-ID"
+        value="{{ q }}"
+      />
+    </div>
+
+    <div class="field compact">
+      <label for="limit">Limit</label>
+      <input
+        id="limit"
+        name="limit"
+        type="number"
+        min="1"
+        max="1000"
+        value="{{ limit }}"
+      />
+    </div>
+
+    <button type="submit">Anwenden</button>
+  </form>
+</section>
+
+<section class="table-card">
+  <div class="table-head">
+    <div>Ticket</div>
+    <div>Betreff</div>
+    <div>Status</div>
+    <div>User</div>
+    <div>Aktualisiert</div>
+  </div>
+
+  {% if items %}
   {% for t in items %}
-  <a class="trow" href="{{ url_for('ticket_detail', ticket_id=t.ticket_id) }}">
-    <div>{{ t.ticket_id }}</div>
-    <div>{{ t.subject }}</div>
-    <div>{{ t.status }}</div>
-    <div>{{ t.creator_user_id }}</div>
-    <div>{{ t.updated_at }}</div>
+  <a class="table-row" href="{{ url_for('ticket_detail', ticket_id=t.ticket_id) }}">
+    <div class="ticket-id" data-label="Ticket">{{ t.ticket_id }}</div>
+    <div data-label="Betreff">{{ t.subject or "Ohne Betreff" }}</div>
+    <div data-label="Status">
+      <span class="badge {% if t.status == 'closed' %}success{% else %}warning{% endif %}">
+        {{ t.status }}
+      </span>
+    </div>
+    <div class="mono" data-label="User">{{ t.creator_user_id or "-" }}</div>
+    <div class="muted" data-label="Aktualisiert">{{ t.updated_at or "-" }}</div>
   </a>
   {% endfor %}
-</div>
+  {% else %}
+  <div class="empty-state">
+    <h2>Keine Tickets gefunden</h2>
+    <p>Mit anderen Suchbegriffen oder einem höheren Limit tauchen sie hier auf.</p>
+  </div>
+  {% endif %}
+</section>
 {% endblock %}

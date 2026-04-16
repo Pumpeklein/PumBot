@@ -246,7 +246,14 @@ def ticket_transcript(ticket_id: str):
         abort(404)
 
     html = path.read_text(encoding="utf-8")
-    return render_template("transcript.html", ticket_id=ticket_id, html=html)
+    u = current_user()
+    return render_template(
+        "transcript.html",
+        ticket_id=ticket_id,
+        html=html,
+        username=u["username"] if u else None,
+        role=u["role"] if u else None,
+    )
 
 
 # ---------------- PUBLIC TRANSCRIPT (TOKEN LINK) ----------------
@@ -288,7 +295,14 @@ def public_transcript(ticket_id: str):
         abort(404)
 
     html = path.read_text(encoding="utf-8")
-    return render_template("transcript.html", ticket_id=ticket_id, html=html)
+    u = current_user()
+    return render_template(
+        "transcript.html",
+        ticket_id=ticket_id,
+        html=html,
+        username=u["username"] if u else None,
+        role=u["role"] if u else None,
+    )
 
 
 # ---------------- OWNER ADMIN ----------------

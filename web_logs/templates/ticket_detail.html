@@ -1,37 +1,97 @@
 {% extends "base.html" %} {% block content %}
-<h1>Ticket {{ t.ticket_id }}</h1>
+<section class="hero">
+  <div class="hero-copy">
+    <span class="eyebrow">Ticket Detail</span>
+    <h1>Ticket {{ t.ticket_id }}</h1>
+    <p>
+      Alle Kerninfos, das Transkript und die letzten Log-Einträge auf einen
+      Blick.
+    </p>
+  </div>
 
-<div class="card">
-  <div><b>Subject:</b> {{ t.subject }}</div>
-  <div><b>Status:</b> {{ t.status }}</div>
-  <div><b>Creator:</b> {{ t.creator_user_id }}</div>
-  <div><b>Closed at:</b> {{ t.closed_at }}</div>
-</div>
+  <div class="hero-meta">
+    <div class="stat">
+      <span class="stat-label">Status</span>
+      <span class="stat-value">{{ t.status or "-" }}</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Logs</span>
+      <span class="stat-value">{{ logs|length }}</span>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h2 class="section-title">Übersicht</h2>
+  <div class="detail-grid">
+    <div class="detail-item">
+      <span class="detail-label">Betreff</span>
+      <div class="detail-value">{{ t.subject or "Ohne Betreff" }}</div>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Status</span>
+      <div class="detail-value">
+        <span class="badge {% if t.status == 'closed' %}success{% else %}warning{% endif %}">
+          {{ t.status or "-" }}
+        </span>
+      </div>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Creator</span>
+      <div class="detail-value mono">{{ t.creator_user_id or "-" }}</div>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Geschlossen am</span>
+      <div class="detail-value">{{ t.closed_at or "-" }}</div>
+    </div>
+  </div>
+</section>
 
 {% if t.transcript_path %}
-<div class="card">
-  <h2>Transcript</h2>
+<section class="card">
+  <h2 class="section-title">Transkript</h2>
   <p>
-    Staff sieht es direkt über Datei-Pfad (intern). Public Link kommt per Token.
+    Moderatoren öffnen das gespeicherte Transkript direkt. Öffentliche Links
+    funktionieren nur mit gültigem Token.
   </p>
-  <a
-    href="{{ url_for('public_transcript', ticket_id=t.ticket_id) }}?token=STAFF_TEST_TOKEN"
-    >Public (mit Token)</a
-  >
-  <p class="small">(Für echte User kommt der echte Token aus dem Bot.)</p>
-</div>
+  <div class="row" style="margin-top: 16px">
+    <a class="button secondary" href="{{ url_for('ticket_transcript', ticket_id=t.ticket_id) }}">
+      Internes Transkript öffnen
+    </a>
+    <a
+      class="button"
+      href="{{ url_for('public_transcript', ticket_id=t.ticket_id) }}?token=STAFF_TEST_TOKEN"
+    >
+      Öffentlichen Testlink öffnen
+    </a>
+  </div>
+  <p class="small" style="margin-top: 12px">
+    Für echte User wird der gültige Token-Link über den Bot ausgeliefert.
+  </p>
+</section>
 {% endif %}
 
-<h2>Logs</h2>
-<div class="card">
+<section class="card">
+  <h2 class="section-title">Logs</h2>
   {% if logs|length == 0 %}
-  <div class="muted">Keine Logs.</div>
-  {% else %} {% for l in logs %}
-  <div class="logline">
-    <span class="muted">{{ l.created_at }}</span>
-    <b>{{ l.level or "" }}</b>
-    {{ l.message or "" }}
+  <div class="empty-state">
+    <h2>Keine Logs vorhanden</h2>
+    <p>Sobald Einträge gespeichert werden, erscheinen sie hier chronologisch.</p>
   </div>
-  {% endfor %} {% endif %}
-</div>
+  {% else %}
+  <div class="log-list">
+    {% for l in logs %}
+    <div class="log-entry">
+      <div class="log-topline">
+        <span class="muted">{{ l.created_at or "-" }}</span>
+        <span class="badge {% if (l.level or '')|lower in ['error', 'critical'] %}danger{% elif (l.level or '')|lower in ['warn', 'warning'] %}warning{% else %}success{% endif %}">
+          {{ l.level or "info" }}
+        </span>
+      </div>
+      <div class="log-message">{{ l.message or "" }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
 {% endblock %}

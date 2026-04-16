@@ -1,4 +1,11 @@
 {% extends "base.html" %} {% block content %}
-<h1>Transkript – Ticket {{ ticket_id }}</h1>
-<div class="card transcript">{{ html | safe }}</div>
+<section class="hero">
+  <div class="hero-copy">
+    <span class="eyebrow">Transkript</span>
+    <h1>Ticket {{ ticket_id }}</h1>
+    <p>Gespeicherter Verlauf in einer fokussierten und besser lesbaren Ansicht.</p>
+  </div>
+</section>
+
+<section class="card transcript-frame">{{ html | safe }}</section>
 {% endblock %}

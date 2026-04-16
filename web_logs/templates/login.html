@@ -1,12 +1,26 @@
 {% extends "base.html" %} {% block content %}
-<h1>Login</h1>
-<form method="post" class="card">
-  <label>Username</label>
-  <input name="username" required />
+<section class="auth-layout">
+  <div class="auth-card">
+    <span class="eyebrow">Login</span>
+    <h1>Willkommen zurück</h1>
+    <p style="margin-bottom: 20px">
+      Melde dich an, um Tickets, Logs und Transkripte in der Moderationsansicht
+      zu verwalten.
+    </p>
 
-  <label>Passwort</label>
-  <input name="password" type="password" required />
+    <form method="post">
+      <div class="field">
+        <label for="username">Username</label>
+        <input id="username" name="username" required />
+      </div>
 
-  <button type="submit">Einloggen</button>
-</form>
+      <div class="field">
+        <label for="password">Passwort</label>
+        <input id="password" name="password" type="password" required />
+      </div>
+
+      <button type="submit">Einloggen</button>
+    </form>
+  </div>
+</section>
 {% endblock %}

@@ -1,12 +1,32 @@
 {% extends "base.html" %} {% block content %}
-<h1>Setup (Owner erstellen)</h1>
-<form method="post" class="card">
-  <label>Username</label>
-  <input name="username" required />
+<section class="auth-layout">
+  <div class="auth-card">
+    <span class="eyebrow">Ersteinrichtung</span>
+    <h1>Owner-Zugang erstellen</h1>
+    <p style="margin-bottom: 20px">
+      Richte den ersten Account ein, damit die Ticket-Log-Oberfläche
+      administriert werden kann.
+    </p>
 
-  <label>Passwort (min 6 Zeichen)</label>
-  <input name="password" type="password" required minlength="6" />
+    <form method="post">
+      <div class="field">
+        <label for="username">Username</label>
+        <input id="username" name="username" required />
+      </div>
 
-  <button type="submit">Owner erstellen</button>
-</form>
+      <div class="field">
+        <label for="password">Passwort</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          required
+          minlength="6"
+        />
+      </div>
+
+      <button type="submit">Owner erstellen</button>
+    </form>
+  </div>
+</section>
 {% endblock %}

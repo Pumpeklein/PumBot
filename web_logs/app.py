@@ -217,6 +217,7 @@ def tickets_page():
         limit=limit,
         role=u["role"],
         username=u["username"],
+        active_page="tickets",
     )
 
 
@@ -230,7 +231,8 @@ def ticket_detail(ticket_id: str):
 
     logs = list_logs_for_ticket(ticket_id, limit=200)
     return render_template(
-        "ticket_detail.html", t=t, logs=logs, role=u["role"], username=u["username"]
+        "ticket_detail.html", t=t, logs=logs, role=u["role"], username=u["username"],
+        active_page="tickets",
     )
 
 
@@ -315,6 +317,7 @@ def admin_users():
         users=users,
         username=current_user()["username"],
         role="owner",
+        active_page="users",
     )
 
 

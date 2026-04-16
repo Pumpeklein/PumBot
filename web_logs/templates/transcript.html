@@ -1,11 +1,12 @@
-{% extends "base.html" %} {% block content %}
-<section class="hero">
-  <div class="hero-copy">
-    <span class="eyebrow">Transkript</span>
-    <h1>Ticket {{ ticket_id }}</h1>
-    <p>Gespeicherter Verlauf in einer fokussierten und besser lesbaren Ansicht.</p>
-  </div>
-</section>
+{% extends "base.html" %}
+{% from "_macros.html" import page_header %}
 
-<section class="card transcript-frame">{{ html | safe }}</section>
+{% block content %}
+{{ page_header("Transkript", "Ticket " ~ ticket_id, "Gespeicherter Verlauf in einer fokussierten Ansicht.") }}
+
+<div class="overflow-auto rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <div class="prose prose-invert max-w-none text-sm leading-relaxed text-slate-300 [&_pre]:whitespace-pre-wrap [&_pre]:break-words [&_pre]:font-sans">
+    {{ html | safe }}
+  </div>
+</div>
 {% endblock %}

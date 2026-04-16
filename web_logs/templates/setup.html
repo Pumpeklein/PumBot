@@ -1,32 +1,29 @@
-{% extends "base.html" %} {% block content %}
-<section class="auth-layout">
-  <div class="auth-card">
-    <span class="eyebrow">Ersteinrichtung</span>
-    <h1>Owner-Zugang erstellen</h1>
-    <p style="margin-bottom: 20px">
-      Richte den ersten Account ein, damit die Ticket-Log-Oberfläche
-      administriert werden kann.
-    </p>
+{% extends "base.html" %}
+{% from "_macros.html" import field, btn %}
 
-    <form method="post">
-      <div class="field">
-        <label for="username">Username</label>
-        <input id="username" name="username" required />
+{% block body %}
+<div class="flex min-h-full items-center justify-center px-4 py-12">
+  <div class="w-full max-w-sm">
+
+    <div class="mb-8 text-center">
+      <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 text-lg font-bold text-white">
+        PB
       </div>
+      <h1 class="text-xl font-bold text-white">Owner-Zugang erstellen</h1>
+      <p class="mt-2 text-sm text-slate-500">Richte den ersten Account ein, damit die Oberfläche administriert werden kann.</p>
+    </div>
 
-      <div class="field">
-        <label for="password">Passwort</label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          required
-          minlength="6"
-        />
+    {% if error %}
+    <div class="mb-4 rounded-lg border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-300">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" class="space-y-4">
+      {{ field("username", "Username") }}
+      {{ field("password", "Passwort", type="password", minlength=6) }}
+      <div class="pt-1">
+        {{ btn("Owner erstellen", class="w-full") }}
       </div>
-
-      <button type="submit">Owner erstellen</button>
     </form>
   </div>
-</section>
+</div>
 {% endblock %}

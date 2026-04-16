@@ -1,46 +1,125 @@
 <!doctype html>
-<html lang="de">
+<html lang="de" class="h-full">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{ title or "PumBot Ticket Logs" }}</title>
-    <link
-      rel="stylesheet"
-      href="{{ url_for('static', filename='style.css') }}"
-    />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Inter", "system-ui", "sans-serif"],
+            },
+          },
+        },
+      };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   </head>
-  <body>
-    <div class="app-shell">
-      <header class="topbar">
-        <div class="brand-wrap">
-          <div class="brand-mark">PB</div>
-          <div class="brand-text">
-            <div class="brand-title">PumBot Ticket Logs</div>
-            <div class="brand-subtitle">
-              Moderation, Tickets und Transkripte in einer Oberfläche
-            </div>
+
+  <body class="h-full bg-[#0a0f1a] font-sans text-slate-200 antialiased">
+    {% block body %}
+    <div class="flex h-full">
+
+      {# ── Sidebar ── #}
+      <aside id="sidebar" class="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-white/[0.06] bg-[#0d1320] transition-transform duration-200 lg:static lg:translate-x-0 -translate-x-full">
+
+        {# Brand #}
+        <div class="flex items-center gap-3 px-5 py-5">
+          <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 text-sm font-bold text-white">
+            PB
+          </div>
+          <div>
+            <div class="text-sm font-semibold text-white">PumBot</div>
+            <div class="text-[11px] text-slate-500">Ticket Logs</div>
           </div>
         </div>
 
-        <nav class="nav">
+        {# Navigation #}
+        <nav class="flex-1 space-y-1 px-3 py-4">
           {% if username %}
-          <span class="pill">{{ username }} · {{ role }}</span>
-          <a class="nav-link" href="{{ url_for('tickets_page') }}">Tickets</a>
+          {% set active_page = active_page|default("") %}
+
+          <a href="{{ url_for('tickets_page') }}"
+            class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
+              {{ 'bg-white/[0.08] text-white' if active_page == 'tickets' else 'text-slate-400 hover:bg-white/[0.04] hover:text-white' }}">
+            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+            Tickets
+          </a>
+
           {% if role == "owner" %}
-          <a class="nav-link" href="{{ url_for('admin_users') }}">Benutzer</a>
+          <a href="{{ url_for('admin_users') }}"
+            class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
+              {{ 'bg-white/[0.08] text-white' if active_page == 'users' else 'text-slate-400 hover:bg-white/[0.04] hover:text-white' }}">
+            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            Benutzer
+          </a>
           {% endif %}
-          <a class="nav-link-danger" href="{{ url_for('logout') }}">Logout</a>
+
           {% else %}
-          <a class="nav-link" href="{{ url_for('login') }}">Login</a>
+          <a href="{{ url_for('login') }}"
+            class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-400 hover:bg-white/[0.04] hover:text-white transition">
+            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
+            Login
+          </a>
           {% endif %}
         </nav>
-      </header>
 
-      <main class="page">
-        {% if error %}
-        <div class="alert">{{ error }}</div>
-        {% endif %} {% block content %}{% endblock %}
-      </main>
+        {# User info at bottom #}
+        {% if username %}
+        <div class="border-t border-white/[0.06] px-4 py-4">
+          <div class="flex items-center justify-between">
+            <div class="min-w-0">
+              <div class="truncate text-sm font-medium text-white">{{ username }}</div>
+              <div class="text-xs text-slate-500">{{ role }}</div>
+            </div>
+            <a href="{{ url_for('logout') }}" title="Logout"
+              class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-500/10 hover:text-red-400">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+            </a>
+          </div>
+        </div>
+        {% endif %}
+      </aside>
+
+      {# ── Overlay for mobile sidebar ── #}
+      <div id="sidebar-overlay" class="fixed inset-0 z-20 bg-black/50 lg:hidden hidden" onclick="toggleSidebar()"></div>
+
+      {# ── Main content ── #}
+      <div class="flex flex-1 flex-col overflow-hidden">
+
+        {# Mobile topbar #}
+        <header class="flex items-center gap-3 border-b border-white/[0.06] px-4 py-3 lg:hidden">
+          <button onclick="toggleSidebar()" class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-white/[0.06]">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+          <span class="text-sm font-semibold text-white">PumBot</span>
+        </header>
+
+        <main class="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
+          {% if error %}
+          <div class="mb-5 rounded-lg border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+            {{ error }}
+          </div>
+          {% endif %}
+          {% block content %}{% endblock %}
+        </main>
+      </div>
     </div>
+
+    <script>
+      function toggleSidebar() {
+        const sb = document.getElementById("sidebar");
+        const ov = document.getElementById("sidebar-overlay");
+        sb.classList.toggle("-translate-x-full");
+        ov.classList.toggle("hidden");
+      }
+    </script>
+    {% endblock %}
   </body>
 </html>

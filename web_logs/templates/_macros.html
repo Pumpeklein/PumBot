@@ -1,0 +1,92 @@
+{# ── Reusable UI components ── #}
+
+{% macro field(name, label, type="text", placeholder="", required=true, value="", min=none, max=none, minlength=none) %}
+<div>
+  <label for="{{ name }}" class="block text-sm font-medium text-slate-400 mb-1.5">{{ label }}</label>
+  <input id="{{ name }}" name="{{ name }}" type="{{ type }}"
+    {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
+    {% if required %}required{% endif %}
+    {% if value %}value="{{ value }}"{% endif %}
+    {% if min is not none %}min="{{ min }}"{% endif %}
+    {% if max is not none %}max="{{ max }}"{% endif %}
+    {% if minlength is not none %}minlength="{{ minlength }}"{% endif %}
+    class="w-full rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-white placeholder-slate-500 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40" />
+</div>
+{% endmacro %}
+
+{% macro select_field(name, label, options, selected="") %}
+<div>
+  <label for="{{ name }}" class="block text-sm font-medium text-slate-400 mb-1.5">{{ label }}</label>
+  <select id="{{ name }}" name="{{ name }}"
+    class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
+    {% for opt in options %}
+    <option value="{{ opt }}" class="bg-[#151c2c] text-white" {% if opt == selected %}selected{% endif %}>{{ opt }}</option>
+    {% endfor %}
+  </select>
+</div>
+{% endmacro %}
+
+{% macro badge(text, variant="default") %}
+{% set colors = {
+  "success": "border-emerald-500/25 bg-emerald-500/10 text-emerald-400",
+  "warning": "border-amber-500/25 bg-amber-500/10 text-amber-400",
+  "danger":  "border-red-500/25 bg-red-500/10 text-red-400",
+  "default": "border-slate-500/25 bg-slate-500/10 text-slate-300"
+} %}
+<span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium {{ colors[variant] or colors['default'] }}">
+  {{ text }}
+</span>
+{% endmacro %}
+
+{% macro stat(label, value) %}
+<div class="rounded-xl border border-white/5 bg-white/[0.03] p-4">
+  <div class="text-xs font-medium uppercase tracking-wider text-slate-500">{{ label }}</div>
+  <div class="mt-1 text-xl font-bold text-white">{{ value }}</div>
+</div>
+{% endmacro %}
+
+{% macro page_header(eyebrow, title, description="") %}
+<div class="mb-6">
+  {% if eyebrow %}
+  <span class="inline-flex items-center rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-xs font-medium uppercase tracking-wider text-cyan-400">
+    {{ eyebrow }}
+  </span>
+  {% endif %}
+  <h1 class="mt-3 text-2xl font-bold text-white sm:text-3xl">{{ title }}</h1>
+  {% if description %}
+  <p class="mt-2 max-w-2xl text-sm text-slate-400 leading-relaxed">{{ description }}</p>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro card(title="", class="") %}
+<div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 {{ class }}">
+  {% if title %}
+  <h2 class="mb-4 text-base font-semibold text-white">{{ title }}</h2>
+  {% endif %}
+  {{ caller() }}
+</div>
+{% endmacro %}
+
+{% macro empty_state(title, description) %}
+<div class="py-12 text-center">
+  <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white/5">
+    <svg class="h-6 w-6 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-2.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+    </svg>
+  </div>
+  <h3 class="text-sm font-semibold text-white">{{ title }}</h3>
+  <p class="mt-1 text-sm text-slate-500">{{ description }}</p>
+</div>
+{% endmacro %}
+
+{% macro btn(text, type="submit", variant="primary", class="") %}
+{% set styles = {
+  "primary":   "bg-cyan-600 text-white hover:bg-cyan-500 shadow-lg shadow-cyan-600/20",
+  "secondary": "border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10",
+  "danger":    "border border-red-500/25 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+} %}
+<button type="{{ type }}" class="rounded-lg px-4 py-2.5 text-sm font-medium transition {{ styles[variant] or styles['primary'] }} {{ class }}">
+  {{ text }}
+</button>
+{% endmacro %}

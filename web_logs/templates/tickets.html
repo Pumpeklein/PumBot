@@ -1,83 +1,60 @@
-{% extends "base.html" %} {% block content %}
-<section class="hero">
-  <div class="hero-copy">
-    <span class="eyebrow">Ticket Center</span>
-    <h1>Alle Tickets an einem Ort.</h1>
-    <p>
-      Durchsuche Ticket-IDs, Themen und User schneller und spring direkt in
-      Verlauf, Status und Transkript.
-    </p>
-  </div>
+{% extends "base.html" %}
+{% from "_macros.html" import page_header, field, btn, badge, stat, empty_state %}
 
-  <div class="hero-meta">
-    <div class="stat">
-      <span class="stat-label">Ansicht</span>
-      <span class="stat-value">Tickets</span>
-    </div>
-    <div class="stat">
-      <span class="stat-label">Limit</span>
-      <span class="stat-value">{{ limit }}</span>
-    </div>
-  </div>
-</section>
+{% block content %}
+{{ page_header("Ticket Center", "Alle Tickets an einem Ort.", "Durchsuche Ticket-IDs, Themen und User – spring direkt in Verlauf, Status und Transkript.") }}
 
-<section class="card">
-  <h2 class="section-title">Suche & Filter</h2>
-  <form method="get" class="toolbar-form">
-    <div class="field">
-      <label for="q">Suche</label>
-      <input
-        id="q"
-        name="q"
-        placeholder="Ticket-ID, Betreff oder User-ID"
-        value="{{ q }}"
-      />
-    </div>
+{# Stats #}
+<div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+  {{ stat("Ansicht", "Tickets") }}
+  {{ stat("Limit", limit) }}
+</div>
 
-    <div class="field compact">
-      <label for="limit">Limit</label>
-      <input
-        id="limit"
-        name="limit"
-        type="number"
-        min="1"
-        max="1000"
-        value="{{ limit }}"
-      />
+{# Filter #}
+<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <h2 class="mb-3 text-sm font-semibold text-white">Suche & Filter</h2>
+  <form method="get" class="flex flex-wrap items-end gap-3">
+    <div class="min-w-0 flex-1">
+      {{ field("q", "Suche", placeholder="Ticket-ID, Betreff oder User-ID", required=false, value=q) }}
     </div>
-
-    <button type="submit">Anwenden</button>
+    <div class="w-28">
+      {{ field("limit", "Limit", type="number", value=limit, min=1, max=1000, required=false) }}
+    </div>
+    {{ btn("Anwenden") }}
   </form>
-</section>
+</div>
 
-<section class="table-card">
-  <div class="table-head">
-    <div>Ticket</div>
-    <div>Betreff</div>
-    <div>Status</div>
-    <div>User</div>
-    <div>Aktualisiert</div>
-  </div>
-
+{# Table #}
+<div class="overflow-hidden rounded-xl border border-white/[0.06]">
   {% if items %}
-  {% for t in items %}
-  <a class="table-row" href="{{ url_for('ticket_detail', ticket_id=t.ticket_id) }}">
-    <div class="ticket-id" data-label="Ticket">{{ t.ticket_id }}</div>
-    <div data-label="Betreff">{{ t.subject or "Ohne Betreff" }}</div>
-    <div data-label="Status">
-      <span class="badge {% if t.status == 'closed' %}success{% else %}warning{% endif %}">
-        {{ t.status }}
-      </span>
-    </div>
-    <div class="mono" data-label="User">{{ t.creator_user_id or "-" }}</div>
-    <div class="muted" data-label="Aktualisiert">{{ t.updated_at or "-" }}</div>
-  </a>
-  {% endfor %}
-  {% else %}
-  <div class="empty-state">
-    <h2>Keine Tickets gefunden</h2>
-    <p>Mit anderen Suchbegriffen oder einem höheren Limit tauchen sie hier auf.</p>
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead>
+        <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+          <th class="px-4 py-3 font-medium">Ticket</th>
+          <th class="px-4 py-3 font-medium">Betreff</th>
+          <th class="px-4 py-3 font-medium">Status</th>
+          <th class="px-4 py-3 font-medium">User</th>
+          <th class="px-4 py-3 font-medium">Aktualisiert</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-white/[0.04]">
+        {% for t in items %}
+        <tr class="transition hover:bg-white/[0.03] cursor-pointer" onclick="location.href='{{ url_for('ticket_detail', ticket_id=t.ticket_id) }}'">
+          <td class="whitespace-nowrap px-4 py-3 font-semibold text-white">{{ t.ticket_id }}</td>
+          <td class="px-4 py-3 text-slate-300">{{ t.subject or "Ohne Betreff" }}</td>
+          <td class="px-4 py-3">
+            {{ badge(t.status, "success" if t.status == "closed" else "warning") }}
+          </td>
+          <td class="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-400">{{ t.creator_user_id or "-" }}</td>
+          <td class="whitespace-nowrap px-4 py-3 text-slate-500">{{ t.updated_at or "-" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
+  {% else %}
+  {{ empty_state("Keine Tickets gefunden", "Mit anderen Suchbegriffen oder einem höheren Limit tauchen sie hier auf.") }}
   {% endif %}
-</section>
+</div>
 {% endblock %}

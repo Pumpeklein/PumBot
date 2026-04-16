@@ -1,97 +1,77 @@
-{% extends "base.html" %} {% block content %}
-<section class="hero">
-  <div class="hero-copy">
-    <span class="eyebrow">Ticket Detail</span>
-    <h1>Ticket {{ t.ticket_id }}</h1>
-    <p>
-      Alle Kerninfos, das Transkript und die letzten Log-Einträge auf einen
-      Blick.
-    </p>
-  </div>
+{% extends "base.html" %}
+{% from "_macros.html" import page_header, badge, stat, empty_state %}
 
-  <div class="hero-meta">
-    <div class="stat">
-      <span class="stat-label">Status</span>
-      <span class="stat-value">{{ t.status or "-" }}</span>
-    </div>
-    <div class="stat">
-      <span class="stat-label">Logs</span>
-      <span class="stat-value">{{ logs|length }}</span>
-    </div>
-  </div>
-</section>
+{% block content %}
+{{ page_header("Ticket Detail", "Ticket " ~ t.ticket_id, "Alle Kerninfos, das Transkript und die letzten Log-Einträge auf einen Blick.") }}
 
-<section class="card">
-  <h2 class="section-title">Übersicht</h2>
-  <div class="detail-grid">
-    <div class="detail-item">
-      <span class="detail-label">Betreff</span>
-      <div class="detail-value">{{ t.subject or "Ohne Betreff" }}</div>
+{# Stats row #}
+<div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+  {{ stat("Status", t.status or "-") }}
+  {{ stat("Logs", logs|length) }}
+</div>
+
+{# Overview #}
+<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <h2 class="mb-4 text-sm font-semibold text-white">Übersicht</h2>
+  <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="rounded-lg border border-white/5 bg-white/[0.02] p-3">
+      <div class="text-xs uppercase tracking-wider text-slate-500">Betreff</div>
+      <div class="mt-1 text-sm text-white">{{ t.subject or "Ohne Betreff" }}</div>
     </div>
-    <div class="detail-item">
-      <span class="detail-label">Status</span>
-      <div class="detail-value">
-        <span class="badge {% if t.status == 'closed' %}success{% else %}warning{% endif %}">
-          {{ t.status or "-" }}
-        </span>
-      </div>
+    <div class="rounded-lg border border-white/5 bg-white/[0.02] p-3">
+      <div class="text-xs uppercase tracking-wider text-slate-500">Status</div>
+      <div class="mt-1">{{ badge(t.status or "-", "success" if t.status == "closed" else "warning") }}</div>
     </div>
-    <div class="detail-item">
-      <span class="detail-label">Creator</span>
-      <div class="detail-value mono">{{ t.creator_user_id or "-" }}</div>
+    <div class="rounded-lg border border-white/5 bg-white/[0.02] p-3">
+      <div class="text-xs uppercase tracking-wider text-slate-500">Creator</div>
+      <div class="mt-1 font-mono text-xs text-white">{{ t.creator_user_id or "-" }}</div>
     </div>
-    <div class="detail-item">
-      <span class="detail-label">Geschlossen am</span>
-      <div class="detail-value">{{ t.closed_at or "-" }}</div>
+    <div class="rounded-lg border border-white/5 bg-white/[0.02] p-3">
+      <div class="text-xs uppercase tracking-wider text-slate-500">Geschlossen am</div>
+      <div class="mt-1 text-sm text-white">{{ t.closed_at or "-" }}</div>
     </div>
   </div>
-</section>
+</div>
 
+{# Transcript #}
 {% if t.transcript_path %}
-<section class="card">
-  <h2 class="section-title">Transkript</h2>
-  <p>
-    Moderatoren öffnen das gespeicherte Transkript direkt. Öffentliche Links
-    funktionieren nur mit gültigem Token.
-  </p>
-  <div class="row" style="margin-top: 16px">
-    <a class="button secondary" href="{{ url_for('ticket_transcript', ticket_id=t.ticket_id) }}">
-      Internes Transkript öffnen
+<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <h2 class="mb-3 text-sm font-semibold text-white">Transkript</h2>
+  <p class="mb-4 text-sm text-slate-400">Öffne das gespeicherte Transkript direkt oder über den öffentlichen Link.</p>
+  <div class="flex flex-wrap gap-2">
+    <a href="{{ url_for('ticket_transcript', ticket_id=t.ticket_id) }}"
+      class="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/10">
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+      Internes Transkript
     </a>
-    <a
-      class="button"
-      href="{{ url_for('public_transcript', ticket_id=t.ticket_id) }}?token=STAFF_TEST_TOKEN"
-    >
-      Öffentlichen Testlink öffnen
+    <a href="{{ url_for('public_transcript', ticket_id=t.ticket_id) }}?token=STAFF_TEST_TOKEN"
+      class="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-cyan-600/20 transition hover:bg-cyan-500">
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+      Öffentlicher Testlink
     </a>
   </div>
-  <p class="small" style="margin-top: 12px">
-    Für echte User wird der gültige Token-Link über den Bot ausgeliefert.
-  </p>
-</section>
+  <p class="mt-3 text-xs text-slate-500">Für echte User wird der gültige Token-Link über den Bot ausgeliefert.</p>
+</div>
 {% endif %}
 
-<section class="card">
-  <h2 class="section-title">Logs</h2>
+{# Logs #}
+<div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <h2 class="mb-4 text-sm font-semibold text-white">Logs</h2>
   {% if logs|length == 0 %}
-  <div class="empty-state">
-    <h2>Keine Logs vorhanden</h2>
-    <p>Sobald Einträge gespeichert werden, erscheinen sie hier chronologisch.</p>
-  </div>
+  {{ empty_state("Keine Logs vorhanden", "Sobald Einträge gespeichert werden, erscheinen sie hier chronologisch.") }}
   {% else %}
-  <div class="log-list">
+  <div class="space-y-2">
     {% for l in logs %}
-    <div class="log-entry">
-      <div class="log-topline">
-        <span class="muted">{{ l.created_at or "-" }}</span>
-        <span class="badge {% if (l.level or '')|lower in ['error', 'critical'] %}danger{% elif (l.level or '')|lower in ['warn', 'warning'] %}warning{% else %}success{% endif %}">
-          {{ l.level or "info" }}
-        </span>
+    <div class="rounded-lg border border-white/5 bg-white/[0.02] p-3">
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-xs text-slate-500">{{ l.created_at or "-" }}</span>
+        {% set lvl = (l.level or "")|lower %}
+        {{ badge(l.level or "info", "danger" if lvl in ["error", "critical"] else ("warning" if lvl in ["warn", "warning"] else "success")) }}
       </div>
-      <div class="log-message">{{ l.message or "" }}</div>
+      <div class="mt-1.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-300">{{ l.message or "" }}</div>
     </div>
     {% endfor %}
   </div>
   {% endif %}
-</section>
+</div>
 {% endblock %}

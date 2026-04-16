@@ -52,7 +52,7 @@ class UserManagementCog(commands.Cog):
     )
 
     @moderation_group.command(
-        name="profile", description="Zeigt Infos ueber einen Nutzer."
+        name="profile", description="Zeigt Infos über einen Nutzer."
     )
     @app_commands.describe(user="User (optional)")
     async def profile(
@@ -124,7 +124,7 @@ class UserManagementCog(commands.Cog):
                 f"**User ID:** `{member.id}`\n"
                 f"**Account erstellt:** {format_dt(member.created_at)}\n"
                 f"**Server beigetreten:** {format_dt(member.joined_at)}\n"
-                f"**Join-Methode:** Nicht direkt ueber die Discord-API verfuegbar"
+                f"**Join-Methode:** Nicht direkt über die Discord-API verfügbar"
             ),
             inline=False,
         )
@@ -173,7 +173,7 @@ class UserManagementCog(commands.Cog):
             and interaction.user != interaction.guild.owner
         ):
             await interaction.response.send_message(
-                "Du kannst keinen User verwarnen, der gleich- oder hoehergestellt ist als du.",
+                "Du kannst keinen User verwarnen, der gleich- oder höhergestellt ist als du.",
                 ephemeral=True,
             )
             return
@@ -276,7 +276,7 @@ class UserManagementCog(commands.Cog):
 
     @moderation_group.command(
         name="clearwarnings",
-        description="Loescht Verwarnungen eines Users (ohne Index: alle).",
+        description="Löscht Verwarnungen eines Users (ohne Index: alle).",
     )
     @app_commands.describe(
         user="User", index="Index (1-basiert) einer einzelnen Verwarnung (optional)"
@@ -305,7 +305,7 @@ class UserManagementCog(commands.Cog):
             and interaction.user != interaction.guild.owner
         ):
             await interaction.response.send_message(
-                "Du kannst keine Verwarnungen von Usern loeschen, die gleich- oder hoehergestellt sind als du.",
+                "Du kannst keine Verwarnungen von Usern löschen, die gleich- oder höhergestellt sind als du.",
                 ephemeral=True,
             )
             return
@@ -327,7 +327,7 @@ class UserManagementCog(commands.Cog):
             if not warns or index < 1 or index > len(warns):
                 count_now = len(warns) if warns else 0
                 await interaction.response.send_message(
-                    f"Ungueltiger Index. {user.mention} hat **{count_now}** Verwarnung(en).",
+                    f"Ungültiger Index. {user.mention} hat **{count_now}** Verwarnung(en).",
                     ephemeral=True,
                 )
                 return
@@ -338,13 +338,13 @@ class UserManagementCog(commands.Cog):
             except Exception:
                 logger.exception("clearwarnings remove_warning error")
                 await interaction.response.send_message(
-                    "Beim Loeschen der Verwarnung ist ein Fehler aufgetreten.",
+                    "Beim Löschen der Verwarnung ist ein Fehler aufgetreten.",
                     ephemeral=True,
                 )
                 return
 
             await interaction.response.send_message(
-                f"Verwarnung #{index} von {user.mention} wurde geloescht.",
+                f"Verwarnung #{index} von {user.mention} wurde gelöscht.",
                 ephemeral=True,
             )
             return
@@ -358,7 +358,7 @@ class UserManagementCog(commands.Cog):
 
         if count <= 0:
             await interaction.response.send_message(
-                f"{user.mention} hat keine Verwarnungen, die geloescht werden koennen.",
+                f"{user.mention} hat keine Verwarnungen, die gelöscht werden können.",
                 ephemeral=True,
             )
             return
@@ -368,13 +368,13 @@ class UserManagementCog(commands.Cog):
         except Exception:
             logger.exception("clearwarnings clear_warnings error")
             await interaction.response.send_message(
-                "Beim Loeschen der Verwarnungen ist ein Fehler aufgetreten.",
+                "Beim Löschen der Verwarnungen ist ein Fehler aufgetreten.",
                 ephemeral=True,
             )
             return
 
         await interaction.response.send_message(
-            f"Alle Verwarnungen von {user.mention} wurden geloescht. (Geloescht: **{count}**)",
+            f"Alle Verwarnungen von {user.mention} wurden gelöscht. (Gelöscht: **{count}**)",
             ephemeral=True,
         )
 
@@ -410,7 +410,7 @@ class UserManagementCog(commands.Cog):
             and interaction.user != interaction.guild.owner
         ):
             await interaction.response.send_message(
-                "Du kannst keinen User bannen, der gleich- oder hoehergestellt ist als du.",
+                "Du kannst keinen User bannen, der gleich- oder höhergestellt ist als du.",
                 ephemeral=True,
             )
             return
@@ -472,7 +472,7 @@ class UserManagementCog(commands.Cog):
 
         if minuten <= 0:
             await interaction.response.send_message(
-                "Die Minuten muessen groesser als 0 sein.", ephemeral=True
+                "Die Minuten müssen größer als 0 sein.", ephemeral=True
             )
             return
 
@@ -487,7 +487,7 @@ class UserManagementCog(commands.Cog):
             and interaction.user != interaction.guild.owner
         ):
             await interaction.response.send_message(
-                "Du kannst keinen User timeouten, der gleich- oder hoehergestellt ist als du.",
+                "Du kannst keinen User timeouten, der gleich- oder höhergestellt ist als du.",
                 ephemeral=True,
             )
             return
@@ -523,13 +523,13 @@ class UserManagementCog(commands.Cog):
             return
 
         await interaction.response.send_message(
-            f"{user.mention} wurde fuer **{minuten}** Minuten in Timeout gesetzt.\nGrund: {reason_text}",
+            f"{user.mention} wurde für **{minuten}** Minuten in Timeout gesetzt.\nGrund: {reason_text}",
             ephemeral=False,
         )
 
         try:
             await user.send(
-                f"Du wurdest auf **{interaction.guild.name}** fuer {minuten} Minuten in Timeout gesetzt.\nGrund: {reason_text}"
+                f"Du wurdest auf **{interaction.guild.name}** für {minuten} Minuten in Timeout gesetzt.\nGrund: {reason_text}"
             )
         except discord.Forbidden:
             pass

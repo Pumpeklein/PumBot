@@ -11,7 +11,7 @@ from src.pumbot.bot import logger
 
 
 class AutoPublisherCog(commands.Cog):
-    """Automatisches Veroeffentlichen von Nachrichten in Announcement-Channels."""
+    """Automatisches Veröffentlichen von Nachrichten in Announcement-Channels."""
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -31,12 +31,12 @@ class AutoPublisherCog(commands.Cog):
 
     autopublisher = app_commands.Group(
         name="autopublisher",
-        description="Konfiguriere automatische Veroeffentlichungen in Announcement-Channels.",
+        description="Konfiguriere automatische Veröffentlichungen in Announcement-Channels.",
     )
 
     @autopublisher.command(
         name="add",
-        description="Fuegt einen Announcement-Channel zum Auto-Publisher hinzu.",
+        description="Fügt einen Announcement-Channel zum Auto-Publisher hinzu.",
     )
     @app_commands.checks.has_permissions(manage_guild=True)
     async def autopublisher_add(
@@ -53,7 +53,7 @@ class AutoPublisherCog(commands.Cog):
             if hasattr(channel, "is_news") and callable(getattr(channel, "is_news")):
                 is_news = channel.is_news()
         except Exception:
-            logger.exception("Fehler bei is_news Pruefung")
+            logger.exception("Fehler bei is_news Prüfung")
 
         if not is_news:
             return await interaction.response.send_message(
@@ -66,8 +66,8 @@ class AutoPublisherCog(commands.Cog):
         self._invalidate_cache(guild.id)
 
         await interaction.response.send_message(
-            f"{channel.mention} wurde zum Auto-Publisher hinzugefuegt.\n"
-            "Neue Nachrichten werden automatisch veroeffentlicht.",
+            f"{channel.mention} wurde zum Auto-Publisher hinzugefügt.\n"
+            "Neue Nachrichten werden automatisch veröffentlicht.",
             ephemeral=True,
         )
 
@@ -100,7 +100,7 @@ class AutoPublisherCog(commands.Cog):
 
     @autopublisher.command(
         name="list",
-        description="Zeigt alle Channels, in denen automatisch veroeffentlicht wird.",
+        description="Zeigt alle Channels, in denen automatisch veröffentlicht wird.",
     )
     @app_commands.checks.has_permissions(manage_guild=True)
     async def autopublisher_list(self, interaction: discord.Interaction):
@@ -113,7 +113,7 @@ class AutoPublisherCog(commands.Cog):
         channels_ids = await self._get_channels(guild.id)
         if not channels_ids:
             return await interaction.response.send_message(
-                "Es sind aktuell **keine** Channels fuer den Auto-Publisher konfiguriert.",
+                "Es sind aktuell **keine** Channels für den Auto-Publisher konfiguriert.",
                 ephemeral=True,
             )
 
@@ -126,7 +126,7 @@ class AutoPublisherCog(commands.Cog):
                 lines.append(f"- Unbekannter Channel (`{ch_id}`)")
 
         await interaction.response.send_message(
-            "Folgende Channels werden automatisch veroeffentlicht:\n" + "\n".join(lines),
+            "Folgende Channels werden automatisch veröffentlicht:\n" + "\n".join(lines),
             ephemeral=True,
         )
 
@@ -155,7 +155,7 @@ class AutoPublisherCog(commands.Cog):
             try:
                 await message.publish()
                 logger.info(
-                    "Auto-Publisher: Nachricht %s in #%s veroeffentlicht",
+                    "Auto-Publisher: Nachricht %s in #%s veröffentlicht",
                     message.id, message.channel.name,
                 )
             except discord.Forbidden:

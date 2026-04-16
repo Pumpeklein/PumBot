@@ -1,9 +1,10 @@
 ﻿from __future__ import annotations
 
+import asyncio
 from typing import Dict, Any, Optional
 
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord import app_commands
 
 from src.pumbot import config
@@ -11,11 +12,11 @@ from src.pumbot.bot import logger
 
 
 STAT_DEFINITIONS: Dict[str, str] = {
-    "all": "All Members",
-    "members": "Members",
+    "all": "Alle Mitglieder",
+    "members": "Mitglieder",
     "bots": "Bots",
-    "channels": "Channels",
-    "roles": "Roles",
+    "channels": "Kanäle",
+    "roles": "Rollen",
 }
 
 
@@ -24,11 +25,50 @@ class ServerStatsCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.api = bot.api
+        self._update_lock = asyncio.Lock()
+        self._pending_task: Optional[asyncio.Task] = None
+        self._stats_loop.start()
+
+    async def cog_unload(self) -> None:
+        self._stats_loop.cancel()
+        if self._pending_task and not self._pending_task.done():
+            self._pending_task.cancel()
+
+    @tasks.loop(minutes=5)
+    async def _stats_loop(self) -> None:
+        try:
+            guild = self.bot.get_guild(config.GUILD_ID)
+            if guild:
+                await self._update_guild_stats(guild)
+        except Exception:
+            logger.exception("Server-Stats Loop: Fehler")
+
+    @_stats_loop.before_loop
+    async def _before_stats_loop(self) -> None:
+        await self.bot.wait_until_ready()
+        logger.info("Server-Stats: Bot ready.")
+
+    def _schedule_update(self) -> None:
+        """Debounce: plant ein Update in 5 s, vorheriges wird verworfen."""
+        if self._pending_task and not self._pending_task.done():
+            self._pending_task.cancel()
+        self._pending_task = self.bot.loop.create_task(self._debounced_update())
+
+    async def _debounced_update(self) -> None:
+        try:
+            await asyncio.sleep(5)
+            guild = self.bot.get_guild(config.GUILD_ID)
+            if guild:
+                await self._update_guild_stats(guild, use_api=False)
+        except asyncio.CancelledError:
+            pass
+        except Exception:
+            logger.exception("Server-Stats: Fehler im debounced Update")
 
     # Slash-Command-Gruppe
     serverstats = app_commands.Group(
         name="serverstats",
-        description="Verwalte die Server-Statistik-Kanaele.",
+        description="Verwalte die Server-Statistik-Kanäle.",
     )
 
     async def _get_guild_config(self, guild_id: int) -> Dict[str, Any]:
@@ -44,19 +84,45 @@ class ServerStatsCog(commands.Cog):
         """Extract stat channel IDs from the flat config."""
         return {k: cfg[k] for k in STAT_DEFINITIONS if k in cfg}
 
-    async def _update_guild_stats(self, guild: discord.Guild) -> None:
-        """Aktualisiert alle konfigurierten Stat-Channels fuer diese Guild."""
+    async def _update_guild_stats(self, guild: discord.Guild, use_api: bool = True) -> None:
+        """Aktualisiert alle konfigurierten Stat-Channels für diese Guild."""
+        if self._update_lock.locked():
+            return
+        async with self._update_lock:
+            await self._run_stat_update(guild, use_api)
+
+    async def _run_stat_update(self, guild: discord.Guild, use_api: bool = True) -> None:
         try:
-            cfg = await self._get_guild_config(guild.id)
+            cached_guild = self.bot.get_guild(guild.id)
+            if not cached_guild:
+                logger.warning("Server-Stats: Guild %s nicht im Cache.", guild.id)
+                return
+
+            cfg = await self._get_guild_config(cached_guild.id)
             stats = self._get_stats(cfg)
             if not stats:
                 return
 
-            all_members = guild.member_count
-            members = sum(1 for m in guild.members if not m.bot)
-            bots = sum(1 for m in guild.members if m.bot)
-            channels_count = len(guild.channels)
-            roles_count = len(guild.roles)
+            if use_api:
+                # Frische Daten von Discord holen (für Loop/Start)
+                try:
+                    channels = await cached_guild.fetch_channels()
+                    channels_count = len(channels)
+                except Exception:
+                    channels_count = len(cached_guild.channels)
+                try:
+                    roles = await cached_guild.fetch_roles()
+                    roles_count = len(roles)
+                except Exception:
+                    roles_count = len(cached_guild.roles)
+            else:
+                # Cache nutzen (bei Events ist der Cache bereits aktualisiert)
+                channels_count = len(cached_guild.channels)
+                roles_count = len(cached_guild.roles)
+
+            all_members = cached_guild.member_count or 0
+            members = sum(1 for m in cached_guild.members if not m.bot)
+            bots = sum(1 for m in cached_guild.members if m.bot)
 
             values = {
                 "all": all_members,
@@ -69,7 +135,7 @@ class ServerStatsCog(commands.Cog):
             for stat_key, channel_id_str in stats.items():
                 if channel_id_str is None:
                     continue
-                channel = guild.get_channel(int(channel_id_str))
+                channel = cached_guild.get_channel(int(channel_id_str))
                 if channel is None:
                     continue
 
@@ -79,9 +145,14 @@ class ServerStatsCog(commands.Cog):
                     continue
 
                 new_name = f"{label}: {value}"
+                old_name = channel.name
 
-                if channel.name != new_name:
-                    await channel.edit(name=new_name, reason="Server-Stat-Update")
+                if old_name != new_name:
+                    try:
+                        await channel.edit(name=new_name, reason="Server-Stat-Update")
+                        logger.info("Server-Stats: %s -> %s", old_name, new_name)
+                    except discord.HTTPException as e:
+                        logger.warning("Server-Stats: Konnte %s nicht umbenennen: %s", stat_key, e)
 
         except Exception:
             logger.exception("Fehler beim Aktualisieren der Server-Statistiken")
@@ -120,7 +191,7 @@ class ServerStatsCog(commands.Cog):
 
         if guild.id != config.GUILD_ID:
             await interaction.response.send_message(
-                "Dieser Bot ist fuer diesen Server nicht konfiguriert.",
+                "Dieser Bot ist für diesen Server nicht konfiguriert.",
                 ephemeral=True,
             )
             return
@@ -148,17 +219,17 @@ class ServerStatsCog(commands.Cog):
         )
 
     @serverstats.command(
-        name="add", description="Fuegt einen zusaetzlichen Stat-Channel hinzu."
+        name="add", description="Fügt einen zusätzlichen Stat-Channel hinzu."
     )
     @app_commands.checks.has_permissions(administrator=True)
-    @app_commands.describe(stat_type="Welche Statistik soll hinzugefuegt werden?")
+    @app_commands.describe(stat_type="Welche Statistik soll hinzugefügt werden?")
     @app_commands.choices(
         stat_type=[
-            app_commands.Choice(name="All Members", value="all"),
-            app_commands.Choice(name="Members", value="members"),
+            app_commands.Choice(name="Alle Mitglieder", value="all"),
+            app_commands.Choice(name="Mitglieder", value="members"),
             app_commands.Choice(name="Bots", value="bots"),
-            app_commands.Choice(name="Channels", value="channels"),
-            app_commands.Choice(name="Roles", value="roles"),
+            app_commands.Choice(name="Kanäle", value="channels"),
+            app_commands.Choice(name="Rollen", value="roles"),
         ]
     )
     async def serverstats_add(
@@ -209,14 +280,14 @@ class ServerStatsCog(commands.Cog):
         await self._update_guild_stats(guild)
 
         await interaction.followup.send(
-            f"Stat `{stat_key}` wurde hinzugefuegt.",
+            f"Stat `{stat_key}` wurde hinzugefügt.",
             ephemeral=True,
         )
 
     @serverstats.command(name="remove", description="Entfernt einen Stat-Channel.")
     @app_commands.checks.has_permissions(administrator=True)
     @app_commands.describe(
-        stat_key="Schluessel der Statistik (z. B. all, members, bots, channels, roles)"
+        stat_key="Schlüssel der Statistik (z. B. all, members, bots, channels, roles)"
     )
     async def serverstats_remove(
         self,
@@ -309,27 +380,33 @@ class ServerStatsCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_join(self, member: discord.Member):
-        await self._update_guild_stats(member.guild)
+        if member.guild.id == config.GUILD_ID:
+            self._schedule_update()
 
     @commands.Cog.listener()
     async def on_member_remove(self, member: discord.Member):
-        await self._update_guild_stats(member.guild)
+        if member.guild.id == config.GUILD_ID:
+            self._schedule_update()
 
     @commands.Cog.listener()
     async def on_guild_channel_create(self, channel: discord.abc.GuildChannel):
-        await self._update_guild_stats(channel.guild)
+        if channel.guild.id == config.GUILD_ID:
+            self._schedule_update()
 
     @commands.Cog.listener()
     async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel):
-        await self._update_guild_stats(channel.guild)
+        if channel.guild.id == config.GUILD_ID:
+            self._schedule_update()
 
     @commands.Cog.listener()
     async def on_guild_role_create(self, role: discord.Role):
-        await self._update_guild_stats(role.guild)
+        if role.guild.id == config.GUILD_ID:
+            self._schedule_update()
 
     @commands.Cog.listener()
     async def on_guild_role_delete(self, role: discord.Role):
-        await self._update_guild_stats(role.guild)
+        if role.guild.id == config.GUILD_ID:
+            self._schedule_update()
 
 
 async def setup(bot: commands.Bot):

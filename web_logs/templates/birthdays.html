@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header, field, btn, stat, empty_state %}
+
+{% set month_names = {1: "Januar", 2: "Februar", 3: "März", 4: "April", 5: "Mai", 6: "Juni", 7: "Juli", 8: "August", 9: "September", 10: "Oktober", 11: "November", 12: "Dezember"} %}
+
+{% block content %}
+{{ page_header("Geburtstage", "Übersicht aller gespeicherten Geburtstage.", "Verwalte Geburtstage und den Gratulations-Channel.") }}
+
+{# Stats #}
+<div class="mb-6 grid gap-4 sm:grid-cols-2">
+  {{ stat("Gespeicherte Geburtstage", birthdays|length) }}
+  {{ stat("Gratulations-Channel", birthday_channel or "Nicht gesetzt") }}
+</div>
+
+{# Settings #}
+<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <h2 class="mb-4 text-sm font-semibold text-white">Einstellungen</h2>
+  <form method="post" action="{{ url_for('birthdays_set_channel') }}" class="flex items-end gap-3">
+    <div class="w-64">
+      {{ field("channel_id", "Gratulations Channel ID", placeholder="z.B. 123456789012345678", value=birthday_channel|default("")) }}
+    </div>
+    {{ btn("Speichern") }}
+  </form>
+</div>
+
+{# Add birthday #}
+<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <h2 class="mb-4 text-sm font-semibold text-white">Geburtstag hinzufügen</h2>
+  <form method="post" action="{{ url_for('birthdays_add') }}" class="flex flex-wrap items-end gap-3">
+    <div class="w-52">
+      {{ field("user_id", "User ID", placeholder="z.B. 123456789012345678", required=true) }}
+    </div>
+    <div class="w-20">
+      {{ field("day", "Tag", type="number", min=1, max=31, required=true) }}
+    </div>
+    <div class="w-20">
+      {{ field("month", "Monat", type="number", min=1, max=12, required=true) }}
+    </div>
+    <div class="w-24">
+      {{ field("year", "Jahr", type="number", required=false, placeholder="optional") }}
+    </div>
+    {{ btn("Hinzufügen") }}
+  </form>
+</div>
+
+{# Birthday list by month #}
+<div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <h2 class="mb-4 text-sm font-semibold text-white">Alle Geburtstage</h2>
+  {% if birthdays %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead>
+        <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+          <th class="px-3 py-2.5">User ID</th>
+          <th class="px-3 py-2.5">Datum</th>
+          <th class="px-3 py-2.5">Monat</th>
+          <th class="px-3 py-2.5">Letzte Gratulation</th>
+          <th class="px-3 py-2.5 text-right">Aktionen</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in birthdays %}
+        <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]">
+          <td class="px-3 py-2.5 font-mono text-xs text-slate-300">{{ b.user_id }}</td>
+          <td class="px-3 py-2.5 text-white font-medium">
+            {{ "%02d"|format(b.day) }}.{{ "%02d"|format(b.month) }}{% if b.year %}.{{ b.year }}{% endif %}
+          </td>
+          <td class="px-3 py-2.5 text-slate-400">{{ month_names.get(b.month, "?") }}</td>
+          <td class="px-3 py-2.5 text-slate-500 text-xs">{{ b.last_congrats or "—" }}</td>
+          <td class="px-3 py-2.5 text-right">
+            <form method="post" action="{{ url_for('birthdays_delete', user_id=b.user_id) }}" class="inline"
+              onsubmit="return confirm('Geburtstag wirklich löschen?')">
+              <button type="submit"
+                class="rounded border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-400 transition hover:bg-red-500/20">
+                Löschen
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  {{ empty_state("Keine Geburtstage gespeichert", "Füge oben einen neuen Geburtstag hinzu.") }}
+  {% endif %}
+</div>
+{% endblock %}

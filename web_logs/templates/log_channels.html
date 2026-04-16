@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header, field, btn, empty_state %}
+
+{% set type_labels = {"voice_log": "Voice", "user_log": "User", "server_log": "Server", "message_log": "Message", "welcome_log": "Welcome"} %}
+
+{% block content %}
+{{ page_header("Log Channels", "Konfiguriere die Log-Channels für verschiedene Event-Typen.", "Setze oder entferne Channel-IDs für jeden Log-Typ.") }}
+
+{# Add / update log channel #}
+<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <h2 class="mb-4 text-sm font-semibold text-white">Log Channel setzen</h2>
+  <form method="post" action="{{ url_for('log_channels_set') }}" class="flex flex-wrap items-end gap-3">
+    <div class="w-48">
+      <label for="log_type" class="block text-sm font-medium text-slate-400 mb-1.5">Log-Typ</label>
+      <select id="log_type" name="log_type" required
+        class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
+        {% for lt in log_types %}
+        <option value="{{ lt }}" class="bg-[#151c2c] text-white">{{ type_labels.get(lt, lt) }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="w-64">
+      {{ field("channel_id", "Channel ID", placeholder="z.B. 123456789012345678", required=true) }}
+    </div>
+    {{ btn("Speichern") }}
+  </form>
+</div>
+
+{# Current config #}
+<div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <h2 class="mb-4 text-sm font-semibold text-white">Aktuelle Konfiguration</h2>
+  {% if channels %}
+  <div class="space-y-3">
+    {% for lt in log_types %}
+    {% set ch_id = channels.get(lt) %}
+    <div class="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] px-4 py-3">
+      <div class="flex items-center gap-3">
+        <span class="inline-flex items-center rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-0.5 text-xs font-medium text-cyan-400">
+          {{ type_labels.get(lt, lt) }}
+        </span>
+        {% if ch_id %}
+        <span class="font-mono text-sm text-white">{{ ch_id }}</span>
+        {% else %}
+        <span class="text-sm text-slate-500">Nicht gesetzt</span>
+        {% endif %}
+      </div>
+      {% if ch_id %}
+      <form method="post" action="{{ url_for('log_channels_delete', log_type=lt) }}"
+        onsubmit="return confirm('Log-Channel für {{ type_labels.get(lt, lt) }} wirklich entfernen?')">
+        <button type="submit"
+          class="rounded border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-400 transition hover:bg-red-500/20">
+          Entfernen
+        </button>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  {{ empty_state("Keine Log-Channels konfiguriert", "Setze oben einen Log-Channel für einen Event-Typ.") }}
+  {% endif %}
+</div>
+{% endblock %}

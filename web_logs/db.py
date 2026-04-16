@@ -310,6 +310,15 @@ def clear_warnings(guild_id: str, user_id: str) -> int:
         return cursor.rowcount
 
 
+def list_all_warnings(guild_id: str, limit: int = 200) -> list[dict]:
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM warnings WHERE guild_id = ? ORDER BY created_at DESC LIMIT ?",
+            (guild_id, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
 # ══════════ Counting ══════════
 
 def get_counting(guild_id: str) -> dict | None:

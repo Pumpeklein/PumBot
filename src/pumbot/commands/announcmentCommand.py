@@ -201,7 +201,7 @@ class AnnouncementCog(commands.Cog):
 
     @announce_group.command(
         name="twitch_channel",
-        description="Setzt den Channel fuer Twitch-Live-Announcements.",
+        description="Setzt den Channel für Twitch-Live-Announcements.",
     )
     @app_commands.describe(channel="Textkanal")
     async def set_twitch_channel(

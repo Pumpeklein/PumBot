@@ -105,25 +105,25 @@ class CountingCog(commands.Cog):
             await message.reply(
                 f"{message.author.mention} hat verkackt!\n"
                 f"Grund: **{reason}**\n"
-                "Der Zaehler wurde zurueckgesetzt, es startet wieder bei **1**.",
+                "Der Zähler wurde zurückgesetzt, es startet wieder bei **1**.",
                 mention_author=False,
             )
         except Exception:
             logger.exception("Fehler beim Verarbeiten einer falschen Zahl")
 
     counting = app_commands.Group(
-        name="counting", description="Zaehl-Channel konfigurieren und verwalten.",
+        name="counting", description="Zähl-Channel konfigurieren und verwalten.",
     )
 
     @counting.command(
-        name="setchannel", description="Legt den Channel fest, in dem gezaehlt werden soll.",
+        name="setchannel", description="Legt den Channel fest, in dem gezählt werden soll.",
     )
     async def counting_setchannel(
         self, interaction: discord.Interaction, channel: discord.TextChannel
     ):
         if not self._is_allowed_staff(interaction):
             return await interaction.response.send_message(
-                "Dafuer hast du keine Berechtigung.", ephemeral=True
+                "Dafür hast du keine Berechtigung.", ephemeral=True
             )
         guild = interaction.guild
         if guild is None:
@@ -137,15 +137,15 @@ class CountingCog(commands.Cog):
 
         await interaction.response.send_message(
             f"Counting-Channel wurde auf {channel.mention} gesetzt.\n"
-            "Der Zaehler startet wieder bei **1**.",
+            "Der Zähler startet wieder bei **1**.",
             ephemeral=True,
         )
 
-    @counting.command(name="reset", description="Setzt den Zaehler manuell zurueck.")
+    @counting.command(name="reset", description="Setzt den Zähler manuell zurück.")
     async def counting_reset(self, interaction: discord.Interaction):
         if not self._is_allowed_staff(interaction):
             return await interaction.response.send_message(
-                "Dafuer hast du keine Berechtigung.", ephemeral=True
+                "Dafür hast du keine Berechtigung.", ephemeral=True
             )
         guild = interaction.guild
         if guild is None:
@@ -163,10 +163,10 @@ class CountingCog(commands.Cog):
         self._state_cache.pop(guild.id, None)
 
         await interaction.response.send_message(
-            "Der Zaehler wurde zurueckgesetzt. Naechste Zahl ist **1**.", ephemeral=True,
+            "Der Zähler wurde zurückgesetzt. Nächste Zahl ist **1**.", ephemeral=True,
         )
 
-    @counting.command(name="info", description="Zeigt Zaehlerstand und Stats.")
+    @counting.command(name="info", description="Zeigt Zählerstand und Stats.")
     async def counting_info(self, interaction: discord.Interaction):
         guild = interaction.guild
         if guild is None:
@@ -191,8 +191,8 @@ class CountingCog(commands.Cog):
         await interaction.response.send_message(
             f"Counting-Channel: {channel.mention if channel else f'`#{channel_id}`'}\n"
             f"Letzte korrekte Zahl: **{last}**\n"
-            f"Naechste Zahl: **{last + 1}**\n"
-            f"Letzter Zaehler: {last_user.mention if last_user else '\u2014'}\n"
+            f"Nächste Zahl: **{last + 1}**\n"
+            f"Letzter Zähler: {last_user.mention if last_user else '\u2014'}\n"
             f"Highscore (Server): **{highscore}**\n\n"
             "**Deine Stats:**\n"
             f"- Korrekte Zahlen: **{your_stats['correct']}**\n"
@@ -250,7 +250,7 @@ class CountingCog(commands.Cog):
             expected = last_number + 1
 
             if not content.isdigit():
-                await self._handle_wrong_number(message, expected, "Keine gueltige Zahl")
+                await self._handle_wrong_number(message, expected, "Keine gültige Zahl")
                 return
 
             number = int(content)
@@ -261,7 +261,7 @@ class CountingCog(commands.Cog):
             last_user_id = state.get("last_user_id")
             if last_user_id and int(last_user_id) == message.author.id:
                 await self._handle_wrong_number(
-                    message, expected, "Du darfst nicht zweimal hintereinander zaehlen"
+                    message, expected, "Du darfst nicht zweimal hintereinander zählen"
                 )
                 return
 

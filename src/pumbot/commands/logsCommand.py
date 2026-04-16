@@ -138,7 +138,7 @@ class LogsCog(commands.Cog):
             )
         except Exception:
             logger.exception(
-                "Fehler beim Abrufen des Log-Channels (%s) fuer Guild %s",
+                "Fehler beim Abrufen des Log-Channels (%s) für Guild %s",
                 log_type,
                 guild.id,
             )
@@ -216,7 +216,7 @@ class LogsCog(commands.Cog):
             await channel.edit(overwrites=overwrites)
             return True, "Channel-Rechte gesetzt."
         except discord.Forbidden:
-            return False, "Mir fehlt die Berechtigung 'Kanaele verwalten'."
+            return False, "Mir fehlt die Berechtigung 'Kanäle verwalten'."
         except Exception:
             logger.exception("Fehler beim Setzen der Channel-Overwrites")
             return False, "Unbekannter Fehler beim Setzen der Rechte."
@@ -239,7 +239,7 @@ class LogsCog(commands.Cog):
     ) -> None:
         if not self._check_staff(interaction):
             await interaction.response.send_message(
-                "Dafuer hast du keine Berechtigung.", ephemeral=True
+                "Dafür hast du keine Berechtigung.", ephemeral=True
             )
             return
 
@@ -253,7 +253,7 @@ class LogsCog(commands.Cog):
         log_type = log_type.lower().strip()
         if log_type not in LOG_TYPES:
             await interaction.response.send_message(
-                "Ungueltiger Typ. Erlaubt: voice, user, server, message, welcome",
+                "Ungültiger Typ. Erlaubt: voice, user, server, message, welcome",
                 ephemeral=True,
             )
             return
@@ -265,7 +265,7 @@ class LogsCog(commands.Cog):
             )
         except Exception:
             logger.exception(
-                "Fehler beim Setzen des Log-Channels (%s) fuer Guild %s",
+                "Fehler beim Setzen des Log-Channels (%s) für Guild %s",
                 log_type,
                 guild.id,
             )
@@ -295,7 +295,7 @@ class LogsCog(commands.Cog):
             channels = await self.api.get_all_log_channels(str(guild.id))
         except Exception:
             logger.exception(
-                "Fehler beim Abrufen der Log-Channels fuer Guild %s", guild.id
+                "Fehler beim Abrufen der Log-Channels für Guild %s", guild.id
             )
             channels = {}
 
@@ -312,13 +312,13 @@ class LogsCog(commands.Cog):
         await interaction.response.send_message("\n".join(lines), ephemeral=True)
 
     @logs.command(
-        name="test", description="Sendet einen Test-Log in den gewuenschten Typ."
+        name="test", description="Sendet einen Test-Log in den gewünschten Typ."
     )
     @app_commands.describe(log_type="voice/user/server/message/welcome")
     async def logs_test(self, interaction: discord.Interaction, log_type: str) -> None:
         if not self._check_staff(interaction):
             await interaction.response.send_message(
-                "Dafuer hast du keine Berechtigung.", ephemeral=True
+                "Dafür hast du keine Berechtigung.", ephemeral=True
             )
             return
 
@@ -332,7 +332,7 @@ class LogsCog(commands.Cog):
         log_type = log_type.lower().strip()
         if log_type not in LOG_TYPES:
             await interaction.response.send_message(
-                "Ungueltiger Typ. Erlaubt: voice, user, server, message, welcome",
+                "Ungültiger Typ. Erlaubt: voice, user, server, message, welcome",
                 ephemeral=True,
             )
             return

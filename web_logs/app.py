@@ -58,6 +58,7 @@ try:
         get_warnings,
         init_db,
         insert_ticket_log,
+        list_all_warnings,
         list_close_reasons,
         list_logs_for_ticket,
         list_roles,
@@ -124,6 +125,7 @@ except ImportError:
         get_warnings,
         init_db,
         insert_ticket_log,
+        list_all_warnings,
         list_close_reasons,
         list_logs_for_ticket,
         list_roles,
@@ -547,6 +549,218 @@ def close_reasons_update(reason_id: int):
 def close_reasons_delete(reason_id: int):
     delete_close_reason(reason_id)
     return redirect(url_for("close_reasons_page"))
+
+
+# ── Counting Overview Page ──
+
+@app.get("/counting")
+@permission_required("config.manage")
+def counting_page():
+    ctx = _ctx()
+    state = get_counting(DEFAULT_GUILD_ID) or {}
+    leaderboard = get_counting_leaderboard(DEFAULT_GUILD_ID, limit=50)
+    return render_template(
+        "counting.html", state=state, leaderboard=leaderboard,
+        active_page="counting", **ctx,
+    )
+
+
+@app.post("/counting/set-channel")
+@permission_required("config.manage")
+def counting_set_channel():
+    channel_id = (request.form.get("channel_id") or "").strip()
+    if channel_id:
+        set_counting(DEFAULT_GUILD_ID, channel_id=channel_id)
+    return redirect(url_for("counting_page"))
+
+
+@app.post("/counting/reset")
+@permission_required("config.manage")
+def counting_reset():
+    set_counting(DEFAULT_GUILD_ID, last_number=0, last_user_id=None, highscore=0)
+    return redirect(url_for("counting_page"))
+
+
+# ── Birthdays Overview Page ──
+
+@app.get("/birthdays")
+@permission_required("config.manage")
+def birthdays_page():
+    ctx = _ctx()
+    all_birthdays = get_birthdays(DEFAULT_GUILD_ID)
+    birthday_channel = get_config(DEFAULT_GUILD_ID, "birthday_channel_id")
+    return render_template(
+        "birthdays.html", birthdays=all_birthdays,
+        birthday_channel=birthday_channel,
+        active_page="birthdays", **ctx,
+    )
+
+
+@app.post("/birthdays/set-channel")
+@permission_required("config.manage")
+def birthdays_set_channel():
+    channel_id = (request.form.get("channel_id") or "").strip()
+    if channel_id:
+        set_config(DEFAULT_GUILD_ID, "birthday_channel_id", channel_id)
+    else:
+        delete_config(DEFAULT_GUILD_ID, "birthday_channel_id")
+    return redirect(url_for("birthdays_page"))
+
+
+@app.post("/birthdays/<user_id>/set")
+@permission_required("config.manage")
+def birthdays_set(user_id: str):
+    day = request.form.get("day", type=int)
+    month = request.form.get("month", type=int)
+    year = request.form.get("year", type=int) or None
+    if day and month:
+        set_birthday(DEFAULT_GUILD_ID, user_id, day, month, year)
+    return redirect(url_for("birthdays_page"))
+
+
+@app.post("/birthdays/add")
+@permission_required("config.manage")
+def birthdays_add():
+    user_id = (request.form.get("user_id") or "").strip()
+    day = request.form.get("day", type=int)
+    month = request.form.get("month", type=int)
+    year = request.form.get("year", type=int) or None
+    if user_id and day and month:
+        set_birthday(DEFAULT_GUILD_ID, user_id, day, month, year)
+    return redirect(url_for("birthdays_page"))
+
+
+@app.post("/birthdays/<user_id>/delete")
+@permission_required("config.manage")
+def birthdays_delete(user_id: str):
+    delete_birthday(DEFAULT_GUILD_ID, user_id)
+    return redirect(url_for("birthdays_page"))
+
+
+# ── Warnings Overview Page ──
+
+@app.get("/warnings")
+@permission_required("users.warn")
+def warnings_page():
+    ctx = _ctx()
+    q_user = request.args.get("user_id", "").strip()
+    if q_user:
+        warns = get_warnings(DEFAULT_GUILD_ID, q_user)
+    else:
+        warns = list_all_warnings(DEFAULT_GUILD_ID, limit=200)
+    return render_template(
+        "warnings.html", warnings=warns, q_user=q_user,
+        active_page="warnings", **ctx,
+    )
+
+
+@app.post("/warnings/<int:warning_id>/delete")
+@permission_required("users.warn")
+def warnings_delete(warning_id: int):
+    remove_warning(warning_id)
+    return redirect(url_for("warnings_page"))
+
+
+# ── Log Channels Config Page ──
+
+@app.get("/log-channels")
+@permission_required("config.manage")
+def log_channels_page():
+    ctx = _ctx()
+    channels = get_all_log_channels(DEFAULT_GUILD_ID)
+    log_types = ["voice_log", "user_log", "server_log", "message_log", "welcome_log"]
+    return render_template(
+        "log_channels.html", channels=channels, log_types=log_types,
+        active_page="log_channels", **ctx,
+    )
+
+
+@app.post("/log-channels/set")
+@permission_required("config.manage")
+def log_channels_set():
+    log_type = (request.form.get("log_type") or "").strip()
+    channel_id = (request.form.get("channel_id") or "").strip()
+    if log_type and channel_id:
+        set_log_channel(DEFAULT_GUILD_ID, log_type, channel_id)
+    return redirect(url_for("log_channels_page"))
+
+
+@app.post("/log-channels/<log_type>/delete")
+@permission_required("config.manage")
+def log_channels_delete(log_type: str):
+    remove_log_channel(DEFAULT_GUILD_ID, log_type)
+    return redirect(url_for("log_channels_page"))
+
+
+# ── Auto Publisher Config Page ──
+
+@app.get("/auto-publisher")
+@permission_required("config.manage")
+def auto_publisher_page():
+    ctx = _ctx()
+    channels = get_auto_publisher_channels(DEFAULT_GUILD_ID)
+    return render_template(
+        "auto_publisher.html", channels=channels,
+        active_page="auto_publisher", **ctx,
+    )
+
+
+@app.post("/auto-publisher/add")
+@permission_required("config.manage")
+def auto_publisher_add():
+    channel_id = (request.form.get("channel_id") or "").strip()
+    if channel_id:
+        add_auto_publisher_channel(DEFAULT_GUILD_ID, channel_id)
+    return redirect(url_for("auto_publisher_page"))
+
+
+@app.post("/auto-publisher/<channel_id>/delete")
+@permission_required("config.manage")
+def auto_publisher_delete(channel_id: str):
+    remove_auto_publisher_channel(DEFAULT_GUILD_ID, channel_id)
+    return redirect(url_for("auto_publisher_page"))
+
+
+# ── Server Stats Config Page ──
+
+@app.get("/server-stats")
+@permission_required("config.manage")
+def server_stats_page():
+    ctx = _ctx()
+    stats = get_server_stats(DEFAULT_GUILD_ID)
+    stat_types = ["all", "members", "bots", "channels", "roles"]
+    return render_template(
+        "server_stats.html", stats=stats, stat_types=stat_types,
+        active_page="server_stats", **ctx,
+    )
+
+
+@app.post("/server-stats/save")
+@permission_required("config.manage")
+def server_stats_save():
+    category_id = (request.form.get("category_id") or "").strip() or None
+    stats = {}
+    for key in ["all", "members", "bots", "channels", "roles"]:
+        channel_id = (request.form.get(f"stat_{key}") or "").strip()
+        if channel_id:
+            stats[key] = channel_id
+    set_server_stats(DEFAULT_GUILD_ID, category_id, stats)
+
+    # Trigger bot to update voice channel names immediately
+    bot = app.config.get("DISCORD_BOT")
+    if bot and bot.is_ready():
+        try:
+            guild = bot.get_guild(int(DEFAULT_GUILD_ID))
+            if guild:
+                cog = bot.get_cog("ServerStatsCog")
+                if cog:
+                    asyncio.run_coroutine_threadsafe(
+                        cog._update_guild_stats(guild), bot.loop
+                    )
+        except Exception:
+            pass
+
+    return redirect(url_for("server_stats_page"))
 
 
 # ════════════════════════════════════════════════════════

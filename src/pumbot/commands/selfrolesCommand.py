@@ -82,7 +82,7 @@ class SelfRolesCog(commands.Cog):
                     if action == "add":
                         try:
                             await member.add_roles(
-                                *roles, reason="Self-Role per Reaktion hinzugefuegt"
+                                *roles, reason="Self-Role per Reaktion hinzugefügt"
                             )
                         except discord.Forbidden:
                             pass
@@ -188,7 +188,7 @@ class SelfRolesCog(commands.Cog):
 
         if not roles_map:
             await interaction.response.send_message(
-                "Ich konnte keine gueltigen Rollen/Emoji-Paare erkennen.",
+                "Ich konnte keine gültigen Rollen/Emoji-Paare erkennen.",
                 ephemeral=True,
             )
             return
@@ -254,7 +254,7 @@ class SelfRolesCog(commands.Cog):
         panels = await self.api.get_all_selfrole_panels(str(interaction.guild.id))
         if not panels:
             await interaction.response.send_message(
-                "Fuer diesen Server existieren noch keine Self-Role Panels.",
+                "Für diesen Server existieren noch keine Self-Role Panels.",
                 ephemeral=True,
             )
             return
@@ -280,7 +280,7 @@ class SelfRolesCog(commands.Cog):
         channel_id = target_panel.get("channel_id")
         if target_msg_id is None or channel_id is None:
             await interaction.response.send_message(
-                "Fuer dieses Self-Role Panel ist kein Channel gespeichert.",
+                "Für dieses Self-Role Panel ist kein Channel gespeichert.",
                 ephemeral=True,
             )
             return
@@ -288,7 +288,7 @@ class SelfRolesCog(commands.Cog):
         channel = interaction.guild.get_channel(int(channel_id))
         if not isinstance(channel, discord.TextChannel):
             await interaction.response.send_message(
-                "Der Kanal fuer dieses Self-Role Panel konnte nicht gefunden werden.",
+                "Der Kanal für dieses Self-Role Panel konnte nicht gefunden werden.",
                 ephemeral=True,
             )
             return
@@ -314,7 +314,7 @@ class SelfRolesCog(commands.Cog):
         if aktion == "add":
             if emoji_key in roles_map:
                 await interaction.response.send_message(
-                    "Fuer dieses Emoji ist bereits eine Rolle in diesem Panel eingetragen.",
+                    "Für dieses Emoji ist bereits eine Rolle in diesem Panel eingetragen.",
                     ephemeral=True,
                 )
                 return
@@ -327,13 +327,13 @@ class SelfRolesCog(commands.Cog):
                 await message.add_reaction(emoji_key)
             except discord.HTTPException:
                 await interaction.response.send_message(
-                    "Rolle gespeichert, Emoji konnte nicht hinzugefuegt werden.",
+                    "Rolle gespeichert, Emoji konnte nicht hinzugefügt werden.",
                     ephemeral=True,
                 )
                 return
 
             await interaction.response.send_message(
-                f"Panel **{panel_titel}** aktualisiert: {rolle.mention} mit {emoji_key} hinzugefuegt.",
+                f"Panel **{panel_titel}** aktualisiert: {rolle.mention} mit {emoji_key} hinzugefügt.",
                 ephemeral=True,
             )
 
@@ -341,7 +341,7 @@ class SelfRolesCog(commands.Cog):
             existing_role_id = roles_map.get(emoji_key)
             if not existing_role_id:
                 await interaction.response.send_message(
-                    "Fuer dieses Emoji ist keine Rolle in diesem Panel eingetragen.",
+                    "Für dieses Emoji ist keine Rolle in diesem Panel eingetragen.",
                     ephemeral=True,
                 )
                 return

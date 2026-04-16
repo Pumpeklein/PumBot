@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header, field, btn, stat, empty_state %}
+
+{% block content %}
+{{ page_header("Counting", "Übersicht und Einstellungen für das Counting-Spiel.", "Aktueller Stand, Highscore und Leaderboard.") }}
+
+{# Stats overview #}
+<div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  {{ stat("Aktueller Stand", state.last_number|default(0)) }}
+  {{ stat("Highscore", state.highscore|default(0)) }}
+  {{ stat("Letzter User", state.last_user_id or "—") }}
+  {{ stat("Channel ID", state.channel_id or "Nicht gesetzt") }}
+</div>
+
+{# Settings #}
+<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <h2 class="mb-4 text-sm font-semibold text-white">Einstellungen</h2>
+  <div class="flex flex-wrap gap-4">
+    <form method="post" action="{{ url_for('counting_set_channel') }}" class="flex items-end gap-3">
+      <div class="w-64">
+        {{ field("channel_id", "Counting Channel ID", placeholder="z.B. 123456789012345678", value=state.channel_id|default("")) }}
+      </div>
+      {{ btn("Speichern") }}
+    </form>
+    <form method="post" action="{{ url_for('counting_reset') }}" class="flex items-end"
+      onsubmit="return confirm('Counting wirklich zurücksetzen? Stand und Highscore werden auf 0 gesetzt.')">
+      {{ btn("Zurücksetzen", variant="danger") }}
+    </form>
+  </div>
+</div>
+
+{# Leaderboard #}
+<div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <h2 class="mb-4 text-sm font-semibold text-white">Leaderboard</h2>
+  {% if leaderboard %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead>
+        <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+          <th class="px-3 py-2.5">#</th>
+          <th class="px-3 py-2.5">User ID</th>
+          <th class="px-3 py-2.5">Richtig</th>
+          <th class="px-3 py-2.5">Fehler</th>
+          <th class="px-3 py-2.5">Beste Streak</th>
+          <th class="px-3 py-2.5">Aktuelle Streak</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in leaderboard %}
+        <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]">
+          <td class="px-3 py-2.5">
+            {% if loop.index == 1 %}
+            <span class="text-yellow-400 font-bold">🥇</span>
+            {% elif loop.index == 2 %}
+            <span class="text-slate-300 font-bold">🥈</span>
+            {% elif loop.index == 3 %}
+            <span class="text-amber-600 font-bold">🥉</span>
+            {% else %}
+            <span class="text-slate-500">{{ loop.index }}</span>
+            {% endif %}
+          </td>
+          <td class="px-3 py-2.5 font-mono text-xs text-slate-300">{{ entry.user_id }}</td>
+          <td class="px-3 py-2.5 text-emerald-400 font-medium">{{ entry.correct }}</td>
+          <td class="px-3 py-2.5 text-red-400 font-medium">{{ entry.fails }}</td>
+          <td class="px-3 py-2.5 text-cyan-400 font-medium">{{ entry.best_streak }}</td>
+          <td class="px-3 py-2.5 text-slate-300">{{ entry.current_streak }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  {{ empty_state("Keine Counting-Daten", "Noch niemand hat beim Counting mitgemacht.") }}
+  {% endif %}
+</div>
+{% endblock %}

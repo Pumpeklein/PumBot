@@ -11,7 +11,7 @@ from discord.ext import commands, tasks
 BIRTHDAY_STAFF_ROLES = {"Admin", "Team", "Twitch Moderator", "Discord Moderator"}
 
 MONTH_NAMES_DE = {
-    1: "Januar", 2: "Februar", 3: "Maerz", 4: "April",
+    1: "Januar", 2: "Februar", 3: "März", 4: "April",
     5: "Mai", 6: "Juni", 7: "Juli", 8: "August",
     9: "September", 10: "Oktober", 11: "November", 12: "Dezember",
 }
@@ -27,14 +27,14 @@ def parse_birthday(date_str: str) -> tuple[int, int, Optional[int]]:
     date_str = date_str.strip()
     match = re.fullmatch(r"(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?", date_str)
     if not match:
-        raise ValueError("Ungueltiges Datumsformat. Nutze TT.MM oder TT.MM.JJ/TT.MM.JJJJ.")
+        raise ValueError("Ungültiges Datumsformat. Nutze TT.MM oder TT.MM.JJ/TT.MM.JJJJ.")
 
     day = int(match.group(1))
     month = int(match.group(2))
     year_raw = match.group(3)
 
     if not 1 <= day <= 31 or not 1 <= month <= 12:
-        raise ValueError("Tag oder Monat ist ungueltig.")
+        raise ValueError("Tag oder Monat ist ungültig.")
 
     year: Optional[int] = None
 
@@ -117,7 +117,7 @@ class BirthdayCog(commands.Cog):
                 ]
                 value = "\n".join(lines)
                 if len(value) > 1024:
-                    value = value[:1000] + "\n\u2026 (gekuerzt)"
+                    value = value[:1000] + "\n\u2026 (gekürzt)"
             else:
                 value = "\u200b"
             embed.add_field(name=MONTH_NAMES_DE.get(month, f"Monat {month}"), value=value, inline=False)
@@ -140,7 +140,7 @@ class BirthdayCog(commands.Cog):
         if embed is None:
             embed = discord.Embed(
                 title=f"\U0001f389 Geburtstagsliste \u2013 {guild.name}",
-                description="Fuer diesen Server sind noch keine Geburtstage gespeichert.",
+                description="Für diesen Server sind noch keine Geburtstage gespeichert.",
                 color=discord.Color.gold(),
             )
 
@@ -158,7 +158,7 @@ class BirthdayCog(commands.Cog):
 
     @birthdays_group.command(
         name="set",
-        description="Speichere oder aendere deinen Geburtstag (TT.MM oder TT.MM.JJ).",
+        description="Speichere oder ändere deinen Geburtstag (TT.MM oder TT.MM.JJ).",
     )
     @app_commands.describe(datum="Geburtstag im Format TT.MM oder TT.MM.JJ/TT.MM.JJJJ")
     async def birthdays_set(self, interaction: discord.Interaction, datum: str):
@@ -196,7 +196,7 @@ class BirthdayCog(commands.Cog):
             await self._update_birthday_list_message(interaction.guild)
         else:
             await interaction.response.send_message(
-                "Fuer dich ist kein Geburtstag gespeichert.", ephemeral=True,
+                "Für dich ist kein Geburtstag gespeichert.", ephemeral=True,
             )
 
     @birthdays_group.command(
@@ -215,7 +215,7 @@ class BirthdayCog(commands.Cog):
         if embed is None:
             embed = discord.Embed(
                 title=f"\U0001f389 Geburtstagsliste \u2013 {guild.name}",
-                description="Fuer diesen Server sind noch keine Geburtstage gespeichert.",
+                description="Für diesen Server sind noch keine Geburtstage gespeichert.",
                 color=discord.Color.gold(),
             )
 
@@ -252,16 +252,16 @@ class BirthdayCog(commands.Cog):
         await self.api.set_birthday(str(interaction.guild.id), str(user.id), day, month, year)
 
         await interaction.response.send_message(
-            f"Geburtstag fuer {user.mention} wurde gesetzt auf **{format_birthday(day, month, year)}**.",
+            f"Geburtstag für {user.mention} wurde gesetzt auf **{format_birthday(day, month, year)}**.",
             ephemeral=True,
         )
         await self._update_birthday_list_message(interaction.guild)
 
     @birthdays_group.command(
         name="set_channel",
-        description="Setzt den Channel fuer automatische Geburtstags-Gratulationen (Staff).",
+        description="Setzt den Channel für automatische Geburtstags-Gratulationen (Staff).",
     )
-    @app_commands.describe(channel="Textkanal fuer Gratulationen")
+    @app_commands.describe(channel="Textkanal für Gratulationen")
     async def birthdays_set_channel(
         self, interaction: discord.Interaction, channel: discord.TextChannel
     ):
@@ -313,12 +313,12 @@ class BirthdayCog(commands.Cog):
                 if age is not None:
                     msg_text = (
                         f"\U0001f389\U0001f382 Alles Gute zum Geburtstag, {member.mention}! \U0001f382\U0001f389\n"
-                        f"Du wirst heute **{age}** Jahre alt \u2013 wir wuenschen dir einen wundervollen Tag!"
+                        f"Du wirst heute **{age}** Jahre alt \u2013 wir wünschen dir einen wundervollen Tag!"
                     )
                 else:
                     msg_text = (
                         f"\U0001f389\U0001f382 Alles Gute zum Geburtstag, {member.mention}! \U0001f382\U0001f389\n"
-                        f"Wir wuenschen dir einen wundervollen Tag!"
+                        f"Wir wünschen dir einen wundervollen Tag!"
                     )
 
                 try:

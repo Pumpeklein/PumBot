@@ -1,7 +1,5 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
-import json
-from pathlib import Path
 from datetime import timedelta
 from typing import Optional
 
@@ -11,10 +9,6 @@ from discord.ext import commands
 
 from src.pumbot.bot import logger
 
-DATA_DIR = Path("data")
-WARNINGS_FILE = DATA_DIR / "warnings.json"
-BIRTHDAY_FILE = DATA_DIR / "birthdays.json"
-
 ALLOWED_ROLES = {"Admin", "Team", "Twitch Moderator", "Discord Moderator"}
 
 
@@ -22,120 +16,6 @@ def is_allowed(member: discord.Member) -> bool:
     if member.guild_permissions.administrator:
         return True
     return any(role.name in ALLOWED_ROLES for role in member.roles)
-
-
-def load_warnings() -> dict:
-    if not WARNINGS_FILE.exists():
-        return {}
-    try:
-        with WARNINGS_FILE.open("r", encoding="utf-8") as f:
-            return json.load(f)
-    except json.JSONDecodeError:
-        logger.warning("warnings.json ist kaputt/leer -> starte mit {}")
-        return {}
-    except Exception:
-        logger.exception("load_warnings error")
-        return {}
-
-
-def save_warnings(data: dict) -> None:
-    try:
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        with WARNINGS_FILE.open("w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
-    except Exception:
-        logger.exception("save_warnings error")
-
-
-def add_warning(
-    guild_id: int, user_id: int, moderator_id: int, reason: str | None
-) -> int:
-    try:
-        data = load_warnings()
-        g_id = str(guild_id)
-        u_id = str(user_id)
-
-        data.setdefault(g_id, {})
-        data[g_id].setdefault(u_id, [])
-
-        entry = {
-            "moderator_id": moderator_id,
-            "reason": reason or "Kein Grund angegeben",
-            "timestamp": discord.utils.utcnow().isoformat(),
-        }
-        data[g_id][u_id].append(entry)
-        save_warnings(data)
-        return len(data[g_id][u_id])
-    except Exception:
-        logger.exception("add_warning error")
-        return 0
-
-
-def get_warnings(guild_id: int, user_id: int) -> list[dict]:
-    try:
-        data = load_warnings()
-        return data.get(str(guild_id), {}).get(str(user_id), []) or []
-    except Exception:
-        logger.exception("get_warnings error")
-        return []
-
-
-def clear_warnings_all(guild_id: int, user_id: int) -> int:
-    try:
-        data = load_warnings()
-        g_id = str(guild_id)
-        u_id = str(user_id)
-
-        warns = data.get(g_id, {}).get(u_id, [])
-        count = len(warns)
-
-        if g_id in data and u_id in data[g_id]:
-            del data[g_id][u_id]
-            save_warnings(data)
-
-        return count
-    except Exception:
-        logger.exception("clear_warnings_all error")
-        return 0
-
-
-def remove_warning_at_index(guild_id: int, user_id: int, index: int) -> bool:
-    try:
-        data = load_warnings()
-        g_id = str(guild_id)
-        u_id = str(user_id)
-
-        warns = data.get(g_id, {}).get(u_id, [])
-        if not warns or index < 1 or index > len(warns):
-            return False
-
-        warns.pop(index - 1)
-
-        if warns:
-            data[g_id][u_id] = warns
-        else:
-            if g_id in data and u_id in data[g_id]:
-                del data[g_id][u_id]
-
-        save_warnings(data)
-        return True
-    except Exception:
-        logger.exception("remove_warning_at_index error")
-        return False
-
-
-def load_birthdays() -> dict:
-    if not BIRTHDAY_FILE.exists():
-        return {}
-    try:
-        with BIRTHDAY_FILE.open("r", encoding="utf-8") as f:
-            return json.load(f)
-    except json.JSONDecodeError:
-        logger.warning("birthdays.json ist kaputt/leer -> starte mit {}")
-        return {}
-    except Exception:
-        logger.exception("load_birthdays error")
-        return {}
 
 
 def format_birthday(day: int, month: int, year: int | None) -> str:
@@ -150,28 +30,7 @@ def format_birthday(day: int, month: int, year: int | None) -> str:
         return f"{day:02d}.{month:02d}"
 
 
-def get_birthday_text(guild_id: int | None, user_id: int) -> str:
-    try:
-        if guild_id is None:
-            return "Nicht verfügbar"
-        data = load_birthdays()
-        g_id = str(guild_id)
-        u_id = str(user_id)
-        info = data.get(g_id, {}).get(u_id)
-        if not info:
-            return "Kein Geburtstag gespeichert"
-        day = info.get("day")
-        month = info.get("month")
-        year = info.get("year")
-        if day is None or month is None:
-            return "Kein Geburtstag gespeichert"
-        return format_birthday(day, month, year)
-    except Exception:
-        logger.exception("get_birthday_text error")
-        return "Kein Geburtstag gespeichert"
-
-
-def format_dt(dt: discord.utils.snowflake_time | None) -> str:
+def format_dt(dt) -> str:
     try:
         if dt is None:
             return "Unbekannt"
@@ -185,6 +44,7 @@ def format_dt(dt: discord.utils.snowflake_time | None) -> str:
 class UserManagementCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.api = bot.api
 
     moderation_group = app_commands.Group(
         name="mod",
@@ -192,7 +52,7 @@ class UserManagementCog(commands.Cog):
     )
 
     @moderation_group.command(
-        name="profile", description="Zeigt Infos über einen Nutzer."
+        name="profile", description="Zeigt Infos ueber einen Nutzer."
     )
     @app_commands.describe(user="User (optional)")
     async def profile(
@@ -222,10 +82,20 @@ class UserManagementCog(commands.Cog):
         ]
         perms_text = ", ".join(perms) if perms else "Keine besonderen Rechte"
 
-        birthday_text = get_birthday_text(guild.id, member.id)
+        birthday_text = "Kein Geburtstag gespeichert"
+        try:
+            bday = await self.api.get_birthday(str(guild.id), str(member.id))
+            if bday:
+                day = bday.get("day")
+                month = bday.get("month")
+                year = bday.get("year")
+                if day is not None and month is not None:
+                    birthday_text = format_birthday(day, month, year)
+        except Exception:
+            logger.exception("profile get_birthday error")
 
         embed = discord.Embed(
-            title=f"Benutzerinfo – {member}",
+            title=f"Benutzerinfo - {member}",
             color=(
                 member.color
                 if isinstance(member, discord.Member)
@@ -254,7 +124,7 @@ class UserManagementCog(commands.Cog):
                 f"**User ID:** `{member.id}`\n"
                 f"**Account erstellt:** {format_dt(member.created_at)}\n"
                 f"**Server beigetreten:** {format_dt(member.joined_at)}\n"
-                f"**Join-Methode:** Nicht direkt über die Discord-API verfügbar"
+                f"**Join-Methode:** Nicht direkt ueber die Discord-API verfuegbar"
             ),
             inline=False,
         )
@@ -303,13 +173,36 @@ class UserManagementCog(commands.Cog):
             and interaction.user != interaction.guild.owner
         ):
             await interaction.response.send_message(
-                "Du kannst keinen User verwarnen, der gleich- oder höhergestellt ist als du.",
+                "Du kannst keinen User verwarnen, der gleich- oder hoehergestellt ist als du.",
                 ephemeral=True,
             )
             return
 
-        count = add_warning(interaction.guild.id, user.id, interaction.user.id, grund)
         reason_text = grund or "Kein Grund angegeben"
+
+        try:
+            await self.api.add_warning(
+                str(interaction.guild.id),
+                str(user.id),
+                str(interaction.user.id),
+                reason_text,
+            )
+        except Exception:
+            logger.exception("warn add_warning error")
+            await interaction.response.send_message(
+                "Beim Speichern der Verwarnung ist ein Fehler aufgetreten.",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            warns = await self.api.get_warnings(
+                str(interaction.guild.id), str(user.id)
+            )
+            count = len(warns)
+        except Exception:
+            logger.exception("warn get_warnings count error")
+            count = "?"
 
         await interaction.response.send_message(
             f"{user.mention} wurde verwarnt. (Verwarnungen auf diesem Server: **{count}**)\nGrund: {reason_text}",
@@ -343,7 +236,17 @@ class UserManagementCog(commands.Cog):
             )
             return
 
-        warns = get_warnings(interaction.guild.id, user.id)
+        try:
+            warns = await self.api.get_warnings(
+                str(interaction.guild.id), str(user.id)
+            )
+        except Exception:
+            logger.exception("warnings get_warnings error")
+            await interaction.response.send_message(
+                "Beim Abrufen der Verwarnungen ist ein Fehler aufgetreten.",
+                ephemeral=True,
+            )
+            return
 
         if not warns:
             await interaction.response.send_message(
@@ -352,7 +255,7 @@ class UserManagementCog(commands.Cog):
             return
 
         embed = discord.Embed(
-            title=f"Verwarnungen – {user}",
+            title=f"Verwarnungen - {user}",
             color=discord.Color.orange(),
         )
 
@@ -360,22 +263,12 @@ class UserManagementCog(commands.Cog):
             mod_id = entry.get("moderator_id")
             mod_mention = f"<@{mod_id}>" if mod_id else "Unbekannt"
             reason = entry.get("reason", "Kein Grund angegeben")
-            ts_iso = entry.get("timestamp")
-
-            try:
-                ts = (
-                    discord.utils.parse_time(ts_iso)
-                    if hasattr(discord.utils, "parse_time")
-                    else None
-                )
-            except Exception:
-                ts = None
-
-            time_text = format_dt(ts) if ts else (ts_iso or "Unbekannt")
+            created_at = entry.get("created_at", "Unbekannt")
+            warning_id = entry.get("id", "?")
 
             embed.add_field(
-                name=f"Verwarnung #{idx}",
-                value=f"**Moderator:** {mod_mention}\n**Zeit:** {time_text}\n**Grund:** {reason}",
+                name=f"Verwarnung #{idx} (ID: {warning_id})",
+                value=f"**Moderator:** {mod_mention}\n**Zeit:** {created_at}\n**Grund:** {reason}",
                 inline=False,
             )
 
@@ -383,7 +276,7 @@ class UserManagementCog(commands.Cog):
 
     @moderation_group.command(
         name="clearwarnings",
-        description="Löscht Verwarnungen eines Users (ohne Index: alle).",
+        description="Loescht Verwarnungen eines Users (ohne Index: alle).",
     )
     @app_commands.describe(
         user="User", index="Index (1-basiert) einer einzelnen Verwarnung (optional)"
@@ -412,37 +305,76 @@ class UserManagementCog(commands.Cog):
             and interaction.user != interaction.guild.owner
         ):
             await interaction.response.send_message(
-                "Du kannst keine Verwarnungen von Usern löschen, die gleich- oder höhergestellt sind als du.",
+                "Du kannst keine Verwarnungen von Usern loeschen, die gleich- oder hoehergestellt sind als du.",
                 ephemeral=True,
             )
             return
 
+        guild_id = str(interaction.guild.id)
+        user_id = str(user.id)
+
         if index is not None:
-            ok = remove_warning_at_index(interaction.guild.id, user.id, index)
-            if not ok:
-                count_now = len(get_warnings(interaction.guild.id, user.id))
+            try:
+                warns = await self.api.get_warnings(guild_id, user_id)
+            except Exception:
+                logger.exception("clearwarnings get_warnings error")
                 await interaction.response.send_message(
-                    f"Ungültiger Index. {user.mention} hat **{count_now}** Verwarnung(en).",
+                    "Beim Abrufen der Verwarnungen ist ein Fehler aufgetreten.",
+                    ephemeral=True,
+                )
+                return
+
+            if not warns or index < 1 or index > len(warns):
+                count_now = len(warns) if warns else 0
+                await interaction.response.send_message(
+                    f"Ungueltiger Index. {user.mention} hat **{count_now}** Verwarnung(en).",
+                    ephemeral=True,
+                )
+                return
+
+            warning_id = warns[index - 1].get("id")
+            try:
+                await self.api.remove_warning(guild_id, warning_id)
+            except Exception:
+                logger.exception("clearwarnings remove_warning error")
+                await interaction.response.send_message(
+                    "Beim Loeschen der Verwarnung ist ein Fehler aufgetreten.",
                     ephemeral=True,
                 )
                 return
 
             await interaction.response.send_message(
-                f"✅ Verwarnung #{index} von {user.mention} wurde gelöscht.",
+                f"Verwarnung #{index} von {user.mention} wurde geloescht.",
                 ephemeral=True,
             )
             return
 
-        count = clear_warnings_all(interaction.guild.id, user.id)
+        try:
+            warns = await self.api.get_warnings(guild_id, user_id)
+            count = len(warns) if warns else 0
+        except Exception:
+            logger.exception("clearwarnings get_warnings error")
+            count = 0
+
         if count <= 0:
             await interaction.response.send_message(
-                f"{user.mention} hat keine Verwarnungen, die gelöscht werden können.",
+                f"{user.mention} hat keine Verwarnungen, die geloescht werden koennen.",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            await self.api.clear_warnings(guild_id, user_id)
+        except Exception:
+            logger.exception("clearwarnings clear_warnings error")
+            await interaction.response.send_message(
+                "Beim Loeschen der Verwarnungen ist ein Fehler aufgetreten.",
                 ephemeral=True,
             )
             return
 
         await interaction.response.send_message(
-            f"✅ Alle Verwarnungen von {user.mention} wurden gelöscht. (Gelöscht: **{count}**)",
+            f"Alle Verwarnungen von {user.mention} wurden geloescht. (Geloescht: **{count}**)",
             ephemeral=True,
         )
 
@@ -478,7 +410,7 @@ class UserManagementCog(commands.Cog):
             and interaction.user != interaction.guild.owner
         ):
             await interaction.response.send_message(
-                "Du kannst keinen User bannen, der gleich- oder höhergestellt ist als du.",
+                "Du kannst keinen User bannen, der gleich- oder hoehergestellt ist als du.",
                 ephemeral=True,
             )
             return
@@ -540,7 +472,7 @@ class UserManagementCog(commands.Cog):
 
         if minuten <= 0:
             await interaction.response.send_message(
-                "Die Minuten müssen größer als 0 sein.", ephemeral=True
+                "Die Minuten muessen groesser als 0 sein.", ephemeral=True
             )
             return
 
@@ -555,7 +487,7 @@ class UserManagementCog(commands.Cog):
             and interaction.user != interaction.guild.owner
         ):
             await interaction.response.send_message(
-                "Du kannst keinen User timeouten, der gleich- oder höhergestellt ist als du.",
+                "Du kannst keinen User timeouten, der gleich- oder hoehergestellt ist als du.",
                 ephemeral=True,
             )
             return
@@ -591,13 +523,13 @@ class UserManagementCog(commands.Cog):
             return
 
         await interaction.response.send_message(
-            f"{user.mention} wurde für **{minuten}** Minuten in Timeout gesetzt.\nGrund: {reason_text}",
+            f"{user.mention} wurde fuer **{minuten}** Minuten in Timeout gesetzt.\nGrund: {reason_text}",
             ephemeral=False,
         )
 
         try:
             await user.send(
-                f"Du wurdest auf **{interaction.guild.name}** für {minuten} Minuten in Timeout gesetzt.\nGrund: {reason_text}"
+                f"Du wurdest auf **{interaction.guild.name}** fuer {minuten} Minuten in Timeout gesetzt.\nGrund: {reason_text}"
             )
         except discord.Forbidden:
             pass

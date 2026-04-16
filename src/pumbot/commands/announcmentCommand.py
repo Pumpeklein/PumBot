@@ -1,9 +1,8 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import os
 import json
 import asyncio
-from pathlib import Path
 from typing import Any, Dict, Optional, List
 from datetime import datetime, timezone
 
@@ -13,9 +12,6 @@ from discord import app_commands
 from discord.ext import commands, tasks
 
 from src.pumbot.bot import logger
-
-DATA_DIR = Path("data")
-ANNOUNCE_FILE = DATA_DIR / "announcement.json"
 
 ANNOUNCE_STAFF_ROLES = {"Admin", "Team", "Twitch Moderator", "Discord Moderator"}
 
@@ -28,29 +24,6 @@ def is_announce_staff(member: discord.Member) -> bool:
     except Exception:
         logger.exception("is_announce_staff error")
         return False
-
-
-def load_data() -> Dict[str, Any]:
-    try:
-        if ANNOUNCE_FILE.exists():
-            with ANNOUNCE_FILE.open("r", encoding="utf-8") as f:
-                return json.load(f)
-    except json.JSONDecodeError:
-        logger.warning("announcement.json ist kaputt/leer -> starte mit {}")
-        return {}
-    except Exception:
-        logger.exception("load_data error")
-        return {}
-    return {}
-
-
-def save_data(data: Dict[str, Any]) -> None:
-    try:
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        with ANNOUNCE_FILE.open("w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
-    except Exception:
-        logger.exception("save_data error")
 
 
 def format_stream_times(started_at_str: str) -> tuple[str, str]:
@@ -83,6 +56,7 @@ def format_stream_times(started_at_str: str) -> tuple[str, str]:
 class AnnouncementCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.api = bot.api
 
         self.twitch_client_id = os.getenv("TWITCH_CLIENT_ID")
         self.twitch_auth_token = os.getenv("TWITCH_AUTH_TOKEN")
@@ -116,13 +90,13 @@ class AnnouncementCog(commands.Cog):
         self, guild: discord.Guild
     ) -> Optional[discord.TextChannel]:
         try:
-            data = load_data()
-            g_id = str(guild.id)
-            cfg = data.get(g_id, {}).get("_twitch", {})
+            cfg = await self.api.get_twitch_config(str(guild.id))
+            if not cfg:
+                return None
             channel_id = cfg.get("channel_id")
             if not channel_id:
                 return None
-            chan = guild.get_channel(channel_id)
+            chan = guild.get_channel(int(channel_id))
             return chan if isinstance(chan, discord.TextChannel) else None
         except Exception:
             logger.exception("get_twitch_announce_channel error")
@@ -199,7 +173,7 @@ class AnnouncementCog(commands.Cog):
 
             if game_name:
                 embed.add_field(name="Game", value=game_name, inline=True)
-            embed.add_field(name="Status", value="🔴 **Live**", inline=True)
+            embed.add_field(name="Status", value="\U0001f534 **Live**", inline=True)
 
             if started_at:
                 started_display, duration_display = format_stream_times(started_at)
@@ -227,7 +201,7 @@ class AnnouncementCog(commands.Cog):
 
     @announce_group.command(
         name="twitch_channel",
-        description="Setzt den Channel für Twitch-Live-Announcements.",
+        description="Setzt den Channel fuer Twitch-Live-Announcements.",
     )
     @app_commands.describe(channel="Textkanal")
     async def set_twitch_channel(
@@ -246,14 +220,9 @@ class AnnouncementCog(commands.Cog):
             )
             return
 
-        data = load_data()
-        g_id = str(interaction.guild.id)
-        data.setdefault(g_id, {})
-
-        cfg = data[g_id].get("_twitch", {})
-        cfg["channel_id"] = channel.id
-        data[g_id]["_twitch"] = cfg
-        save_data(data)
+        await self.api.set_twitch_config(
+            str(interaction.guild.id), channel_id=str(channel.id)
+        )
 
         await interaction.response.send_message(
             f"Twitch-Announcement-Channel wurde auf {channel.mention} gesetzt.",
@@ -322,21 +291,18 @@ class AnnouncementCog(commands.Cog):
         ):
             return
 
-        data = load_data()
-
         for guild in list(self.bot.guilds):
             try:
                 g_id = str(guild.id)
-                g_data = data.get(g_id)
-                if not g_data:
+                cfg = await self.api.get_twitch_config(g_id)
+                if not cfg:
                     continue
 
-                cfg = g_data.get("_twitch", {})
                 channel_id = cfg.get("channel_id")
                 if not channel_id:
                     continue
 
-                channel = guild.get_channel(channel_id)
+                channel = guild.get_channel(int(channel_id))
                 if not isinstance(channel, discord.TextChannel):
                     continue
 
@@ -344,9 +310,6 @@ class AnnouncementCog(commands.Cog):
 
                 streams = await self.fetch_twitch_stream()
                 if not streams:
-                    cfg["last_live"] = False
-                    g_data["_twitch"] = cfg
-                    data[g_id] = g_data
                     continue
 
                 stream = streams[0]
@@ -361,16 +324,11 @@ class AnnouncementCog(commands.Cog):
                             "Twitch announce send fehlgeschlagen (guild=%s)", guild.id
                         )
 
-                    cfg["last_stream_id"] = stream_id
-                    cfg["last_live"] = True
-                    g_data["_twitch"] = cfg
-                    data[g_id] = g_data
+                    await self.api.set_twitch_config(g_id, last_stream_id=stream_id)
 
             except Exception:
                 logger.exception("twitch_check_loop guild error (guild=%s)", guild.id)
                 continue
-
-        save_data(data)
 
     @twitch_check_loop.error
     async def twitch_check_loop_error(self, error: Exception):

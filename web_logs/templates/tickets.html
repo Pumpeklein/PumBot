@@ -34,7 +34,8 @@
           <th class="px-4 py-3 font-medium">Ticket</th>
           <th class="px-4 py-3 font-medium">Betreff</th>
           <th class="px-4 py-3 font-medium">Status</th>
-          <th class="px-4 py-3 font-medium">User</th>
+          <th class="px-4 py-3 font-medium">Ersteller</th>
+          <th class="px-4 py-3 font-medium">Kategorie</th>
           <th class="px-4 py-3 font-medium">Aktualisiert</th>
         </tr>
       </thead>
@@ -46,7 +47,8 @@
           <td class="px-4 py-3">
             {{ badge(t.status, "success" if t.status == "closed" else "warning") }}
           </td>
-          <td class="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-400">{{ t.creator_user_id or "-" }}</td>
+          <td class="whitespace-nowrap px-4 py-3 text-slate-300">{{ t.creator_username or t.creator_user_id or "-" }}</td>
+          <td class="whitespace-nowrap px-4 py-3 text-slate-400">{{ t.category or "-" }}</td>
           <td class="whitespace-nowrap px-4 py-3 text-slate-500">{{ t.updated_at or "-" }}</td>
         </tr>
         {% endfor %}

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header, field, btn, badge, empty_state %}
+
+{% block content %}
+{{ page_header("Rollen-Verwaltung", "Discord-Rollen mit Berechtigungen verknüpfen.", "Erstelle und verwalte Rollen, um Zugriff auf das Web-Panel zu steuern.") }}
+
+{# Create new role #}
+<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <h2 class="mb-4 text-sm font-semibold text-white">Neue Rolle erstellen</h2>
+  <form method="post" action="{{ url_for('roles_create') }}" class="space-y-4">
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div>
+        {{ field("discord_role_id", "Discord Rollen-ID", placeholder="z.B. 1441253029432262787", required=true) }}
+      </div>
+      <div>
+        {{ field("role_name", "Rollenname", placeholder="z.B. Admin", required=true) }}
+      </div>
+    </div>
+    <div>
+      <label class="mb-2 block text-xs font-medium uppercase tracking-wider text-slate-400">Berechtigungen</label>
+      <div class="flex flex-wrap gap-2">
+        {% for perm in all_permissions %}
+        <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300 transition hover:bg-white/10">
+          <input type="checkbox" name="permissions" value="{{ perm }}" class="rounded border-white/20 bg-white/5 text-cyan-500 focus:ring-cyan-500/30">
+          {{ perm }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    <div>{{ btn("Rolle erstellen") }}</div>
+  </form>
+</div>
+
+{# Existing roles #}
+<div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <h2 class="mb-4 text-sm font-semibold text-white">Vorhandene Rollen</h2>
+  {% if roles|length == 0 %}
+  {{ empty_state("Keine Rollen vorhanden", "Erstelle oben eine neue Rolle, um loszulegen.") }}
+  {% else %}
+  <div class="space-y-4">
+    {% for role in roles %}
+    <div class="rounded-xl border border-white/[0.06] bg-white/[0.03] p-4">
+      <form method="post" action="{{ url_for('roles_update', role_id=role.id) }}">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-3 mb-3">
+              <input type="text" name="role_name" value="{{ role.role_name }}"
+                class="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-semibold text-white outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30">
+              <span class="font-mono text-xs text-slate-500">Discord ID: {{ role.discord_role_id }}</span>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              {% for perm in all_permissions %}
+              <label class="flex cursor-pointer items-center gap-1.5 rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-300 transition hover:bg-white/10">
+                <input type="checkbox" name="permissions" value="{{ perm }}"
+                  {{ "checked" if perm in role.permissions else "" }}
+                  class="rounded border-white/20 bg-white/5 text-cyan-500 focus:ring-cyan-500/30">
+                {{ perm }}
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="flex gap-2 shrink-0">
+            <button type="submit"
+              class="rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-cyan-500">
+              Speichern
+            </button>
+          </div>
+        </div>
+      </form>
+      <form method="post" action="{{ url_for('roles_delete', role_id=role.id) }}" class="mt-2 flex justify-end"
+        onsubmit="return confirm('Rolle wirklich löschen?')">
+        <button type="submit"
+          class="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-400 transition hover:bg-red-500/20">
+          Löschen
+        </button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

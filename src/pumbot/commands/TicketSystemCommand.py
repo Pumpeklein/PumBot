@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import io
-import asyncio
+import re
 from typing import Optional, Dict, Tuple
 
 import aiohttp
@@ -11,7 +11,6 @@ from discord import ButtonStyle, app_commands
 from discord.ext import commands
 
 from src.pumbot.bot import logger
-from src.pumbot.services.web_log_service import send_ticket_archive, send_web_log
 
 
 TICKET_CATEGORY_NAME = "🎫 Tickets"
@@ -109,15 +108,39 @@ class TicketSystemCog(commands.Cog):
         except Exception:
             logger.exception("TicketSystemCog.cog_unload error")
 
-    async def get_session(self) -> aiohttp.ClientSession:
-        try:
-            if self.session is None or self.session.closed:
-                self.session = aiohttp.ClientSession()
-            return self.session
-        except Exception:
-            logger.exception("TicketSystemCog.get_session error")
+    async def _get_twitch_session(self) -> aiohttp.ClientSession:
+        if self.session is None or self.session.closed:
             self.session = aiohttp.ClientSession()
-            return self.session
+        return self.session
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        """Save every message in a ticket channel to the DB via API."""
+        try:
+            if message.author.bot:
+                return
+            channel = message.channel
+            if not isinstance(channel, discord.TextChannel):
+                return
+            if channel.category is None or channel.category.name != TICKET_CATEGORY_NAME:
+                return
+
+            content = message.content or ""
+            if not content and message.attachments:
+                content = " ".join(a.url for a in message.attachments)
+            if not content:
+                return
+
+            await self.bot.api.add_ticket_message(
+                ticket_id=str(channel.id),
+                author_id=str(message.author.id),
+                author_name=str(message.author),
+                content=content,
+                source="discord",
+                discord_message_id=str(message.id),
+            )
+        except Exception:
+            logger.exception("on_message ticket save error")
 
     async def validate_twitch_username(self, username: str) -> Tuple[bool, Optional[bool]]:
         try:
@@ -129,7 +152,7 @@ class TicketSystemCog(commands.Cog):
                 logger.warning("validate_twitch_username: Twitch-API nicht konfiguriert, überspringe Check.")
                 return True, None
 
-            session = await self.get_session()
+            session = await self._get_twitch_session()
             url = "https://api.twitch.tv/helix/users"
             headers = {
                 "Client-ID": self.twitch_client_id,
@@ -153,6 +176,13 @@ class TicketSystemCog(commands.Cog):
             logger.exception("validate_twitch_username unexpected error")
             return True, None
 
+    @staticmethod
+    def _sanitize_channel_name(name: str) -> str:
+        """Sanitize a string for use in a Discord channel name."""
+        name = name.lower().replace(" ", "-")
+        name = re.sub(r"[^a-z0-9\-_]", "", name)
+        return name[:20].rstrip("-")
+
     async def create_ticket_channel(
         self,
         interaction: discord.Interaction,
@@ -175,7 +205,8 @@ class TicketSystemCog(commands.Cog):
             if ticket_category is None:
                 ticket_category = await guild.create_category(TICKET_CATEGORY_NAME)
 
-            channel_name = f"ticket-{category_key}-{user.id}"
+            safe_name = self._sanitize_channel_name(user.display_name)
+            channel_name = f"ticket-{safe_name}-{category_key}"
 
             overwrites: Dict[discord.abc.Snowflake, discord.PermissionOverwrite] = {
                 guild.default_role: discord.PermissionOverwrite(view_channel=False),
@@ -200,6 +231,7 @@ class TicketSystemCog(commands.Cog):
             topic_parts = [
                 "TICKET",
                 f"creator_id:{user.id}",
+                f"creator_name:{user}",
                 f"category:{category_label}",
                 f"created_at:{discord.utils.utcnow().isoformat()}",
             ]
@@ -215,18 +247,34 @@ class TicketSystemCog(commands.Cog):
                 topic="|".join(topic_parts) + "|",
             )
 
-            # ✅ WEBLOG: Ticket created
+            # Register ticket in DB via API
+            api = self.bot.api
             try:
-                session = await self.get_session()
-                await send_web_log(
-                    session,
+                await api.upsert_ticket({
+                    "ticket_id": str(channel.id),
+                    "guild_id": str(guild.id),
+                    "channel_id": str(channel.id),
+                    "creator_user_id": str(user.id),
+                    "creator_username": str(user),
+                    "status": "open",
+                    "subject": category_label,
+                    "category": category_key,
+                    "twitch_name": twitch_name,
+                    "opened_at": discord.utils.utcnow().isoformat(),
+                })
+            except Exception:
+                logger.exception("upsert_ticket (created) error")
+
+            # Log creation via API
+            try:
+                await api.send_ticket_log(
                     ticket_id=str(channel.id),
                     user_name=str(user),
                     action="created",
                     content=f"{category_label} | Grund: {reason[:500]}",
                 )
             except Exception:
-                logger.exception("send_web_log created error")
+                logger.exception("send_ticket_log created error")
 
             embed = discord.Embed(
                 title=f"{category_label} – Ticket von {user}",
@@ -278,6 +326,7 @@ class TicketSystemCog(commands.Cog):
             guild = channel.guild
             topic_data = self._parse_ticket_topic(channel.topic)
             creator_id = topic_data.get("creator_id")
+            creator_name = topic_data.get("creator_name")
             category_label = topic_data.get("category")
             created_at_iso = topic_data.get("created_at")
             twitch_name = topic_data.get("twitch_name")
@@ -293,29 +342,28 @@ class TicketSystemCog(commands.Cog):
             except Exception:
                 transcript_url = None
 
-            # ✅ WEBLOG: Ticket closed
+            api = self.bot.api
+
+            # Log close action
             try:
-                session = await self.get_session()
-                await send_web_log(
-                    session,
+                await api.send_ticket_log(
                     ticket_id=str(channel.id),
                     user_name=str(closer),
                     action="closed",
                     content=f"Grund: {reason or 'Per Button geschlossen.'} | Transcript: {transcript_url or 'kein Link'}",
                 )
             except Exception:
-                logger.exception("send_web_log closed error")
+                logger.exception("send_ticket_log closed error")
 
-            # ✅ ARCHIV: Voll-Archiv (Meta + Transcript)
+            # Archive ticket (updates DB + saves transcript HTML)
             try:
-                session = await self.get_session()
-                await send_ticket_archive(
-                    session,
+                await api.send_ticket_archive(
                     ticket_id=str(channel.id),
                     channel_name=channel.name,
                     category_label=category_label or "Unbekannt",
                     creator_id=str(creator_id) if creator_id else None,
-                    creator_name=None,
+                    creator_name=creator_name,
+                    guild_id=str(guild.id),
                     opened_at=created_at_iso,
                     closed_at=closed_at.isoformat(),
                     closed_by_id=str(closer.id),
@@ -368,7 +416,7 @@ class TicketSystemCog(commands.Cog):
                 if creator_id:
                     creator_user = guild.get_member(int(creator_id)) or await self.bot.fetch_user(int(creator_id))
 
-                    base = os.getenv("TICKET_VIEW_BASE_URL")  # z.B. http://127.0.0.1:8080/tickets
+                    base = os.getenv("TICKET_VIEW_BASE_URL")  # z.B. http://127.0.0.1:3000/tickets
                     ticket_url = f"{base.rstrip('/')}/{channel.id}" if base else transcript_url
                     ticket_click = f"[{channel.name}]({ticket_url})" if ticket_url else channel.name
 
@@ -705,6 +753,83 @@ class TicketPanelView(discord.ui.View):
         await self._open_modal(interaction, key="general", label="Allgemeiner Support")
 
 
+class TicketCloseReasonModal(discord.ui.Modal):
+    """Modal for entering a custom close reason."""
+
+    def __init__(self, bot: commands.Bot):
+        super().__init__(title="Ticket schließen – Eigener Grund")
+        self.bot = bot
+        self.reason_input = discord.ui.TextInput(
+            label="Grund",
+            placeholder="Beschreibe den Grund für das Schließen …",
+            style=discord.TextStyle.paragraph,
+            required=True,
+            max_length=500,
+        )
+        self.add_item(self.reason_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            reason = str(self.reason_input.value).strip() or "Kein Grund angegeben."
+            channel = interaction.channel
+            member = interaction.user
+            if not isinstance(channel, discord.TextChannel) or not isinstance(member, discord.Member):
+                await interaction.response.send_message("Fehler.", ephemeral=True)
+                return
+            cog = self.bot.get_cog("TicketSystemCog")
+            if cog is None or not isinstance(cog, TicketSystemCog):
+                await interaction.response.send_message("Ticket-System ist derzeit nicht verfügbar.", ephemeral=True)
+                return
+            await interaction.response.send_message("Ticket wird geschlossen …", ephemeral=True)
+            await cog.close_ticket(member, channel, reason=reason)
+        except Exception:
+            logger.exception("TicketCloseReasonModal on_submit error")
+
+
+class TicketCloseReasonView(discord.ui.View):
+    """View with a dropdown of predefined reasons + a custom reason button."""
+
+    def __init__(self, bot: commands.Bot, reasons: list[dict]):
+        super().__init__(timeout=120)
+        self.bot = bot
+        if reasons:
+            options = [
+                discord.SelectOption(label=r["label"][:100], value=r["label"][:100])
+                for r in reasons[:25]
+            ]
+            self.reason_select = discord.ui.Select(
+                placeholder="Grund auswählen …",
+                options=options,
+                custom_id="ticket_close_reason_select",
+            )
+            self.reason_select.callback = self._select_callback
+            self.add_item(self.reason_select)
+
+    async def _select_callback(self, interaction: discord.Interaction):
+        try:
+            reason = self.reason_select.values[0] if self.reason_select.values else "Kein Grund."
+            channel = interaction.channel
+            member = interaction.user
+            if not isinstance(channel, discord.TextChannel) or not isinstance(member, discord.Member):
+                await interaction.response.send_message("Fehler.", ephemeral=True)
+                return
+            cog = self.bot.get_cog("TicketSystemCog")
+            if cog is None or not isinstance(cog, TicketSystemCog):
+                await interaction.response.send_message("Ticket-System nicht verfügbar.", ephemeral=True)
+                return
+            await interaction.response.send_message("Ticket wird geschlossen …", ephemeral=True)
+            await cog.close_ticket(member, channel, reason=reason)
+        except Exception:
+            logger.exception("TicketCloseReasonView select_callback error")
+
+    @discord.ui.button(label="Eigener Grund", style=ButtonStyle.secondary, emoji="✏️")
+    async def custom_reason_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        try:
+            await interaction.response.send_modal(TicketCloseReasonModal(self.bot))
+        except Exception:
+            logger.exception("custom_reason_button error")
+
+
 class TicketCloseView(discord.ui.View):
     def __init__(self, bot: commands.Bot):
         super().__init__(timeout=None)
@@ -732,13 +857,22 @@ class TicketCloseView(discord.ui.View):
                 await interaction.response.send_message("Du darfst dieses Ticket nicht schließen.", ephemeral=True)
                 return
 
-            cog = self.bot.get_cog("TicketSystemCog")
-            if cog is None or not isinstance(cog, TicketSystemCog):
-                await interaction.response.send_message("Ticket-System ist derzeit nicht verfügbar.", ephemeral=True)
-                return
+            # Fetch configurable close reasons from API
+            reasons = []
+            try:
+                reasons = await self.bot.api.get_close_reasons(str(guild.id))
+            except Exception:
+                logger.exception("get_close_reasons error")
 
-            await interaction.response.send_message("Ticket wird geschlossen …", ephemeral=True)
-            await cog.close_ticket(member, channel, reason="Per Button geschlossen.")
+            if reasons:
+                view = TicketCloseReasonView(self.bot, reasons)
+                await interaction.response.send_message(
+                    "Bitte wähle einen Grund aus oder gib einen eigenen ein:",
+                    view=view,
+                    ephemeral=True,
+                )
+            else:
+                await interaction.response.send_modal(TicketCloseReasonModal(self.bot))
         except Exception:
             logger.exception("close_button error")
             try:

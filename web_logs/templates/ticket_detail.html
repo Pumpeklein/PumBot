@@ -1,13 +1,15 @@
 {% extends "base.html" %}
-{% from "_macros.html" import page_header, badge, stat, empty_state %}
+{% from "_macros.html" import page_header, badge, stat, empty_state, btn %}
 
 {% block content %}
-{{ page_header("Ticket Detail", "Ticket " ~ t.ticket_id, "Alle Kerninfos, das Transkript und die letzten Log-Einträge auf einen Blick.") }}
+{{ page_header("Ticket Detail", "Ticket " ~ t.ticket_id, "Alle Kerninfos, Nachrichten, das Transkript und die letzten Log-Einträge auf einen Blick.") }}
 
 {# Stats row #}
 <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
   {{ stat("Status", t.status or "-") }}
-  {{ stat("Logs", logs|length) }}
+  {{ stat("Ersteller", t.creator_username or t.creator_user_id or "-") }}
+  {{ stat("Kategorie", t.category or t.subject or "-") }}
+  {{ stat("Nachrichten", messages|length) }}
 </div>
 
 {# Overview #}
@@ -23,15 +25,205 @@
       <div class="mt-1">{{ badge(t.status or "-", "success" if t.status == "closed" else "warning") }}</div>
     </div>
     <div class="rounded-lg border border-white/5 bg-white/[0.02] p-3">
-      <div class="text-xs uppercase tracking-wider text-slate-500">Creator</div>
-      <div class="mt-1 font-mono text-xs text-white">{{ t.creator_user_id or "-" }}</div>
+      <div class="text-xs uppercase tracking-wider text-slate-500">Ersteller</div>
+      <div class="mt-1 text-sm text-white">{{ t.creator_username or "-" }}</div>
+      {% if t.creator_user_id %}
+      <div class="mt-0.5 font-mono text-xs text-slate-500">{{ t.creator_user_id }}</div>
+      {% endif %}
     </div>
     <div class="rounded-lg border border-white/5 bg-white/[0.02] p-3">
       <div class="text-xs uppercase tracking-wider text-slate-500">Geschlossen am</div>
       <div class="mt-1 text-sm text-white">{{ t.closed_at or "-" }}</div>
+      {% if t.closed_by_name %}
+      <div class="mt-0.5 text-xs text-slate-500">von {{ t.closed_by_name }}</div>
+      {% endif %}
     </div>
   </div>
+  {% if t.close_reason %}
+  <div class="mt-3 rounded-lg border border-white/5 bg-white/[0.02] p-3">
+    <div class="text-xs uppercase tracking-wider text-slate-500">Schließungsgrund</div>
+    <div class="mt-1 text-sm text-slate-300">{{ t.close_reason }}</div>
+  </div>
+  {% endif %}
+  {% if t.twitch_name %}
+  <div class="mt-3 rounded-lg border border-purple-500/20 bg-purple-500/5 p-3">
+    <div class="text-xs uppercase tracking-wider text-slate-500">Twitch</div>
+    <div class="mt-1 flex items-center gap-2">
+      <svg class="h-4 w-4 text-purple-400" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>
+      <a href="https://twitch.tv/{{ t.twitch_name }}" target="_blank" rel="noopener"
+        class="text-sm font-medium text-purple-400 hover:text-purple-300 transition">{{ t.twitch_name }}</a>
+    </div>
+  </div>
+  {% endif %}
 </div>
+
+{# Messages #}
+<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <h2 class="mb-4 text-sm font-semibold text-white">Nachrichten</h2>
+  <div id="messages-container" class="space-y-3 max-h-[500px] overflow-y-auto pr-2">
+    {# Rendered by JS #}
+  </div>
+  <div id="messages-empty" class="hidden">
+    {{ empty_state("Keine Nachrichten", "Nachrichten werden hier angezeigt, sobald sie vorhanden sind.") }}
+  </div>
+
+  {# Reply form (only for open tickets and users with permission) #}
+  {% if t.status != "closed" and ("tickets.reply" in permissions or "admin" in permissions) %}
+  <form id="reply-form" method="post" action="{{ url_for('ticket_reply_web', ticket_id=t.ticket_id) }}" class="mt-4">
+    <div class="flex gap-2">
+      <input type="text" id="reply-input" name="content" placeholder="Nachricht schreiben..." required
+        class="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30">
+      {{ btn("Senden") }}
+    </div>
+  </form>
+  {% endif %}
+</div>
+
+{# Close Ticket #}
+{% if t.status != "closed" and ("tickets.close" in permissions or "admin" in permissions) %}
+<div class="mb-6 rounded-xl border border-red-500/20 bg-red-500/5 p-5">
+  <h2 class="mb-3 text-sm font-semibold text-red-400">Ticket schließen</h2>
+  <form method="post" action="{{ url_for('ticket_close_web', ticket_id=t.ticket_id) }}" id="close-form">
+    <input type="hidden" name="reason" id="close-reason-hidden" value="">
+    <div class="mb-3">
+      <label class="mb-1 block text-xs uppercase tracking-wider text-slate-500">Grund</label>
+      {% if close_reasons %}
+      <select id="close-reason-select"
+        class="w-full rounded-lg border border-white/10 bg-[#0d1320] px-3 py-2 text-sm text-white outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/30 [&>option]:bg-[#0d1320] [&>option]:text-white">
+        {% for r in close_reasons %}
+        <option value="{{ r.label }}">{{ r.label }}</option>
+        {% endfor %}
+        <option value="__custom__">Eigener Grund …</option>
+      </select>
+      {% endif %}
+      <input type="text" id="close-custom-reason" placeholder="Eigenen Grund eingeben …"
+        class="{{ 'mt-2 ' if close_reasons else '' }}w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/30 {{ 'hidden' if close_reasons else '' }}">
+    </div>
+    <button type="submit"
+      class="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700">
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+      Ticket schließen
+    </button>
+  </form>
+</div>
+<script>
+(function() {
+  const select = document.getElementById("close-reason-select");
+  const customInput = document.getElementById("close-custom-reason");
+  const hidden = document.getElementById("close-reason-hidden");
+  const form = document.getElementById("close-form");
+
+  if (select) {
+    select.addEventListener("change", function() {
+      if (this.value === "__custom__") {
+        customInput.classList.remove("hidden");
+        customInput.required = true;
+        customInput.focus();
+      } else {
+        customInput.classList.add("hidden");
+        customInput.required = false;
+        customInput.value = "";
+      }
+    });
+  }
+
+  form.addEventListener("submit", function() {
+    if (select && select.value !== "__custom__") {
+      hidden.value = select.value;
+    } else {
+      hidden.value = customInput.value;
+    }
+  });
+})();
+</script>
+{% endif %}
+
+<script>
+(function() {
+  const TICKET_ID = {{ t.ticket_id | tojson }};
+  const POLL_URL = `/tickets/${TICKET_ID}/messages.json`;
+  const POLL_INTERVAL = 3000;
+  const container = document.getElementById("messages-container");
+  const emptyEl = document.getElementById("messages-empty");
+  let knownCount = 0;
+
+  function escapeHtml(s) {
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function renderMessage(m) {
+    const isWeb = m.source === "web";
+    const borderCls = isWeb ? "border-cyan-500/20 bg-cyan-500/5" : "border-white/5 bg-white/[0.02]";
+    const badgeCls = isWeb
+      ? '<span class="rounded bg-cyan-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-cyan-400">Web</span>'
+      : '<span class="rounded bg-indigo-500/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-indigo-400">Discord</span>';
+    return `<div class="rounded-lg border p-3 ${borderCls}">
+      <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-medium text-white">${escapeHtml(m.author_name)}</span>
+          ${badgeCls}
+        </div>
+        <span class="text-xs text-slate-500">${escapeHtml(m.created_at || "-")}</span>
+      </div>
+      <div class="mt-1.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-300">${escapeHtml(m.content)}</div>
+    </div>`;
+  }
+
+  function renderAll(messages) {
+    if (!messages.length) {
+      container.classList.add("hidden");
+      emptyEl.classList.remove("hidden");
+      return;
+    }
+    emptyEl.classList.add("hidden");
+    container.classList.remove("hidden");
+    container.innerHTML = messages.map(renderMessage).join("");
+    if (messages.length > knownCount && knownCount > 0) {
+      container.scrollTop = container.scrollHeight;
+    }
+    knownCount = messages.length;
+  }
+
+  async function poll() {
+    try {
+      const resp = await fetch(POLL_URL);
+      if (resp.ok) {
+        const msgs = await resp.json();
+        renderAll(msgs);
+      }
+    } catch (e) { /* silent */ }
+  }
+
+  // Initial load + server-rendered data as fallback
+  const initialMessages = {{ messages | tojson }};
+  renderAll(initialMessages);
+
+  // Poll for new messages
+  setInterval(poll, POLL_INTERVAL);
+
+  // Submit reply via AJAX to avoid page reload
+  const form = document.getElementById("reply-form");
+  if (form) {
+    form.addEventListener("submit", async function(e) {
+      e.preventDefault();
+      const input = document.getElementById("reply-input");
+      const content = input.value.trim();
+      if (!content) return;
+      input.value = "";
+      try {
+        await fetch(form.action, {
+          method: "POST",
+          headers: {"Content-Type": "application/x-www-form-urlencoded"},
+          body: "content=" + encodeURIComponent(content),
+        });
+        await poll();
+      } catch (err) { /* silent */ }
+    });
+  }
+})();
+</script>
 
 {# Transcript #}
 {% if t.transcript_path %}
@@ -44,13 +236,7 @@
       <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
       Internes Transkript
     </a>
-    <a href="{{ url_for('public_transcript', ticket_id=t.ticket_id) }}?token=STAFF_TEST_TOKEN"
-      class="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-cyan-600/20 transition hover:bg-cyan-500">
-      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
-      Öffentlicher Testlink
-    </a>
   </div>
-  <p class="mt-3 text-xs text-slate-500">Für echte User wird der gültige Token-Link über den Bot ausgeliefert.</p>
 </div>
 {% endif %}
 

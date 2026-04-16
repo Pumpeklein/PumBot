@@ -1,10 +1,8 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Optional, Tuple
 
 import discord
 from discord import app_commands
@@ -13,65 +11,11 @@ from discord.ext import commands
 from src.pumbot import config
 from src.pumbot.bot import logger
 
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-LOG_CFG_FILE = BASE_DIR / "database" / "logs_config.json"
-
 LOG_TYPES = ("voice", "user", "server", "message", "welcome")
 
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def _load_cfg() -> Dict[str, Any]:
-    try:
-        if not LOG_CFG_FILE.exists():
-            return {"guilds": {}}
-        with LOG_CFG_FILE.open("r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        logger.exception("Fehler beim Laden der Logs-Config")
-        return {"guilds": {}}
-
-
-def _save_cfg(data: Dict[str, Any]) -> None:
-    try:
-        LOG_CFG_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with LOG_CFG_FILE.open("w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
-    except Exception:
-        logger.exception("Fehler beim Speichern der Logs-Config")
-
-
-def _get_guild_cfg(guild_id: int) -> Dict[str, Any]:
-    data = _load_cfg()
-    return data.get("guilds", {}).get(str(guild_id), {})
-
-
-def _set_guild_cfg(guild_id: int, cfg: Dict[str, Any]) -> None:
-    data = _load_cfg()
-    guilds = data.setdefault("guilds", {})
-    guilds[str(guild_id)] = cfg
-    _save_cfg(data)
-
-
-def _set_log_channel(guild_id: int, log_type: str, channel_id: int) -> None:
-    cfg = _get_guild_cfg(guild_id)
-    channels = cfg.setdefault("channels", {})
-    channels[log_type] = int(channel_id)
-    cfg["channels"] = channels
-    _set_guild_cfg(guild_id, cfg)
-
-
-def _get_log_channel_id(guild_id: int, log_type: str) -> Optional[int]:
-    cfg = _get_guild_cfg(guild_id)
-    ch = cfg.get("channels", {}).get(log_type)
-    return (
-        int(ch)
-        if isinstance(ch, int) or (isinstance(ch, str) and str(ch).isdigit())
-        else None
-    )
 
 
 def _staff_role_ids() -> set[int]:
@@ -125,7 +69,7 @@ def _fmt_channel_label(ch: discord.abc.GuildChannel) -> str:
 
 
 def _count_label(voice: discord.VoiceChannel) -> str:
-    limit = voice.user_limit if voice.user_limit else "∞"
+    limit = voice.user_limit if voice.user_limit else "\u221e"
     return f"{len(voice.members)}/{limit}"
 
 
@@ -170,6 +114,7 @@ class AuditHint:
 class LogsCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.api = bot.api
 
     logs = app_commands.Group(
         name="logs",
@@ -186,10 +131,21 @@ class LogsCog(commands.Cog):
     async def _send_log(
         self, guild: discord.Guild, log_type: str, embed: discord.Embed
     ) -> None:
-        channel_id = _get_log_channel_id(guild.id, log_type)
-        if not channel_id:
+        api_log_type = f"{log_type}_log"
+        try:
+            channel_id_str = await self.api.get_log_channel(
+                str(guild.id), api_log_type
+            )
+        except Exception:
+            logger.exception(
+                "Fehler beim Abrufen des Log-Channels (%s) fuer Guild %s",
+                log_type,
+                guild.id,
+            )
             return
-        channel = await _safe_fetch_channel(guild, channel_id)
+        if not channel_id_str:
+            return
+        channel = await _safe_fetch_channel(guild, int(channel_id_str))
         if channel is None:
             return
         try:
@@ -260,7 +216,7 @@ class LogsCog(commands.Cog):
             await channel.edit(overwrites=overwrites)
             return True, "Channel-Rechte gesetzt."
         except discord.Forbidden:
-            return False, "Mir fehlt die Berechtigung 'Kanäle verwalten'."
+            return False, "Mir fehlt die Berechtigung 'Kanaele verwalten'."
         except Exception:
             logger.exception("Fehler beim Setzen der Channel-Overwrites")
             return False, "Unbekannter Fehler beim Setzen der Rechte."
@@ -283,7 +239,7 @@ class LogsCog(commands.Cog):
     ) -> None:
         if not self._check_staff(interaction):
             await interaction.response.send_message(
-                "Dafür hast du keine Berechtigung.", ephemeral=True
+                "Dafuer hast du keine Berechtigung.", ephemeral=True
             )
             return
 
@@ -297,12 +253,27 @@ class LogsCog(commands.Cog):
         log_type = log_type.lower().strip()
         if log_type not in LOG_TYPES:
             await interaction.response.send_message(
-                "Ungültiger Typ. Erlaubt: voice, user, server, message, welcome",
+                "Ungueltiger Typ. Erlaubt: voice, user, server, message, welcome",
                 ephemeral=True,
             )
             return
 
-        _set_log_channel(guild.id, log_type, channel.id)
+        api_log_type = f"{log_type}_log"
+        try:
+            await self.api.set_log_channel(
+                str(guild.id), api_log_type, str(channel.id)
+            )
+        except Exception:
+            logger.exception(
+                "Fehler beim Setzen des Log-Channels (%s) fuer Guild %s",
+                log_type,
+                guild.id,
+            )
+            await interaction.response.send_message(
+                "Beim Speichern des Log-Channels ist ein Fehler aufgetreten.",
+                ephemeral=True,
+            )
+            return
 
         msg = f"{log_type}-Log Channel gesetzt: {channel.mention}"
         if lock:
@@ -320,26 +291,34 @@ class LogsCog(commands.Cog):
             )
             return
 
-        cfg = _get_guild_cfg(guild.id).get("channels", {})
+        try:
+            channels = await self.api.get_all_log_channels(str(guild.id))
+        except Exception:
+            logger.exception(
+                "Fehler beim Abrufen der Log-Channels fuer Guild %s", guild.id
+            )
+            channels = {}
+
         lines = []
         for t in LOG_TYPES:
-            cid = cfg.get(t)
+            api_key = f"{t}_log"
+            cid = channels.get(api_key)
             if cid:
                 ch = guild.get_channel(int(cid))
                 lines.append(f"- **{t}**: {ch.mention if ch else f'`{cid}`'}")
             else:
-                lines.append(f"- **{t}**: —")
+                lines.append(f"- **{t}**: \u2014")
 
         await interaction.response.send_message("\n".join(lines), ephemeral=True)
 
     @logs.command(
-        name="test", description="Sendet einen Test-Log in den gewünschten Typ."
+        name="test", description="Sendet einen Test-Log in den gewuenschten Typ."
     )
     @app_commands.describe(log_type="voice/user/server/message/welcome")
     async def logs_test(self, interaction: discord.Interaction, log_type: str) -> None:
         if not self._check_staff(interaction):
             await interaction.response.send_message(
-                "Dafür hast du keine Berechtigung.", ephemeral=True
+                "Dafuer hast du keine Berechtigung.", ephemeral=True
             )
             return
 
@@ -353,7 +332,7 @@ class LogsCog(commands.Cog):
         log_type = log_type.lower().strip()
         if log_type not in LOG_TYPES:
             await interaction.response.send_message(
-                "Ungültiger Typ. Erlaubt: voice, user, server, message, welcome",
+                "Ungueltiger Typ. Erlaubt: voice, user, server, message, welcome",
                 ephemeral=True,
             )
             return
@@ -380,7 +359,7 @@ class LogsCog(commands.Cog):
                 ("User", _fmt_name_and_tag(member)),
                 ("ID", str(member.id)),
                 ("Created", created),
-                ("Members", str(member.guild.member_count or "—")),
+                ("Members", str(member.guild.member_count or "\u2014")),
             ]
         )
         await self._send_log(member.guild, "welcome", embed)
@@ -390,14 +369,14 @@ class LogsCog(commands.Cog):
         if member.guild is None:
             return
 
-        joined = "—"
+        joined = "\u2014"
         if member.joined_at:
             joined = f"<t:{int(member.joined_at.replace(tzinfo=timezone.utc).timestamp())}:R>"
 
         roles = [
             r.mention for r in getattr(member, "roles", []) if r.name != "@everyone"
         ]
-        roles_text = " → ".join(roles) if roles else "—"
+        roles_text = " \u2192 ".join(roles) if roles else "\u2014"
 
         embed = _embed_base("User left", _red(), thumb_url=member.display_avatar.url)
         embed.description = _kv_block(
@@ -406,7 +385,7 @@ class LogsCog(commands.Cog):
                 ("ID", str(member.id)),
                 ("Joined", joined),
                 ("Roles", roles_text),
-                ("Members", str(member.guild.member_count or "—")),
+                ("Members", str(member.guild.member_count or "\u2014")),
             ]
         )
         await self._send_log(member.guild, "welcome", embed)
@@ -499,8 +478,8 @@ class LogsCog(commands.Cog):
                     "User nick update",
                     [
                         ("User", _fmt_name_and_tag(after)),
-                        ("Before", before.nick or "—"),
-                        ("After", after.nick or "—"),
+                        ("Before", before.nick or "\u2014"),
+                        ("After", after.nick or "\u2014"),
                     ],
                     _yellow(),
                 )
@@ -523,14 +502,14 @@ class LogsCog(commands.Cog):
             if added or removed:
                 lines = [("User", _fmt_name_and_tag(after))]
                 if added:
-                    lines.append(("Added", " → ".join(added)))
+                    lines.append(("Added", " \u2192 ".join(added)))
                     color = _green()
                     title = "User roles added"
                 else:
                     color = _red()
                     title = "User roles removed"
                 if removed:
-                    lines.append(("Removed", " → ".join(removed)))
+                    lines.append(("Removed", " \u2192 ".join(removed)))
                     title = "User roles update"
                     color = _yellow()
                 blocks.append((title, lines, color))
@@ -563,7 +542,7 @@ class LogsCog(commands.Cog):
         )
         lines = [("Server", f"{after.name} (`{after.id}`)")]
         for n, b, a in changes:
-            lines.append((n, f"{b} → {a}"))
+            lines.append((n, f"{b} \u2192 {a}"))
         embed.description = _kv_block(lines)
         await self._send_log(after, "server", embed)
 
@@ -604,8 +583,8 @@ class LogsCog(commands.Cog):
                 changes.append(
                     (
                         "Topic",
-                        getattr(before, "topic", None) or "—",
-                        getattr(after, "topic", None) or "—",
+                        getattr(before, "topic", None) or "\u2014",
+                        getattr(after, "topic", None) or "\u2014",
                     )
                 )
 
@@ -618,7 +597,7 @@ class LogsCog(commands.Cog):
             ("ID", str(after.id)),
         ]
         for n, b, a in changes:
-            lines.append((n, f"{b} → {a}"))
+            lines.append((n, f"{b} \u2192 {a}"))
         embed.description = _kv_block(lines)
         await self._send_log(after.guild, "server", embed)
 
@@ -654,7 +633,7 @@ class LogsCog(commands.Cog):
         embed = _embed_base("Role updated", _yellow())
         lines = [("Role", after.mention), ("ID", str(after.id))]
         for n, b, a in changes:
-            lines.append((n, f"{b} → {a}"))
+            lines.append((n, f"{b} \u2192 {a}"))
         embed.description = _kv_block(lines)
         await self._send_log(after.guild, "server", embed)
 
@@ -668,7 +647,7 @@ class LogsCog(commands.Cog):
         embed = _embed_base(
             "Message deleted", _red(), thumb_url=message.author.display_avatar.url
         )
-        created = "—"
+        created = "\u2014"
         if message.created_at:
             created = f"<t:{int(message.created_at.replace(tzinfo=timezone.utc).timestamp())}:R>"
 
@@ -686,13 +665,13 @@ class LogsCog(commands.Cog):
         content = (message.content or "").strip()
         if content:
             if len(content) > 900:
-                content = content[:900] + "…"
+                content = content[:900] + "\u2026"
             embed.add_field(name="Content", value=f"```{content}```", inline=False)
 
         if message.attachments:
             urls = "\n".join(a.url for a in message.attachments)
             if len(urls) > 1000:
-                urls = urls[:1000] + "…"
+                urls = urls[:1000] + "\u2026"
             embed.add_field(name="Attachments", value=urls, inline=False)
 
         await self._send_log(message.guild, "message", embed)
@@ -711,7 +690,7 @@ class LogsCog(commands.Cog):
         embed = _embed_base(
             "Message edited", _yellow(), thumb_url=after.author.display_avatar.url
         )
-        created = "—"
+        created = "\u2014"
         if after.created_at:
             created = f"<t:{int(after.created_at.replace(tzinfo=timezone.utc).timestamp())}:R>"
 
@@ -730,9 +709,9 @@ class LogsCog(commands.Cog):
         a = (after.content or "").strip()
 
         if len(b) > 900:
-            b = b[:900] + "…"
+            b = b[:900] + "\u2026"
         if len(a) > 900:
-            a = a[:900] + "…"
+            a = a[:900] + "\u2026"
 
         if b:
             embed.add_field(name="Before", value=f"```{b}```", inline=True)

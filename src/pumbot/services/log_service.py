@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import requests
 
 
-LOG_WEB_URL = os.getenv("LOG_WEB_URL", "http://127.0.0.1:8080/api/logs")
+LOG_WEB_URL = os.getenv("LOG_WEB_URL", "http://127.0.0.1:3000/api/logs")
 
 
 def send_ticket_log(

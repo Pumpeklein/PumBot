@@ -26,7 +26,7 @@ async def send_web_log(
     content: str,
     created_at: Optional[str] = None,
 ) -> None:
-    url = os.getenv("LOG_WEB_URL", "http://127.0.0.1:8080/api/logs")
+    url = os.getenv("LOG_WEB_URL", "http://127.0.0.1:3000/api/logs")
 
     payload = {
         "created_at": created_at or _now_iso(),
@@ -58,7 +58,7 @@ async def send_ticket_archive(
     transcript_url: str | None,
     transcript_text: str,
 ) -> None:
-    url = os.getenv("LOG_ARCHIVE_URL", "http://127.0.0.1:8080/api/tickets/close")
+    url = os.getenv("LOG_ARCHIVE_URL", "http://127.0.0.1:3000/api/tickets/close")
     transcript_html = f"<pre>{escape(transcript_text)}</pre>" if transcript_text else ""
 
     payload = {

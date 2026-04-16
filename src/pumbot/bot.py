@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 from werkzeug.serving import make_server
 
 from src.pumbot import config
+from src.pumbot.services.api_client import ApiClient
 from web_logs.app import create_app
 from web_logs.config import Config as WebConfig
 
@@ -45,7 +46,8 @@ logger.addHandler(console_handler)
 logging.getLogger("discord.app_commands").setLevel(logging.INFO)
 
 BASE_DIR = Path(__file__).resolve().parent
-load_dotenv(dotenv_path=BASE_DIR / ".env")
+PROJECT_ROOT = BASE_DIR.parent.parent
+load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
 
 TOKEN_ENV_NAME = getattr(config, "DISCORD_TOKEN_ENV", "DISCORD_TOKEN")
 TOKEN: Final[str | None] = os.getenv(TOKEN_ENV_NAME) or os.getenv("DISCORD_TOKEN")
@@ -100,6 +102,10 @@ async def reply_ephemeral(interaction: discord.Interaction, content: str) -> Non
 
 
 class PumpeBot(commands.Bot):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.api = ApiClient()
+
     async def setup_hook(self) -> None:
         guild_obj = discord.Object(id=int(GUILD_ID)) if GUILD_ID is not None else None
 
@@ -149,15 +155,17 @@ async def on_app_command_error(
 
 
 class WebServerThread(Thread):
-    def __init__(self, host: str, port: int):
+    def __init__(self, host: str, port: int, discord_bot=None):
         super().__init__(name="flask-web", daemon=True)
         self.host = host
         self.port = port
+        self._bot = discord_bot
         self._server = None
 
     def run(self) -> None:
-        app = create_app()
-        self._server = make_server(self.host, self.port, app, threaded=True)
+        flask_app = create_app()
+        flask_app.config["DISCORD_BOT"] = self._bot
+        self._server = make_server(self.host, self.port, flask_app, threaded=True)
         logger.info("Web-Interface gestartet auf http://%s:%s", self.host, self.port)
         self._server.serve_forever()
 
@@ -167,7 +175,7 @@ class WebServerThread(Thread):
 
 
 async def main() -> None:
-    web_server = WebServerThread("127.0.0.1", WebConfig.PORT)
+    web_server = WebServerThread("127.0.0.1", WebConfig.PORT, discord_bot=bot)
     web_server.start()
     try:
         async with bot:
@@ -176,6 +184,7 @@ async def main() -> None:
         logger.exception("Bot-Start fehlgeschlagen")
         raise
     finally:
+        await bot.api.close()
         web_server.shutdown()
         web_server.join(timeout=5)
 

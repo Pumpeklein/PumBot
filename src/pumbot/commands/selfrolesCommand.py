@@ -1,8 +1,6 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
-import json
 import asyncio
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import discord
@@ -10,9 +8,6 @@ from discord import app_commands
 from discord.ext import commands
 
 from src.pumbot.bot import logger
-
-DATA_DIR = Path("data")
-SELFROLES_FILE = DATA_DIR / "selfroles.json"
 
 SELFROLE_STAFF_ROLES = {"Admin", "Team", "Twitch Moderator", "Discord Moderator"}
 
@@ -23,31 +18,10 @@ def is_selfrole_staff(member: discord.Member) -> bool:
     return any(r.name in SELFROLE_STAFF_ROLES for r in member.roles)
 
 
-def load_selfroles() -> Dict[str, Any]:
-    if SELFROLES_FILE.exists():
-        try:
-            with SELFROLES_FILE.open("r", encoding="utf-8") as f:
-                return json.load(f)
-        except json.JSONDecodeError:
-            return {}
-        except Exception:
-            logger.exception("Fehler beim Laden der Selfroles-Datei")
-            return {}
-    return {}
-
-
-def save_selfroles(data: Dict[str, Any]) -> None:
-    try:
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        with SELFROLES_FILE.open("w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
-    except Exception:
-        logger.exception("Fehler beim Speichern der Selfroles-Datei")
-
-
 class SelfRolesCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.api = bot.api
         self._role_queue: asyncio.Queue[
             Tuple[int, int, str, List[int], Optional[int]]
         ] = asyncio.Queue()
@@ -108,7 +82,7 @@ class SelfRolesCog(commands.Cog):
                     if action == "add":
                         try:
                             await member.add_roles(
-                                *roles, reason="Self-Role per Reaktion hinzugefügt"
+                                *roles, reason="Self-Role per Reaktion hinzugefuegt"
                             )
                         except discord.Forbidden:
                             pass
@@ -147,7 +121,7 @@ class SelfRolesCog(commands.Cog):
     @app_commands.describe(
         titel="Titel des Panels",
         limit="Max. Anzahl Rollen aus diesem Panel (0 = unbegrenzt)",
-        rollen_und_emojis="Paare im Format: @Rolle 😀 @Rolle 😎 ...",
+        rollen_und_emojis="Paare im Format: @Rolle Emoji @Rolle Emoji ...",
     )
     async def selfroles_create(
         self,
@@ -214,7 +188,7 @@ class SelfRolesCog(commands.Cog):
 
         if not roles_map:
             await interaction.response.send_message(
-                "Ich konnte keine gültigen Rollen/Emoji-Paare erkennen. Beispiel: `@Minecraft ⛏️ @Valorant 🎯`",
+                "Ich konnte keine gueltigen Rollen/Emoji-Paare erkennen.",
                 ephemeral=True,
             )
             return
@@ -224,7 +198,7 @@ class SelfRolesCog(commands.Cog):
         )
 
         embed = discord.Embed(
-            title=f"{titel} (Limit: {limit if limit > 0 else '∞'})",
+            title=f"{titel} (Limit: {limit if limit > 0 else 'unbegrenzt'})",
             description=description,
             color=discord.Color.blurple(),
         )
@@ -238,21 +212,14 @@ class SelfRolesCog(commands.Cog):
             except discord.HTTPException:
                 continue
 
-        data = load_selfroles()
-        g_id = str(guild.id)
-        m_id = str(message.id)
-
-        if g_id not in data:
-            data[g_id] = {}
-
-        data[g_id][m_id] = {
-            "max_roles": limit,
-            "title": titel,
-            "roles": roles_map,
-            "channel_id": message.channel.id,
-        }
-
-        save_selfroles(data)
+        await self.api.create_selfrole_panel(
+            str(guild.id),
+            str(message.id),
+            str(message.channel.id),
+            titel,
+            limit,
+            roles_map,
+        )
 
     @selfroles_group.command(
         name="edit", description="Bearbeitet ein bestehendes Self-Role Panel."
@@ -284,53 +251,50 @@ class SelfRolesCog(commands.Cog):
             )
             return
 
-        data = load_selfroles()
-        g_id = str(interaction.guild.id)
-        g_data = data.get(g_id)
-        if not g_data:
+        panels = await self.api.get_all_selfrole_panels(str(interaction.guild.id))
+        if not panels:
             await interaction.response.send_message(
-                "Für diesen Server existieren noch keine Self-Role Panels.",
+                "Fuer diesen Server existieren noch keine Self-Role Panels.",
                 ephemeral=True,
             )
             return
 
         panel_title_lower = panel_titel.lower()
-        target_msg_id: int | None = None
-        config: Dict[str, Any] | None = None
+        target_panel: Dict[str, Any] | None = None
 
-        for msg_id_str, cfg in g_data.items():
-            if not isinstance(cfg, dict):
+        for panel in panels:
+            if not isinstance(panel, dict):
                 continue
-            if cfg.get("title", "").lower() == panel_title_lower:
-                target_msg_id = int(msg_id_str)
-                config = cfg
+            if panel.get("title", "").lower() == panel_title_lower:
+                target_panel = panel
                 break
 
-        if target_msg_id is None or config is None:
+        if target_panel is None:
             await interaction.response.send_message(
                 f"Kein Self-Role Panel mit dem Titel **{panel_titel}** gefunden.",
                 ephemeral=True,
             )
             return
 
-        channel_id = config.get("channel_id")
-        if channel_id is None:
+        target_msg_id = target_panel.get("message_id")
+        channel_id = target_panel.get("channel_id")
+        if target_msg_id is None or channel_id is None:
             await interaction.response.send_message(
-                "Für dieses Self-Role Panel ist kein Channel gespeichert.",
+                "Fuer dieses Self-Role Panel ist kein Channel gespeichert.",
                 ephemeral=True,
             )
             return
 
-        channel = interaction.guild.get_channel(channel_id)
+        channel = interaction.guild.get_channel(int(channel_id))
         if not isinstance(channel, discord.TextChannel):
             await interaction.response.send_message(
-                "Der Kanal für dieses Self-Role Panel konnte nicht gefunden werden.",
+                "Der Kanal fuer dieses Self-Role Panel konnte nicht gefunden werden.",
                 ephemeral=True,
             )
             return
 
         try:
-            message = await channel.fetch_message(target_msg_id)
+            message = await channel.fetch_message(int(target_msg_id))
         except discord.NotFound:
             await interaction.response.send_message(
                 "Die Panel-Nachricht wurde nicht gefunden.", ephemeral=True
@@ -343,35 +307,33 @@ class SelfRolesCog(commands.Cog):
             )
             return
 
-        roles_map: Dict[str, int] = config.get("roles", {})
+        roles_map: Dict[str, int] = target_panel.get("roles", {})
         aktion = aktion.lower()
         emoji_key = emoji
 
         if aktion == "add":
             if emoji_key in roles_map:
                 await interaction.response.send_message(
-                    "Für dieses Emoji ist bereits eine Rolle in diesem Panel eingetragen.",
+                    "Fuer dieses Emoji ist bereits eine Rolle in diesem Panel eingetragen.",
                     ephemeral=True,
                 )
                 return
 
-            roles_map[emoji_key] = rolle.id
-            config["roles"] = roles_map
-            g_data[str(target_msg_id)] = config
-            data[g_id] = g_data
-            save_selfroles(data)
+            await self.api.add_selfrole_mapping(
+                str(interaction.guild.id), str(target_msg_id), emoji_key, rolle.id
+            )
 
             try:
                 await message.add_reaction(emoji_key)
             except discord.HTTPException:
                 await interaction.response.send_message(
-                    "Rolle gespeichert, Emoji konnte nicht hinzugefügt werden.",
+                    "Rolle gespeichert, Emoji konnte nicht hinzugefuegt werden.",
                     ephemeral=True,
                 )
                 return
 
             await interaction.response.send_message(
-                f"Panel **{panel_titel}** aktualisiert: {rolle.mention} mit {emoji_key} hinzugefügt.",
+                f"Panel **{panel_titel}** aktualisiert: {rolle.mention} mit {emoji_key} hinzugefuegt.",
                 ephemeral=True,
             )
 
@@ -379,23 +341,21 @@ class SelfRolesCog(commands.Cog):
             existing_role_id = roles_map.get(emoji_key)
             if not existing_role_id:
                 await interaction.response.send_message(
-                    "Für dieses Emoji ist keine Rolle in diesem Panel eingetragen.",
+                    "Fuer dieses Emoji ist keine Rolle in diesem Panel eingetragen.",
                     ephemeral=True,
                 )
                 return
 
-            if existing_role_id != rolle.id:
+            if int(existing_role_id) != rolle.id:
                 await interaction.response.send_message(
                     "Die Kombination aus Rolle und Emoji passt nicht zu diesem Panel.",
                     ephemeral=True,
                 )
                 return
 
-            roles_map.pop(emoji_key, None)
-            config["roles"] = roles_map
-            g_data[str(target_msg_id)] = config
-            data[g_id] = g_data
-            save_selfroles(data)
+            await self.api.remove_selfrole_mapping(
+                str(interaction.guild.id), str(target_msg_id), emoji_key
+            )
 
             try:
                 await message.clear_reaction(emoji_key)
@@ -420,16 +380,10 @@ class SelfRolesCog(commands.Cog):
             if payload.guild_id is None:
                 return
 
-            data = load_selfroles()
-            g_id = str(payload.guild_id)
-            m_id = str(payload.message_id)
-
-            g_data = data.get(g_id)
-            if not g_data:
-                return
-
-            config = g_data.get(m_id)
-            if not config or not isinstance(config, dict):
+            panel = await self.api.get_selfrole_panel(
+                str(payload.guild_id), str(payload.message_id)
+            )
+            if not panel:
                 return
 
             guild = self.bot.get_guild(payload.guild_id)
@@ -441,20 +395,20 @@ class SelfRolesCog(commands.Cog):
                 return
 
             emoji_str = str(payload.emoji)
-            roles_map: Dict[str, int] = config.get("roles", {})
+            roles_map: Dict[str, int] = panel.get("roles", {})
             role_id = roles_map.get(emoji_str)
             if not role_id:
                 return
 
-            role = guild.get_role(role_id)
+            role = guild.get_role(int(role_id))
             if role is None:
                 return
 
-            max_roles = int(config.get("max_roles", 0) or 0)
+            max_roles = int(panel.get("max_roles", 0) or 0)
             if max_roles > 0:
                 current_roles = []
                 for _, r_id in roles_map.items():
-                    r = guild.get_role(r_id)
+                    r = guild.get_role(int(r_id))
                     if r and r in member.roles:
                         current_roles.append(r)
 
@@ -501,16 +455,10 @@ class SelfRolesCog(commands.Cog):
             if payload.guild_id is None:
                 return
 
-            data = load_selfroles()
-            g_id = str(payload.guild_id)
-            m_id = str(payload.message_id)
-
-            g_data = data.get(g_id)
-            if not g_data:
-                return
-
-            config = g_data.get(m_id)
-            if not config or not isinstance(config, dict):
+            panel = await self.api.get_selfrole_panel(
+                str(payload.guild_id), str(payload.message_id)
+            )
+            if not panel:
                 return
 
             guild = self.bot.get_guild(payload.guild_id)
@@ -522,12 +470,12 @@ class SelfRolesCog(commands.Cog):
                 return
 
             emoji_str = str(payload.emoji)
-            roles_map: Dict[str, int] = config.get("roles", {})
+            roles_map: Dict[str, int] = panel.get("roles", {})
             role_id = roles_map.get(emoji_str)
             if not role_id:
                 return
 
-            role = guild.get_role(role_id)
+            role = guild.get_role(int(role_id))
             if role is None:
                 return
 

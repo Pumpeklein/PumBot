@@ -2,3 +2,6 @@
 *\.env
 *\__pycache__
 /logs
+web_logs/data/pumbot.db
+web_logs/data/pumbot.db-shm
+web_logs/data/pumbot.db-wal

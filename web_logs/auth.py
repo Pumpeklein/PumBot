@@ -1,7 +1,9 @@
 ﻿from __future__ import annotations
 
 import logging
+import time
 from functools import wraps
+from threading import Lock
 from urllib.parse import urlencode
 
 import requests
@@ -19,6 +21,52 @@ logger = logging.getLogger("web_logs.auth")
 DISCORD_API = "https://discord.com/api/v10"
 DISCORD_OAUTH_AUTHORIZE = "https://discord.com/api/oauth2/authorize"
 DISCORD_OAUTH_TOKEN = "https://discord.com/api/oauth2/token"
+DISPLAY_NAME_CACHE_TTL_SECONDS = 60 * 30
+DISPLAY_NAME_ERROR_TTL_SECONDS = 60
+
+_CACHE_MISS = object()
+_display_name_cache: dict[str, tuple[float, str | None]] = {}
+_display_name_rate_limited_until: dict[str, float] = {}
+_display_name_cache_lock = Lock()
+
+
+def _get_cached_display_name(discord_user_id: str) -> str | None | object:
+    now = time.time()
+    with _display_name_cache_lock:
+        cached = _display_name_cache.get(discord_user_id)
+        if not cached:
+            return _CACHE_MISS
+        expires_at, value = cached
+        if expires_at <= now:
+            _display_name_cache.pop(discord_user_id, None)
+            return _CACHE_MISS
+        return value
+
+
+def _set_cached_display_name(
+    discord_user_id: str,
+    value: str | None,
+    ttl_seconds: float = DISPLAY_NAME_CACHE_TTL_SECONDS,
+) -> None:
+    with _display_name_cache_lock:
+        _display_name_cache[discord_user_id] = (time.time() + max(ttl_seconds, 0), value)
+
+
+def _set_rate_limit_cooldown(discord_user_id: str, retry_after_seconds: float) -> None:
+    with _display_name_cache_lock:
+        _display_name_rate_limited_until[discord_user_id] = time.time() + max(
+            retry_after_seconds, 0
+        )
+
+
+def _is_rate_limited(discord_user_id: str) -> bool:
+    now = time.time()
+    with _display_name_cache_lock:
+        blocked_until = _display_name_rate_limited_until.get(discord_user_id, 0)
+        if blocked_until <= now:
+            _display_name_rate_limited_until.pop(discord_user_id, None)
+            return False
+        return True
 
 
 def discord_login_url() -> str:
@@ -82,11 +130,20 @@ def fetch_guild_member_display_name(discord_user_id: str) -> str | None:
     if not discord_user_id:
         return None
 
+    memory_cached_name = _get_cached_display_name(discord_user_id)
+    if memory_cached_name is not _CACHE_MISS:
+        return memory_cached_name
+
     cached_user = get_user_by_discord_id(discord_user_id)
     cached_name = cached_user.get("discord_username") if cached_user else None
+    if cached_name:
+        _set_cached_display_name(discord_user_id, cached_name)
+        return cached_name
 
     bot_token = Config.DISCORD_BOT_TOKEN
     if not bot_token:
+        return cached_name
+    if _is_rate_limited(discord_user_id):
         return cached_name
 
     resp = requests.get(
@@ -95,6 +152,24 @@ def fetch_guild_member_display_name(discord_user_id: str) -> str | None:
         timeout=10,
     )
     if resp.status_code != 200:
+        if resp.status_code == 429:
+            retry_after = DISPLAY_NAME_ERROR_TTL_SECONDS
+            try:
+                retry_after = float(resp.json().get("retry_after", retry_after))
+            except Exception:
+                pass
+            _set_rate_limit_cooldown(discord_user_id, retry_after)
+            _set_cached_display_name(
+                discord_user_id,
+                cached_name,
+                ttl_seconds=max(retry_after, 1),
+            )
+        elif resp.status_code == 404:
+            _set_cached_display_name(
+                discord_user_id,
+                cached_name,
+                ttl_seconds=DISPLAY_NAME_ERROR_TTL_SECONDS,
+            )
         if resp.status_code != 404:
             logger.error("fetch_guild_member_display_name failed: %d %s", resp.status_code, resp.text)
         return cached_name
@@ -111,6 +186,7 @@ def fetch_guild_member_display_name(discord_user_id: str) -> str | None:
             else None
         )
         upsert_user(user["id"], display_name, avatar_url)
+        _set_cached_display_name(discord_user_id, display_name)
 
     return display_name or cached_name
 

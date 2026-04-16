@@ -230,7 +230,7 @@ def _format_date_fields(rows: list[dict], *fields: str) -> list[dict]:
 
 
 def _resolve_display_name(
-    user_id: str | int | None, cache: dict[str, str] | None = None
+    user_id: str | int | None, cache: dict[str, str | None] | None = None
 ) -> str | None:
     if user_id in (None, ""):
         return None
@@ -250,13 +250,16 @@ def _resolve_display_name(
 
 
 def _attach_display_name(
-    rows: list[dict], user_field: str, target_field: str = "display_name"
+    rows: list[dict],
+    user_field: str,
+    target_field: str = "display_name",
+    cache: dict[str, str | None] | None = None,
 ) -> list[dict]:
-    cache: dict[str, str] = {}
+    local_cache = cache if cache is not None else {}
     enriched = []
     for row in rows:
         item = dict(row)
-        item[target_field] = _resolve_display_name(item.get(user_field), cache)
+        item[target_field] = _resolve_display_name(item.get(user_field), local_cache)
         enriched.append(item)
     return enriched
 
@@ -778,17 +781,18 @@ def birthdays_delete(user_id: str):
 def warnings_page():
     ctx = _ctx()
     q_user = request.args.get("user_id", "").strip()
+    cache: dict[str, str | None] = {}
     if q_user:
         warns = get_warnings(DEFAULT_GUILD_ID, q_user)
     else:
         warns = list_all_warnings(DEFAULT_GUILD_ID, limit=200)
-    warns = _attach_display_name(warns, "user_id", "user_display_name")
-    warns = _attach_display_name(warns, "moderator_id", "moderator_display_name")
+    warns = _attach_display_name(warns, "user_id", "user_display_name", cache)
+    warns = _attach_display_name(warns, "moderator_id", "moderator_display_name", cache)
     return render_template(
         "warnings.html",
         warnings=warns,
         q_user=q_user,
-        q_user_display_name=_resolve_display_name(q_user) if q_user else None,
+        q_user_display_name=_resolve_display_name(q_user, cache) if q_user else None,
         active_page="warnings",
         **ctx,
     )

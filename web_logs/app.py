@@ -229,7 +229,9 @@ def _format_date_fields(rows: list[dict], *fields: str) -> list[dict]:
     return formatted
 
 
-def _resolve_display_name(user_id: str | int | None, cache: dict[str, str] | None = None) -> str | None:
+def _resolve_display_name(
+    user_id: str | int | None, cache: dict[str, str] | None = None
+) -> str | None:
     if user_id in (None, ""):
         return None
 
@@ -247,7 +249,9 @@ def _resolve_display_name(user_id: str | int | None, cache: dict[str, str] | Non
     return display_name
 
 
-def _attach_display_name(rows: list[dict], user_field: str, target_field: str = "display_name") -> list[dict]:
+def _attach_display_name(
+    rows: list[dict], user_field: str, target_field: str = "display_name"
+) -> list[dict]:
     cache: dict[str, str] = {}
     enriched = []
     for row in rows:
@@ -259,6 +263,7 @@ def _attach_display_name(rows: list[dict], user_field: str, target_field: str = 
 
 # ════════════════ API KEY SECURITY ════════════════
 
+
 def api_key_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
@@ -269,10 +274,12 @@ def api_key_required(fn):
         if provided != expected:
             return jsonify({"ok": False, "error": "unauthorized"}), 401
         return fn(*args, **kwargs)
+
     return wrapper
 
 
 # ════════════════ AUTH ROUTES ════════════════
+
 
 @app.get("/login")
 def login():
@@ -309,6 +316,7 @@ def logout():
 
 # ════════════════ WEB PAGES ════════════════
 
+
 @app.get("/")
 def home():
     if not current_user():
@@ -330,11 +338,17 @@ def tickets_page():
     cache: dict[str, str] = {}
     for ticket in list_tickets(q=q, limit=limit):
         item = dict(ticket)
-        item["creator_display_name"] = _resolve_display_name(item.get("creator_user_id"), cache)
+        item["creator_display_name"] = _resolve_display_name(
+            item.get("creator_user_id"), cache
+        )
         items.append(item)
     return render_template(
-        "tickets.html", items=items, q=q, limit=limit,
-        active_page="tickets", **ctx,
+        "tickets.html",
+        items=items,
+        q=q,
+        limit=limit,
+        active_page="tickets",
+        **ctx,
     )
 
 
@@ -353,9 +367,13 @@ def ticket_detail(ticket_id: str):
     messages = get_ticket_messages(ticket_id)
     close_reasons = list_close_reasons(DEFAULT_GUILD_ID)
     return render_template(
-        "ticket_detail.html", t=t, logs=logs,
+        "ticket_detail.html",
+        t=t,
+        logs=logs,
         messages=_format_date_fields(messages, "created_at"),
-        close_reasons=close_reasons, active_page="tickets", **ctx,
+        close_reasons=close_reasons,
+        active_page="tickets",
+        **ctx,
     )
 
 
@@ -371,7 +389,10 @@ def ticket_transcript(ticket_id: str):
     html = _format_transcript_dates(path.read_text(encoding="utf-8"))
     ctx = _ctx()
     return render_template(
-        "transcript.html", ticket_id=ticket_id, html=html, **ctx,
+        "transcript.html",
+        ticket_id=ticket_id,
+        html=html,
+        **ctx,
     )
 
 
@@ -382,7 +403,9 @@ def public_transcript(ticket_id: str):
         if current_user():
             return ticket_transcript(ticket_id)
         abort(403)
-    data = verify_transcript_token(app.secret_key, token, max_age_seconds=60 * 60 * 24 * 7)
+    data = verify_transcript_token(
+        app.secret_key, token, max_age_seconds=60 * 60 * 24 * 7
+    )
     if not data:
         abort(403)
     if str(data.get("ticket_id")) != str(ticket_id):
@@ -399,11 +422,15 @@ def public_transcript(ticket_id: str):
     html = _format_transcript_dates(path.read_text(encoding="utf-8"))
     ctx = _ctx()
     return render_template(
-        "transcript.html", ticket_id=ticket_id, html=html, **ctx,
+        "transcript.html",
+        ticket_id=ticket_id,
+        html=html,
+        **ctx,
     )
 
 
 # ── Roles Management Page ──
+
 
 @app.get("/roles")
 @permission_required("roles.manage")
@@ -411,8 +438,11 @@ def roles_page():
     ctx = _ctx()
     roles = list_roles(DEFAULT_GUILD_ID)
     return render_template(
-        "roles.html", roles=roles, all_permissions=ALL_PERMISSIONS,
-        active_page="roles", **ctx,
+        "roles.html",
+        roles=roles,
+        all_permissions=ALL_PERMISSIONS,
+        active_page="roles",
+        **ctx,
     )
 
 
@@ -446,6 +476,7 @@ def roles_delete(role_id: int):
 
 # ── Ticket Messages JSON (web session auth) ──
 
+
 @app.get("/tickets/<ticket_id>/messages.json")
 @login_required
 def ticket_messages_json(ticket_id: str):
@@ -454,6 +485,7 @@ def ticket_messages_json(ticket_id: str):
 
 
 # ── Ticket Reply from Web ──
+
 
 @app.post("/tickets/<ticket_id>/reply")
 @login_required
@@ -491,7 +523,9 @@ def ticket_reply_web(ticket_id: str):
     return redirect(url_for("ticket_detail", ticket_id=ticket_id))
 
 
-async def _send_discord_reply(bot, channel_id: int, username: str, content: str) -> None:
+async def _send_discord_reply(
+    bot, channel_id: int, username: str, content: str
+) -> None:
     channel = bot.get_channel(channel_id)
     if not channel:
         return
@@ -499,6 +533,7 @@ async def _send_discord_reply(bot, channel_id: int, username: str, content: str)
 
 
 # ── Close Ticket from Web ──
+
 
 @app.post("/tickets/<ticket_id>/close")
 @login_required
@@ -513,14 +548,16 @@ def ticket_close_web(ticket_id: str):
     u = current_user()
 
     # Mark closed in DB immediately so the page reflects the new state
-    upsert_ticket({
-        "ticket_id": ticket_id,
-        "status": "closed",
-        "closed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "closed_by_id": u["discord_id"],
-        "closed_by_name": u["username"],
-        "close_reason": reason,
-    })
+    upsert_ticket(
+        {
+            "ticket_id": ticket_id,
+            "status": "closed",
+            "closed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "closed_by_id": u["discord_id"],
+            "closed_by_name": u["username"],
+            "close_reason": reason,
+        }
+    )
 
     # Let the bot's TicketSystemCog.close_ticket handle the rest
     # (transcript, logs, DM, archive, channel delete)
@@ -531,7 +568,9 @@ def ticket_close_web(ticket_id: str):
             try:
                 loop = bot.loop
                 asyncio.run_coroutine_threadsafe(
-                    _close_discord_ticket(bot, int(channel_id), u["discord_id"], reason),
+                    _close_discord_ticket(
+                        bot, int(channel_id), u["discord_id"], reason
+                    ),
                     loop,
                 )
             except Exception:
@@ -540,7 +579,9 @@ def ticket_close_web(ticket_id: str):
     return redirect(url_for("ticket_detail", ticket_id=ticket_id))
 
 
-async def _close_discord_ticket(bot, channel_id: int, closer_discord_id: str, reason: str) -> None:
+async def _close_discord_ticket(
+    bot, channel_id: int, closer_discord_id: str, reason: str
+) -> None:
     channel = bot.get_channel(channel_id)
     if not channel:
         return
@@ -560,6 +601,7 @@ async def _close_discord_ticket(bot, channel_id: int, closer_discord_id: str, re
     else:
         # Fallback if cog or member not available
         import discord as _discord
+
         embed = _discord.Embed(
             title="Ticket geschlossen",
             description=f"Dieses Ticket wurde über das Web Panel geschlossen.",
@@ -575,14 +617,17 @@ async def _close_discord_ticket(bot, channel_id: int, closer_discord_id: str, re
 
 # ── Close Reasons Config Page ──
 
+
 @app.get("/close-reasons")
 @permission_required("config.manage")
 def close_reasons_page():
     ctx = _ctx()
     reasons = list_close_reasons(DEFAULT_GUILD_ID)
     return render_template(
-        "close_reasons.html", reasons=reasons,
-        active_page="close_reasons", **ctx,
+        "close_reasons.html",
+        reasons=reasons,
+        active_page="close_reasons",
+        **ctx,
     )
 
 
@@ -623,6 +668,7 @@ def close_reasons_delete(reason_id: int):
 
 # ── Counting Overview Page ──
 
+
 @app.get("/counting")
 @permission_required("config.manage")
 def counting_page():
@@ -631,7 +677,9 @@ def counting_page():
     cache: dict[str, str] = {}
     state = {
         **state,
-        "last_user_display_name": _resolve_display_name(state.get("last_user_id"), cache),
+        "last_user_display_name": _resolve_display_name(
+            state.get("last_user_id"), cache
+        ),
     }
     leaderboard = []
     for entry in get_counting_leaderboard(DEFAULT_GUILD_ID, limit=50):
@@ -639,8 +687,11 @@ def counting_page():
         item["display_name"] = _resolve_display_name(item.get("user_id"), cache)
         leaderboard.append(item)
     return render_template(
-        "counting.html", state=state, leaderboard=leaderboard,
-        active_page="counting", **ctx,
+        "counting.html",
+        state=state,
+        leaderboard=leaderboard,
+        active_page="counting",
+        **ctx,
     )
 
 
@@ -662,6 +713,7 @@ def counting_reset():
 
 # ── Birthdays Overview Page ──
 
+
 @app.get("/birthdays")
 @permission_required("config.manage")
 def birthdays_page():
@@ -669,9 +721,11 @@ def birthdays_page():
     all_birthdays = _attach_display_name(get_birthdays(DEFAULT_GUILD_ID), "user_id")
     birthday_channel = get_config(DEFAULT_GUILD_ID, "birthday_channel_id")
     return render_template(
-        "birthdays.html", birthdays=all_birthdays,
+        "birthdays.html",
+        birthdays=all_birthdays,
         birthday_channel=birthday_channel,
-        active_page="birthdays", **ctx,
+        active_page="birthdays",
+        **ctx,
     )
 
 
@@ -718,6 +772,7 @@ def birthdays_delete(user_id: str):
 
 # ── Warnings Overview Page ──
 
+
 @app.get("/warnings")
 @permission_required("users.warn")
 def warnings_page():
@@ -734,7 +789,8 @@ def warnings_page():
         warnings=warns,
         q_user=q_user,
         q_user_display_name=_resolve_display_name(q_user) if q_user else None,
-        active_page="warnings", **ctx,
+        active_page="warnings",
+        **ctx,
     )
 
 
@@ -747,6 +803,7 @@ def warnings_delete(warning_id: int):
 
 # ── Log Channels Config Page ──
 
+
 @app.get("/log-channels")
 @permission_required("config.manage")
 def log_channels_page():
@@ -754,8 +811,11 @@ def log_channels_page():
     channels = get_all_log_channels(DEFAULT_GUILD_ID)
     log_types = ["voice_log", "user_log", "server_log", "message_log", "welcome_log"]
     return render_template(
-        "log_channels.html", channels=channels, log_types=log_types,
-        active_page="log_channels", **ctx,
+        "log_channels.html",
+        channels=channels,
+        log_types=log_types,
+        active_page="log_channels",
+        **ctx,
     )
 
 
@@ -778,14 +838,17 @@ def log_channels_delete(log_type: str):
 
 # ── Auto Publisher Config Page ──
 
+
 @app.get("/auto-publisher")
 @permission_required("config.manage")
 def auto_publisher_page():
     ctx = _ctx()
     channels = get_auto_publisher_channels(DEFAULT_GUILD_ID)
     return render_template(
-        "auto_publisher.html", channels=channels,
-        active_page="auto_publisher", **ctx,
+        "auto_publisher.html",
+        channels=channels,
+        active_page="auto_publisher",
+        **ctx,
     )
 
 
@@ -807,6 +870,7 @@ def auto_publisher_delete(channel_id: str):
 
 # ── Server Stats Config Page ──
 
+
 @app.get("/server-stats")
 @permission_required("config.manage")
 def server_stats_page():
@@ -814,8 +878,11 @@ def server_stats_page():
     stats = get_server_stats(DEFAULT_GUILD_ID)
     stat_types = ["all", "members", "bots", "channels", "roles"]
     return render_template(
-        "server_stats.html", stats=stats, stat_types=stat_types,
-        active_page="server_stats", **ctx,
+        "server_stats.html",
+        stats=stats,
+        stat_types=stat_types,
+        active_page="server_stats",
+        **ctx,
     )
 
 
@@ -853,6 +920,7 @@ def server_stats_save():
 
 # ── Guild Config ──
 
+
 @app.get("/api/guild/<guild_id>/config/<key>")
 @api_key_required
 def api_get_config(guild_id: str, key: str):
@@ -871,6 +939,7 @@ def api_set_config(guild_id: str, key: str):
 
 
 # ── Birthdays ──
+
 
 @app.get("/api/guild/<guild_id>/birthdays")
 @api_key_required
@@ -917,6 +986,7 @@ def api_mark_birthday_congrats(guild_id: str, user_id: str):
 
 # ── Warnings ──
 
+
 @app.get("/api/guild/<guild_id>/warnings/<user_id>")
 @api_key_required
 def api_get_warnings(guild_id: str, user_id: str):
@@ -927,7 +997,9 @@ def api_get_warnings(guild_id: str, user_id: str):
 @api_key_required
 def api_add_warning(guild_id: str):
     data = request.get_json(silent=True) or {}
-    w = add_warning(guild_id, data["user_id"], data["moderator_id"], data.get("reason", ""))
+    w = add_warning(
+        guild_id, data["user_id"], data["moderator_id"], data.get("reason", "")
+    )
     return jsonify(w)
 
 
@@ -946,6 +1018,7 @@ def api_clear_warnings(guild_id: str, user_id: str):
 
 
 # ── Counting ──
+
 
 @app.get("/api/guild/<guild_id>/counting")
 @api_key_required
@@ -990,6 +1063,7 @@ def api_get_counting_leaderboard(guild_id: str):
 
 # ── Auto Publisher ──
 
+
 @app.get("/api/guild/<guild_id>/auto_publisher")
 @api_key_required
 def api_get_auto_publisher(guild_id: str):
@@ -1013,6 +1087,7 @@ def api_remove_auto_publisher(guild_id: str, channel_id: str):
 
 # ── Selfroles ──
 
+
 @app.get("/api/guild/<guild_id>/selfroles")
 @api_key_required
 def api_get_selfroles(guild_id: str):
@@ -1033,8 +1108,12 @@ def api_get_selfrole(guild_id: str, message_id: str):
 def api_create_selfrole(guild_id: str):
     data = request.get_json(silent=True) or {}
     panel = create_selfrole_panel(
-        guild_id, data["message_id"], data["channel_id"],
-        data["title"], data.get("max_roles", 0), data.get("roles", {}),
+        guild_id,
+        data["message_id"],
+        data["channel_id"],
+        data["title"],
+        data.get("max_roles", 0),
+        data.get("roles", {}),
     )
     return jsonify(panel)
 
@@ -1063,6 +1142,7 @@ def api_delete_selfrole(guild_id: str, message_id: str):
 
 # ── Server Stats ──
 
+
 @app.get("/api/guild/<guild_id>/server_stats")
 @api_key_required
 def api_get_server_stats(guild_id: str):
@@ -1079,6 +1159,7 @@ def api_set_server_stats(guild_id: str):
 
 
 # ── Log Channels ──
+
 
 @app.get("/api/guild/<guild_id>/log_channels")
 @api_key_required
@@ -1112,6 +1193,7 @@ def api_remove_log_channel(guild_id: str, log_type: str):
 
 # ── Twitch Config ──
 
+
 @app.get("/api/guild/<guild_id>/twitch_config")
 @api_key_required
 def api_get_twitch_config(guild_id: str):
@@ -1137,6 +1219,7 @@ def api_remove_twitch_config(guild_id: str):
 
 
 # ── Tickets API ──
+
 
 @app.get("/api/tickets")
 @api_key_required
@@ -1181,27 +1264,35 @@ def api_ticket_close():
         transcript_abs.parent.mkdir(parents=True, exist_ok=True)
         transcript_abs.write_text(transcript_html, encoding="utf-8")
 
-    upsert_ticket({
-        "ticket_id": ticket_id,
-        "guild_id": data.get("guild_id"),
-        "channel_id": data.get("channel_id") or ticket_id,
-        "creator_user_id": str(data.get("creator_user_id") or data.get("creator_id") or ""),
-        "creator_username": data.get("creator_name") or data.get("creator_username"),
-        "status": data.get("status") or "closed",
-        "subject": data.get("subject") or data.get("category_label") or "",
-        "category": data.get("category") or data.get("category_label") or "",
-        "closed_at": data.get("closed_at") or "",
-        "closed_by_id": data.get("closed_by_id"),
-        "closed_by_name": data.get("closed_by_name"),
-        "close_reason": data.get("close_reason"),
-        "transcript_path": transcript_rel or None,
-        "transcript_url": data.get("transcript_url"),
-    })
+    upsert_ticket(
+        {
+            "ticket_id": ticket_id,
+            "guild_id": data.get("guild_id"),
+            "channel_id": data.get("channel_id") or ticket_id,
+            "creator_user_id": str(
+                data.get("creator_user_id") or data.get("creator_id") or ""
+            ),
+            "creator_username": data.get("creator_name")
+            or data.get("creator_username"),
+            "status": data.get("status") or "closed",
+            "subject": data.get("subject") or data.get("category_label") or "",
+            "category": data.get("category") or data.get("category_label") or "",
+            "closed_at": data.get("closed_at") or "",
+            "closed_by_id": data.get("closed_by_id"),
+            "closed_by_name": data.get("closed_by_name"),
+            "close_reason": data.get("close_reason"),
+            "transcript_path": transcript_rel or None,
+            "transcript_url": data.get("transcript_url"),
+        }
+    )
 
-    return jsonify({"ok": True, "ticket_id": ticket_id, "transcript_path": transcript_rel})
+    return jsonify(
+        {"ok": True, "ticket_id": ticket_id, "transcript_path": transcript_rel}
+    )
 
 
 # ── Ticket Messages API ──
+
 
 @app.get("/api/tickets/<ticket_id>/messages")
 @api_key_required
@@ -1226,6 +1317,7 @@ def api_add_ticket_message(ticket_id: str):
 
 # ── Ticket Logs API ──
 
+
 @app.post("/api/ticket_logs")
 @api_key_required
 def api_ticket_logs():
@@ -1249,6 +1341,7 @@ def api_logs_legacy():
 
 # ── Roles API (for external use) ──
 
+
 @app.get("/api/guild/<guild_id>/roles")
 @api_key_required
 def api_get_roles(guild_id: str):
@@ -1256,6 +1349,7 @@ def api_get_roles(guild_id: str):
 
 
 # ── Close Reasons API ──
+
 
 @app.get("/api/guild/<guild_id>/close_reasons")
 @api_key_required
@@ -1284,4 +1378,4 @@ def api_delete_close_reason(guild_id: str, reason_id: int):
 # ════════════════ STARTUP ════════════════
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=Config.PORT, debug=True)
+    app.run(host="0.0.0.0", port=Config.PORT, debug=True)

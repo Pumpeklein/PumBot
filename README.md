@@ -1,32 +1,385 @@
-# 🤖 PumBot
+# PumBot
 
-Kurzbeschreibung: Dieser Discord-Bot bietet ein umfassendes Server Management, z.B. Selfroles, Geburtstage, Tickets und Server-Tools.
+PumBot ist ein Discord-Bot für Community- und Server-Management mit integriertem Web-Panel. Das Projekt kombiniert einen `discord.py`-Bot mit einer lokalen Flask-Anwendung, die gleichzeitig als Admin-Oberfläche, interne API und Ticket-Archiv dient.
 
-## ✨ Features
-- 🎭 Selfroles (Rollen selbst auswählen)
-- 🎂 Geburtstags-System (Eintragen + Erinnerungen)
-- 🎟️ Ticket-System (Support / Bewerbung / Beschwerden etc.)
-- 📊 Server-Infos / Stats
-- 🛠️ Moderation-Tools (optional)
+Der aktuelle Stand des Projekts ist kein reiner Chat-Bot, sondern ein kleines Gesamtsystem:
 
-## 🧩 Voraussetzungen
-- Python 3.11+
-- Discord Bot Token (Developer Portal)
-- Intents aktiviert (z.B. Members, Message Content falls nötig)
+- Der Bot führt Slash-Commands, Event-Handler und Hintergrundjobs aus.
+- Das Web-Panel verwaltet Konfigurationen, Tickets, Feature-Daten und Rollen-/Rechtezuordnung.
+- Beide Komponenten teilen sich dieselbe SQLite-Datenbank und kommunizieren zusätzlich über eine interne HTTP-API.
 
-## 🚀 Installation
+## Gesamtkonzept
+
+Die Architektur besteht aus drei Schichten:
+
+1. Discord-Bot
+
+- Einstieg über [Bot.py](./Bot.py) und die eigentliche Laufzeit in [src/pumbot/bot.py](./src/pumbot/bot.py).
+- Startet alle Command-Cogs, registriert persistente Views für Ticket-Buttons und synchronisiert Slash-Commands.
+- Nutzt `discord.py`, Message-/Member-/Reaction-Events sowie einzelne `tasks.loop`-Jobs.
+
+2. Web-Panel + interne API
+
+- Implementiert in [web_logs/app.py](./web_logs/app.py).
+- Läuft im selben Prozess parallel zum Bot in einem eigenen Thread über einen lokalen Flask-Server.
+- Hat zwei Rollen:
+  - Web-Oberfläche für Moderation, Konfiguration und Ticket-Ansicht
+  - interne REST-API für den Bot
+
+3. Datenhaltung
+
+- SQLite-Datenbank unter `web_logs/data/pumbot.db`
+- Schema in [web_logs/models.sql](./web_logs/models.sql)
+- Zugriff über [web_logs/db.py](./web_logs/db.py)
+
+Der Bot arbeitet fachlich gegen die interne API in [src/pumbot/services/api_client.py](./src/pumbot/services/api_client.py), statt direkt auf SQLite zu schreiben. Dadurch bleibt die Datenlogik an einer Stelle gebündelt.
+
+## Laufzeitmodell
+
+Beim Start passiert im Wesentlichen Folgendes:
+
+- `.env` wird geladen.
+- Der Discord-Bot wird initialisiert.
+- Parallel dazu startet ein lokaler Flask-Server auf `127.0.0.1:<PORT>`.
+- Der Bot lädt alle Cogs aus `src/pumbot/commands`.
+- Der Bot spricht die Flask-API über `API_BASE_URL` und `LOG_API_KEY` an.
+
+Das bedeutet: Bot und Panel gehören logisch zusammen und sind auf einen gemeinsamen Betrieb ausgelegt.
+
+## Hauptfunktionen des Bots
+
+### Ticketsystem
+
+- Ticket-Panel mit Buttons für verschiedene Anfragearten
+- Ticket-Erstellung in Discord-Kanälen
+- Speicherung von Ticket-Metadaten im Web-Backend
+- Mitschreiben von Ticket-Nachrichten in die Datenbank
+- Ticket-Schließen per Slash-Command, Button oder Web-Panel
+- Archivierung inklusive Transcript-HTML und optionalem externem Transcript-Link
+- Web-Ansicht für Ticketverlauf, Logeinträge und Antworten aus dem Panel
+- Unterstützung für Twitch-bezogene Tickets mit Validierung des Twitch-Namens
+
+Wichtige Dateien:
+
+- [src/pumbot/commands/TicketSystemCommand.py](./src/pumbot/commands/TicketSystemCommand.py)
+- [web_logs/app.py](./web_logs/app.py)
+- [web_logs/templates/tickets.html](./web_logs/templates/tickets.html)
+- [web_logs/templates/ticket_detail.html](./web_logs/templates/ticket_detail.html)
+
+### Selfroles
+
+- Erstellen und Bearbeiten von Selfrole-Panels
+- Emoji-zu-Rolle-Zuordnung
+- Rollenvergabe und -entfernung über Reaktionen
+- Speicherung der Panel-Konfiguration im Backend
+
+Wichtige Dateien:
+
+- [src/pumbot/commands/selfrolesCommand.py](./src/pumbot/commands/selfrolesCommand.py)
+- [web_logs/db.py](./web_logs/db.py)
+
+### Geburtstage
+
+- Nutzer können Geburtstage speichern und entfernen
+- Staff kann Geburtstage für andere setzen
+- Hintergrundjob prüft regelmäßig anstehende Geburtstage
+- Gratulationen und Geburtstagsdaten werden zentral gespeichert
+- Web-Panel zeigt alle Geburtstage und den konfigurierten Geburtstags-Channel
+
+Wichtige Dateien:
+
+- [src/pumbot/commands/birthdayCommand.py](./src/pumbot/commands/birthdayCommand.py)
+- [web_logs/templates/birthdays.html](./web_logs/templates/birthdays.html)
+
+### Counting
+
+- Konfigurierbarer Zähl-Channel
+- Validierung der Zählregeln direkt über `on_message`
+- Speicherung von aktuellem Stand, Highscore und User-Statistiken
+- Leaderboard im Bot und im Web-Panel
+
+Wichtige Dateien:
+
+- [src/pumbot/commands/countingCommand.py](./src/pumbot/commands/countingCommand.py)
+- [web_logs/templates/counting.html](./web_logs/templates/counting.html)
+
+### Verwarnungen und Moderation
+
+- Nutzerprofil-Anzeige
+- Verwarnungen setzen, auflisten und löschen
+- Ban- und Timeout-Kommandos
+- Web-Panel für Verwarnungsübersicht
+
+Wichtige Dateien:
+
+- [src/pumbot/commands/userManagementCommand.py](./src/pumbot/commands/userManagementCommand.py)
+- [web_logs/templates/warnings.html](./web_logs/templates/warnings.html)
+
+### Nachrichten- und Kanaltools
+
+- Nachrichten in Menge löschen
+- Nachrichten eines bestimmten Users löschen
+- Logging für relevante Serverereignisse
+
+Wichtige Dateien:
+
+- [src/pumbot/commands/deleteCommand.py](./src/pumbot/commands/deleteCommand.py)
+- [src/pumbot/commands/logsCommand.py](./src/pumbot/commands/logsCommand.py)
+
+### Auto Publisher
+
+- Verwaltung von Channels, in denen neue Inhalte automatisch veröffentlicht werden
+- Speicherung der Ziel-Channels im Backend
+
+Wichtige Dateien:
+
+- [src/pumbot/commands/autoPublisherCommand.py](./src/pumbot/commands/autoPublisherCommand.py)
+
+### Server-Stats
+
+- Automatisches Einrichten und Aktualisieren von Statistik-Channels
+- Typische Werte: Mitglieder, Bots, Channels, Rollen, Gesamtzahl
+- Speicherung der Stat-Konfiguration im Backend
+
+Wichtige Dateien:
+
+- [src/pumbot/commands/serverStatsCommand.py](./src/pumbot/commands/serverStatsCommand.py)
+- [web_logs/templates/server_stats.html](./web_logs/templates/server_stats.html)
+
+### Weitere Module
+
+- Willkommensnachrichten: [src/pumbot/commands/willkommenCommand.py](./src/pumbot/commands/willkommenCommand.py)
+- Ankündigungen / Timer-Logik: [src/pumbot/commands/announcmentCommand.py](./src/pumbot/commands/announcmentCommand.py)
+- Hilfe / FAQ: [src/pumbot/commands/helpCommand.py](./src/pumbot/commands/helpCommand.py)
+- Serverinfos: [src/pumbot/commands/serverinfoCommand.py](./src/pumbot/commands/serverinfoCommand.py)
+
+## Web-Panel
+
+Das Web-Panel ist kein separates Frontend-Projekt, sondern serverseitig gerendertes Flask + Jinja mit Tailwind via CDN.
+
+Wichtige Eigenschaften:
+
+- Discord OAuth2 Login
+- Rechteprüfung über Discord-Rollen
+- interne Rollen-/Permission-Zuordnung in der Datenbank
+- Ticket-Ansicht mit Nachrichtenverlauf und Web-Antwortfunktion
+- Konfigurationsseiten für mehrere Bot-Features
+- geschützte Transcript-Ansicht
+
+### Aktuelle Hauptseiten
+
+- `Tickets`
+- `Rollen`
+- `Counting`
+- `Geburtstage`
+- `Verwarnungen`
+- `Log Channels`
+- `Auto Publisher`
+- `Server Stats`
+- `Schließungsgründe`
+
+Die Navigation dafür liegt in [web_logs/templates/base.html](./web_logs/templates/base.html).
+
+## Berechtigungskonzept
+
+Das Web-Panel arbeitet mit einem zweistufigen Rechtekonzept:
+
+1. Discord-Rollen
+
+- Ein eingeloggter Benutzer wird über Discord OAuth identifiziert.
+- Anschließend werden die Rollen des Benutzers im konfigurierten Guild-Kontext abgefragt.
+
+2. App-Berechtigungen
+
+- In der Tabelle `roles` werden Discord-Rollen internen Rechten zugeordnet.
+- Beispiele:
+  - `admin`
+  - `tickets.view`
+  - `tickets.reply`
+  - `tickets.close`
+  - `users.view`
+  - `users.warn`
+  - `users.ban`
+  - `users.timeout`
+  - `roles.manage`
+  - `config.manage`
+  - `logs.view`
+  - `logs.manage`
+
+Die Rechteprüfung erfolgt in [web_logs/auth.py](./web_logs/auth.py) und [web_logs/app.py](./web_logs/app.py).
+
+## Interne API
+
+Die Flask-App stellt eine interne JSON-API bereit, die primär vom Bot genutzt wird.
+
+Abgedeckte Bereiche:
+
+- Guild-Konfiguration
+- Geburtstage
+- Verwarnungen
+- Counting
+- Auto Publisher
+- Selfroles
+- Server Stats
+- Log-Channels
+- Twitch-Konfiguration
+- Tickets
+- Ticket-Nachrichten
+- Ticket-Logs
+- Rollen
+- Schließungsgründe
+
+Der Zugriff ist über `LOG_API_KEY` abgesichert.
+
+## Datenfluss zwischen Bot und Panel
+
+Typischer Ablauf am Beispiel Tickets:
+
+- Ein User erstellt in Discord ein Ticket.
+- Der Bot erstellt Channel, Metadaten und erste Logeinträge.
+- Der Bot sendet Ticketdaten per HTTP an die Flask-API.
+- Die API schreibt in SQLite.
+- Das Web-Panel liest dieselben Daten aus und stellt sie dar.
+- Antworten aus dem Web-Panel können wieder an Discord zurückgesendet werden.
+
+Das gleiche Muster wird auch für Counting, Geburtstage, Warnungen, Selfroles und Stats verwendet.
+
+## Projektstruktur
+
+```text
+PumBot/
+├─ Bot.py
+├─ README.md
+├─ .env.example
+├─ src/
+│  └─ pumbot/
+│     ├─ bot.py
+│     ├─ config.py
+│     ├─ commands/
+│     └─ services/
+└─ web_logs/
+   ├─ app.py
+   ├─ auth.py
+   ├─ config.py
+   ├─ db.py
+   ├─ models.sql
+   ├─ templates/
+   ├─ static/
+   └─ data/
+```
+
+## Voraussetzungen
+
+- Python 3.11 oder neuer
+- Discord-Bot-Anwendung im Discord Developer Portal
+- aktivierte Intents für den Bot
+- Discord OAuth2-Konfiguration für das Web-Panel
+- optional: Twitch API Zugang für Twitch-Ticketprüfung
+
+## Installation
+
+1. Repository klonen
+
 ```bash
-git clone <repo-url>[requirements.txt](https://github.com/user-attachments/files/25353499/requirements.txt)
+git clone <repo-url>
+cd PumBot
+```
 
-cd <repo-ordner>
-python -m venv .venv      
-# Windows: .venv\Scripts\activate
-# Linux/Mac: source .venv/bin/activate
-pip install -r requirements.txt
+2. Virtuelle Umgebung anlegen und aktivieren
 
-## Konfiguration (.env)
-- DISCORD_TOKEN=dein_token_hier
-- GUILD_ID=123456789012345678
-# Optional:
-# LOG_CHANNEL_ID=123...
-# DATABASE_URL=...
+```bash
+python -m venv .venv
+```
+
+Windows:
+
+```bash
+.venv\Scripts\activate
+```
+
+Linux / macOS:
+
+```bash
+source .venv/bin/activate
+```
+
+3. Abhängigkeiten installieren
+
+Für den Bot und das Panel werden Python-Pakete benötigt. Falls du die Dependencies in einer zentralen `requirements.txt` pflegst, installiere diese. Zusätzlich enthält das Web-Panel aktuell eine eigene Datei unter [web_logs/requirements.txt](./web_logs/requirements.txt).
+
+Beispiel:
+
+```bash
+pip install -r web_logs/requirements.txt
+```
+
+Wenn du eine Root-`requirements.txt` ergänzst, sollte die `README` entsprechend darauf angepasst werden.
+
+## Konfiguration
+
+Die wichtigsten Variablen stehen in [.env.example](./.env.example).
+
+### Pflichtvariablen
+
+- `DISCORD_TOKEN`
+- `DISCORD_GUILD_ID`
+- `FLASK_SECRET_KEY`
+- `LOG_API_KEY`
+- `DISCORD_CLIENT_ID`
+- `DISCORD_CLIENT_SECRET`
+- `DISCORD_REDIRECT_URI`
+
+### Typische Web-Panel-Konfiguration
+
+- `BASE_URL`
+- `PORT`
+- `DEFAULT_ADMIN_ROLE_ID`
+
+### Bot/API-Kommunikation
+
+- `API_BASE_URL`
+- `LOG_API_KEY`
+
+### Twitch optional
+
+- `TWITCH_CLIENT_ID`
+- `TWITCH_AUTH_TOKEN`
+- `TWITCH_USER_LOGIN`
+
+## Starten
+
+Der normale Start erfolgt über:
+
+```bash
+python Bot.py
+```
+
+Dann gilt standardmäßig:
+
+- Discord-Bot verbindet sich mit Discord
+- Web-Panel läuft lokal auf `http://127.0.0.1:3000`
+
+## Entwicklungshinweise
+
+- Der Bot ist auf eine konkrete Haupt-Guild ausgelegt.
+- Slash-Commands werden beim Start synchronisiert.
+- Viele Features setzen voraus, dass Rollen, Channel-IDs und OAuth korrekt konfiguriert sind.
+- Die Datenbank wird beim Start automatisch initialisiert bzw. bei älteren Schemata teilweise migriert.
+
+## Bekannte Besonderheiten des aktuellen Stands
+
+- Einige Dateien im Projekt enthalten noch ältere Encoding-/Textartefakte in Kommentaren oder Templates.
+- Das Web-Panel verwendet serverseitiges Rendering und kein SPA-Frontend.
+- Bot und Web-Panel laufen zusammen in einem Prozess, aber getrennten Threads / Laufzeitkontexten.
+- Die interne API ist für den Bot gedacht, nicht als öffentliche externe API.
+
+## Kurzfazit
+
+PumBot ist aktuell ein kombiniertes Moderations-, Support- und Verwaltungswerkzeug für einen Discord-Server. Der Kern des Projekts ist nicht nur die Command-Sammlung, sondern das Zusammenspiel aus:
+
+- Discord-Bot
+- internem API-Layer
+- SQLite-Datenmodell
+- Web-Panel für Betrieb, Einsicht und Konfiguration
+
+Wenn du das Projekt weiterentwickelst, ist diese Trennung der wichtigste Architekturgedanke: Discord erledigt Interaktion, die Flask-App bündelt Daten und Administration.

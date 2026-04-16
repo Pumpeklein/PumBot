@@ -31,7 +31,7 @@
 {# Warnings list #}
 <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
   <h2 class="mb-4 text-sm font-semibold text-white">
-    {% if q_user %}Verwarnungen für {{ q_user }}{% else %}Alle Verwarnungen{% endif %}
+    {% if q_user %}Verwarnungen für {{ q_user_display_name or q_user }}{% else %}Alle Verwarnungen{% endif %}
   </h2>
   {% if warnings %}
   <div class="overflow-x-auto">
@@ -39,8 +39,8 @@
       <thead>
         <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
           <th class="px-3 py-2.5">ID</th>
-          <th class="px-3 py-2.5">User ID</th>
-          <th class="px-3 py-2.5">Moderator ID</th>
+          <th class="px-3 py-2.5">User</th>
+          <th class="px-3 py-2.5">Moderator</th>
           <th class="px-3 py-2.5">Grund</th>
           <th class="px-3 py-2.5">Datum</th>
           <th class="px-3 py-2.5 text-right">Aktionen</th>
@@ -50,8 +50,8 @@
         {% for w in warnings %}
         <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]">
           <td class="px-3 py-2.5 text-slate-500 text-xs">{{ w.id }}</td>
-          <td class="px-3 py-2.5 font-mono text-xs text-slate-300">{{ w.user_id }}</td>
-          <td class="px-3 py-2.5 font-mono text-xs text-slate-400">{{ w.moderator_id }}</td>
+          <td class="px-3 py-2.5 text-slate-200">{{ w.user_display_name or w.user_id }}</td>
+          <td class="px-3 py-2.5 text-slate-300">{{ w.moderator_display_name or w.moderator_id }}</td>
           <td class="px-3 py-2.5 text-white max-w-xs truncate">{{ w.reason or "Kein Grund" }}</td>
           <td class="px-3 py-2.5 text-slate-500 text-xs whitespace-nowrap">{{ w.created_at|datetime_de if w.created_at else "-" }}</td>
           <td class="px-3 py-2.5 text-right">

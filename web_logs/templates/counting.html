@@ -8,7 +8,7 @@
 <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
   {{ stat("Aktueller Stand", state.last_number|default(0)) }}
   {{ stat("Highscore", state.highscore|default(0)) }}
-  {{ stat("Letzter User", state.last_user_id or "—") }}
+  {{ stat("Letzter User", state.last_user_display_name or "—") }}
   {{ stat("Channel ID", state.channel_id or "Nicht gesetzt") }}
 </div>
 
@@ -38,7 +38,7 @@
       <thead>
         <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
           <th class="px-3 py-2.5">#</th>
-          <th class="px-3 py-2.5">User ID</th>
+          <th class="px-3 py-2.5">User</th>
           <th class="px-3 py-2.5">Richtig</th>
           <th class="px-3 py-2.5">Fehler</th>
           <th class="px-3 py-2.5">Beste Streak</th>
@@ -59,7 +59,7 @@
             <span class="text-slate-500">{{ loop.index }}</span>
             {% endif %}
           </td>
-          <td class="px-3 py-2.5 font-mono text-xs text-slate-300">{{ entry.user_id }}</td>
+          <td class="px-3 py-2.5 text-slate-200">{{ entry.display_name or entry.user_id }}</td>
           <td class="px-3 py-2.5 text-emerald-400 font-medium">{{ entry.correct }}</td>
           <td class="px-3 py-2.5 text-red-400 font-medium">{{ entry.fails }}</td>
           <td class="px-3 py-2.5 text-cyan-400 font-medium">{{ entry.best_streak }}</td>

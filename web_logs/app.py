@@ -56,6 +56,7 @@ try:
         get_ticket,
         get_ticket_messages,
         get_twitch_config,
+        get_user_by_discord_id,
         get_warnings,
         init_db,
         insert_ticket_log,
@@ -84,6 +85,7 @@ try:
     from .auth import (
         current_user,
         discord_login_url,
+        fetch_guild_member_display_name,
         has_permission,
         login_required,
         login_user_from_oauth,
@@ -124,6 +126,7 @@ except ImportError:
         get_ticket,
         get_ticket_messages,
         get_twitch_config,
+        get_user_by_discord_id,
         get_warnings,
         init_db,
         insert_ticket_log,
@@ -152,6 +155,7 @@ except ImportError:
     from auth import (
         current_user,
         discord_login_url,
+        fetch_guild_member_display_name,
         has_permission,
         login_required,
         login_user_from_oauth,
@@ -225,6 +229,34 @@ def _format_date_fields(rows: list[dict], *fields: str) -> list[dict]:
     return formatted
 
 
+def _resolve_display_name(user_id: str | int | None, cache: dict[str, str] | None = None) -> str | None:
+    if user_id in (None, ""):
+        return None
+
+    key = str(user_id)
+    if cache is not None and key in cache:
+        return cache[key]
+
+    display_name = fetch_guild_member_display_name(key)
+    if not display_name:
+        cached_user = get_user_by_discord_id(key)
+        display_name = cached_user.get("discord_username") if cached_user else key
+
+    if cache is not None:
+        cache[key] = display_name
+    return display_name
+
+
+def _attach_display_name(rows: list[dict], user_field: str, target_field: str = "display_name") -> list[dict]:
+    cache: dict[str, str] = {}
+    enriched = []
+    for row in rows:
+        item = dict(row)
+        item[target_field] = _resolve_display_name(item.get(user_field), cache)
+        enriched.append(item)
+    return enriched
+
+
 # ════════════════ API KEY SECURITY ════════════════
 
 def api_key_required(fn):
@@ -294,7 +326,12 @@ def tickets_page():
         limit = max(1, min(1000, int(limit_raw)))
     except ValueError:
         limit = 200
-    items = list_tickets(q=q, limit=limit)
+    items = []
+    cache: dict[str, str] = {}
+    for ticket in list_tickets(q=q, limit=limit):
+        item = dict(ticket)
+        item["creator_display_name"] = _resolve_display_name(item.get("creator_user_id"), cache)
+        items.append(item)
     return render_template(
         "tickets.html", items=items, q=q, limit=limit,
         active_page="tickets", **ctx,
@@ -308,6 +345,10 @@ def ticket_detail(ticket_id: str):
     t = get_ticket(ticket_id)
     if not t:
         abort(404)
+    t = {
+        **t,
+        "creator_display_name": _resolve_display_name(t.get("creator_user_id")),
+    }
     logs = list_logs_for_ticket(ticket_id, limit=200)
     messages = get_ticket_messages(ticket_id)
     close_reasons = list_close_reasons(DEFAULT_GUILD_ID)
@@ -587,7 +628,16 @@ def close_reasons_delete(reason_id: int):
 def counting_page():
     ctx = _ctx()
     state = get_counting(DEFAULT_GUILD_ID) or {}
-    leaderboard = get_counting_leaderboard(DEFAULT_GUILD_ID, limit=50)
+    cache: dict[str, str] = {}
+    state = {
+        **state,
+        "last_user_display_name": _resolve_display_name(state.get("last_user_id"), cache),
+    }
+    leaderboard = []
+    for entry in get_counting_leaderboard(DEFAULT_GUILD_ID, limit=50):
+        item = dict(entry)
+        item["display_name"] = _resolve_display_name(item.get("user_id"), cache)
+        leaderboard.append(item)
     return render_template(
         "counting.html", state=state, leaderboard=leaderboard,
         active_page="counting", **ctx,
@@ -616,7 +666,7 @@ def counting_reset():
 @permission_required("config.manage")
 def birthdays_page():
     ctx = _ctx()
-    all_birthdays = get_birthdays(DEFAULT_GUILD_ID)
+    all_birthdays = _attach_display_name(get_birthdays(DEFAULT_GUILD_ID), "user_id")
     birthday_channel = get_config(DEFAULT_GUILD_ID, "birthday_channel_id")
     return render_template(
         "birthdays.html", birthdays=all_birthdays,
@@ -677,8 +727,13 @@ def warnings_page():
         warns = get_warnings(DEFAULT_GUILD_ID, q_user)
     else:
         warns = list_all_warnings(DEFAULT_GUILD_ID, limit=200)
+    warns = _attach_display_name(warns, "user_id", "user_display_name")
+    warns = _attach_display_name(warns, "moderator_id", "moderator_display_name")
     return render_template(
-        "warnings.html", warnings=warns, q_user=q_user,
+        "warnings.html",
+        warnings=warns,
+        q_user=q_user,
+        q_user_display_name=_resolve_display_name(q_user) if q_user else None,
         active_page="warnings", **ctx,
     )
 

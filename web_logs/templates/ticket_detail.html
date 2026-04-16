@@ -7,7 +7,7 @@
 {# Stats row #}
 <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
   {{ stat("Status", t.status or "-") }}
-  {{ stat("Ersteller", t.creator_username or t.creator_user_id or "-") }}
+  {{ stat("Ersteller", t.creator_display_name or t.creator_username or t.creator_user_id or "-") }}
   {{ stat("Kategorie", t.category or t.subject or "-") }}
   {{ stat("Nachrichten", messages|length) }}
 </div>
@@ -26,10 +26,7 @@
     </div>
     <div class="rounded-lg border border-white/5 bg-white/[0.02] p-3">
       <div class="text-xs uppercase tracking-wider text-slate-500">Ersteller</div>
-      <div class="mt-1 text-sm text-white">{{ t.creator_username or "-" }}</div>
-      {% if t.creator_user_id %}
-      <div class="mt-0.5 font-mono text-xs text-slate-500">{{ t.creator_user_id }}</div>
-      {% endif %}
+      <div class="mt-1 text-sm text-white">{{ t.creator_display_name or t.creator_username or "-" }}</div>
     </div>
     <div class="rounded-lg border border-white/5 bg-white/[0.02] p-3">
       <div class="text-xs uppercase tracking-wider text-slate-500">Geschlossen am</div>

@@ -9,10 +9,10 @@ from flask import abort, redirect, request, session, url_for
 
 try:
     from .config import Config, DEFAULT_GUILD_ID
-    from .db import get_permissions_for_discord_roles, upsert_user
+    from .db import get_permissions_for_discord_roles, get_user_by_discord_id, upsert_user
 except ImportError:
     from config import Config, DEFAULT_GUILD_ID
-    from db import get_permissions_for_discord_roles, upsert_user
+    from db import get_permissions_for_discord_roles, get_user_by_discord_id, upsert_user
 
 logger = logging.getLogger("web_logs.auth")
 
@@ -76,6 +76,43 @@ def fetch_guild_member_roles(discord_user_id: str) -> list[str]:
         logger.error("fetch_guild_member_roles failed: %d %s", resp.status_code, resp.text)
         return []
     return resp.json().get("roles", [])
+
+
+def fetch_guild_member_display_name(discord_user_id: str) -> str | None:
+    if not discord_user_id:
+        return None
+
+    cached_user = get_user_by_discord_id(discord_user_id)
+    cached_name = cached_user.get("discord_username") if cached_user else None
+
+    bot_token = Config.DISCORD_BOT_TOKEN
+    if not bot_token:
+        return cached_name
+
+    resp = requests.get(
+        f"{DISCORD_API}/guilds/{DEFAULT_GUILD_ID}/members/{discord_user_id}",
+        headers={"Authorization": f"Bot {bot_token}"},
+        timeout=10,
+    )
+    if resp.status_code != 200:
+        if resp.status_code != 404:
+            logger.error("fetch_guild_member_display_name failed: %d %s", resp.status_code, resp.text)
+        return cached_name
+
+    member = resp.json()
+    user = member.get("user") or {}
+    display_name = member.get("nick") or user.get("global_name") or user.get("username")
+
+    if user.get("id") and display_name:
+        avatar = user.get("avatar")
+        avatar_url = (
+            f"https://cdn.discordapp.com/avatars/{user['id']}/{avatar}.png"
+            if avatar
+            else None
+        )
+        upsert_user(user["id"], display_name, avatar_url)
+
+    return display_name or cached_name
 
 
 def login_user_from_oauth(code: str) -> bool:

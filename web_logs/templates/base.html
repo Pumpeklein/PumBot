@@ -1,196 +1,239 @@
 <!doctype html>
 <html lang="de" class="h-full">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{{ title or "PumBot - Panel" }}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        darkMode: "class",
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ["Inter", "system-ui", "sans-serif"],
-            },
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ title or "PumBot - Panel" }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ["Inter", "system-ui", "sans-serif"],
           },
         },
-      };
-    </script>
-    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  </head>
+      },
+    };
+  </script>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
 
-  <body class="h-full bg-[#0a0f1a] font-sans text-slate-200 antialiased">
-    {% block body %}
-    <div class="flex h-full">
+<body class="h-full bg-[#0a0f1a] font-sans text-slate-200 antialiased">
+  {% block body %}
+  <div class="flex h-full">
 
-      {# ── Sidebar ── #}
-      <aside id="sidebar" class="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-white/[0.06] bg-[#0d1320] transition-transform duration-200 lg:static lg:translate-x-0 -translate-x-full">
+    {# ── Sidebar ── #}
+    <aside id="sidebar"
+      class="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-white/[0.06] bg-[#0d1320] transition-transform duration-200 lg:static lg:translate-x-0 -translate-x-full">
 
-        {# Brand #}
-        <div class="flex items-center gap-3 px-5 py-5">
-          <img src="{{ url_for('static', filename='logo.png') }}" alt="PumBot" class="h-9 w-9 rounded-lg">
-          <div>
-            <div class="text-sm font-semibold text-white">PumBot</div>
-            <div class="text-[11px] text-slate-500">Übersichts-Panel</div>
-          </div>
+      {# Brand #}
+      <div class="flex items-center gap-3 px-5 py-5">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="PumBot" class="h-9 w-9 rounded-lg">
+        <div>
+          <div class="text-sm font-semibold text-white">PumBot</div>
+          <div class="text-[11px] text-slate-500">Übersichts-Panel yeah</div>
+        </div>
+      </div>
+
+      {# Navigation #}
+      <nav class="flex-1 space-y-1 px-3 py-4">
+        {% if username %}
+        {% set active_page = active_page|default("") %}
+
+        <a href="{{ url_for('tickets_page') }}"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
+              {{ 'bg-white/[0.08] text-white' if active_page == 'tickets' else 'text-slate-400 hover:bg-white/[0.04] hover:text-white' }}">
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          Tickets
+        </a>
+
+        {% if "roles.manage" in permissions or "admin" in permissions %}
+        <a href="{{ url_for('roles_page') }}"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
+              {{ 'bg-white/[0.08] text-white' if active_page == 'roles' else 'text-slate-400 hover:bg-white/[0.04] hover:text-white' }}">
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+          </svg>
+          Rollen
+        </a>
+        {% endif %}
+
+        {# ── Feature Overview Section ── #}
+        {% if "config.manage" in permissions or "admin" in permissions %}
+        <div class="mt-5 mb-2 px-3">
+          <span class="text-[10px] font-semibold uppercase tracking-widest text-slate-600">Features</span>
         </div>
 
-        {# Navigation #}
-        <nav class="flex-1 space-y-1 px-3 py-4">
-          {% if username %}
-          {% set active_page = active_page|default("") %}
-
-          <a href="{{ url_for('tickets_page') }}"
-            class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
-              {{ 'bg-white/[0.08] text-white' if active_page == 'tickets' else 'text-slate-400 hover:bg-white/[0.04] hover:text-white' }}">
-            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-            Tickets
-          </a>
-
-          {% if "roles.manage" in permissions or "admin" in permissions %}
-          <a href="{{ url_for('roles_page') }}"
-            class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
-              {{ 'bg-white/[0.08] text-white' if active_page == 'roles' else 'text-slate-400 hover:bg-white/[0.04] hover:text-white' }}">
-            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-            Rollen
-          </a>
-          {% endif %}
-
-          {# ── Feature Overview Section ── #}
-          {% if "config.manage" in permissions or "admin" in permissions %}
-          <div class="mt-5 mb-2 px-3">
-            <span class="text-[10px] font-semibold uppercase tracking-widest text-slate-600">Features</span>
-          </div>
-
-          <a href="{{ url_for('counting_page') }}"
-            class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
+        <a href="{{ url_for('counting_page') }}"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
               {{ 'bg-white/[0.08] text-white' if active_page == 'counting' else 'text-slate-400 hover:bg-white/[0.04] hover:text-white' }}">
-            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/></svg>
-            Counting
-          </a>
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+          </svg>
+          Counting
+        </a>
 
-          <a href="{{ url_for('birthdays_page') }}"
-            class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
+        <a href="{{ url_for('birthdays_page') }}"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
               {{ 'bg-white/[0.08] text-white' if active_page == 'birthdays' else 'text-slate-400 hover:bg-white/[0.04] hover:text-white' }}">
-            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 15.546c-.523 0-1.046.151-1.5.454a2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0A1.5 1.5 0 003 15.546V12a9 9 0 0118 0v3.546zM12 3v2m6.364 1.636l-1.414 1.414M21 12h-2M5 12H3m3.636-4.95L5.222 5.636"/></svg>
-            Geburtstage
-          </a>
-          {% endif %}
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M21 15.546c-.523 0-1.046.151-1.5.454a2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0A1.5 1.5 0 003 15.546V12a9 9 0 0118 0v3.546zM12 3v2m6.364 1.636l-1.414 1.414M21 12h-2M5 12H3m3.636-4.95L5.222 5.636" />
+          </svg>
+          Geburtstage
+        </a>
+        {% endif %}
 
-          {% if "users.warn" in permissions or "admin" in permissions %}
-          <a href="{{ url_for('warnings_page') }}"
-            class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
+        {% if "users.warn" in permissions or "admin" in permissions %}
+        <a href="{{ url_for('warnings_page') }}"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
               {{ 'bg-white/[0.08] text-white' if active_page == 'warnings' else 'text-slate-400 hover:bg-white/[0.04] hover:text-white' }}">
-            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-            Verwarnungen
-          </a>
-          {% endif %}
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          Verwarnungen
+        </a>
+        {% endif %}
 
-          {# ── Config Section ── #}
-          {% if "config.manage" in permissions or "admin" in permissions %}
-          <div class="mt-5 mb-2 px-3">
-            <span class="text-[10px] font-semibold uppercase tracking-widest text-slate-600">Konfiguration</span>
-          </div>
+        {# ── Config Section ── #}
+        {% if "config.manage" in permissions or "admin" in permissions %}
+        <div class="mt-5 mb-2 px-3">
+          <span class="text-[10px] font-semibold uppercase tracking-widest text-slate-600">Konfiguration</span>
+        </div>
 
-          <a href="{{ url_for('log_channels_page') }}"
-            class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
+        <a href="{{ url_for('log_channels_page') }}"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
               {{ 'bg-white/[0.08] text-white' if active_page == 'log_channels' else 'text-slate-400 hover:bg-white/[0.04] hover:text-white' }}">
-            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-            Log Channels
-          </a>
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Log Channels
+        </a>
 
-          <a href="{{ url_for('auto_publisher_page') }}"
-            class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
+        <a href="{{ url_for('auto_publisher_page') }}"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
               {{ 'bg-white/[0.08] text-white' if active_page == 'auto_publisher' else 'text-slate-400 hover:bg-white/[0.04] hover:text-white' }}">
-            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
-            Auto Publisher
-          </a>
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+          </svg>
+          Auto Publisher
+        </a>
 
-          <a href="{{ url_for('server_stats_page') }}"
-            class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
+        <a href="{{ url_for('server_stats_page') }}"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
               {{ 'bg-white/[0.08] text-white' if active_page == 'server_stats' else 'text-slate-400 hover:bg-white/[0.04] hover:text-white' }}">
-            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-            Server Stats
-          </a>
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          Server Stats
+        </a>
 
-          <a href="{{ url_for('close_reasons_page') }}"
-            class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
+        <a href="{{ url_for('close_reasons_page') }}"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
               {{ 'bg-white/[0.08] text-white' if active_page == 'close_reasons' else 'text-slate-400 hover:bg-white/[0.04] hover:text-white' }}">
-            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.573-1.066z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-            Schließungsgründe
-          </a>
-          {% endif %}
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.573-1.066z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          Schließungsgründe
+        </a>
+        {% endif %}
 
-          {% else %}
-          <a href="{{ url_for('login') }}"
-            class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-400 hover:bg-white/[0.04] hover:text-white transition">
-            <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
-            Login
-          </a>
-          {% endif %}
-        </nav>
+        {% else %}
+        <a href="{{ url_for('login') }}"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-slate-400 hover:bg-white/[0.04] hover:text-white transition">
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+          </svg>
+          Login
+        </a>
+        {% endif %}
+      </nav>
 
-        {# User info at bottom #}
-        {% if username %}
-        <div class="border-t border-white/[0.06] px-4 py-4">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3 min-w-0">
-              {% if avatar %}
-              <img src="{{ avatar }}" alt="" class="h-8 w-8 rounded-full">
-              {% else %}
-              <div class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-xs font-bold text-white">{{ username[:2]|upper }}</div>
-              {% endif %}
-              <div class="min-w-0">
-                <div class="truncate text-sm font-medium text-white">{{ username }}</div>
-              </div>
+      {# User info at bottom #}
+      {% if username %}
+      <div class="border-t border-white/[0.06] px-4 py-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3 min-w-0">
+            {% if avatar %}
+            <img src="{{ avatar }}" alt="" class="h-8 w-8 rounded-full">
+            {% else %}
+            <div
+              class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-xs font-bold text-white">{{
+              username[:2]|upper }}</div>
+            {% endif %}
+            <div class="min-w-0">
+              <div class="truncate text-sm font-medium text-white">{{ username }}</div>
             </div>
-            <a href="{{ url_for('logout') }}" title="Logout"
-              class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-500/10 hover:text-red-400">
-              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-            </a>
           </div>
+          <a href="{{ url_for('logout') }}" title="Logout"
+            class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition hover:bg-red-500/10 hover:text-red-400">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </a>
+        </div>
+      </div>
+      {% endif %}
+    </aside>
+
+    {# ── Overlay for mobile sidebar ── #}
+    <div id="sidebar-overlay" class="fixed inset-0 z-20 bg-black/50 lg:hidden hidden" onclick="toggleSidebar()"></div>
+
+    {# ── Main content ── #}
+    <div class="flex flex-1 flex-col overflow-hidden">
+
+      {# Mobile topbar #}
+      <header class="flex items-center gap-3 border-b border-white/[0.06] px-4 py-3 lg:hidden">
+        <button onclick="toggleSidebar()"
+          class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-white/[0.06]">
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="PumBot" class="h-6 w-6 rounded">
+        <span class="text-sm font-semibold text-white">PumBot</span>
+      </header>
+
+      <main class="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
+        {% if error %}
+        <div class="mb-5 rounded-lg border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          {{ error }}
         </div>
         {% endif %}
-      </aside>
-
-      {# ── Overlay for mobile sidebar ── #}
-      <div id="sidebar-overlay" class="fixed inset-0 z-20 bg-black/50 lg:hidden hidden" onclick="toggleSidebar()"></div>
-
-      {# ── Main content ── #}
-      <div class="flex flex-1 flex-col overflow-hidden">
-
-        {# Mobile topbar #}
-        <header class="flex items-center gap-3 border-b border-white/[0.06] px-4 py-3 lg:hidden">
-          <button onclick="toggleSidebar()" class="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-white/[0.06]">
-            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/></svg>
-          </button>
-          <img src="{{ url_for('static', filename='logo.png') }}" alt="PumBot" class="h-6 w-6 rounded">
-          <span class="text-sm font-semibold text-white">PumBot</span>
-        </header>
-
-        <main class="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
-          {% if error %}
-          <div class="mb-5 rounded-lg border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-            {{ error }}
-          </div>
-          {% endif %}
-          {% block content %}{% endblock %}
-        </main>
-      </div>
+        {% block content %}{% endblock %}
+      </main>
     </div>
+  </div>
 
-    <script>
-      function toggleSidebar() {
-        const sb = document.getElementById("sidebar");
-        const ov = document.getElementById("sidebar-overlay");
-        sb.classList.toggle("-translate-x-full");
-        ov.classList.toggle("hidden");
-      }
-    </script>
-    {% endblock %}
-  </body>
+  <script>
+    function toggleSidebar() {
+      const sb = document.getElementById("sidebar");
+      const ov = document.getElementById("sidebar-overlay");
+      sb.classList.toggle("-translate-x-full");
+      ov.classList.toggle("hidden");
+    }
+  </script>
+  {% endblock %}
+</body>
+
 </html>

@@ -186,13 +186,14 @@ class CountingCog(commands.Cog):
         highscore = int(state.get("highscore", 0))
         channel = guild.get_channel(channel_id)
         last_user = guild.get_member(int(last_uid)) if last_uid else None
+        last_user_display = last_user.mention if last_user else chr(8212)
         your_stats = await self._get_user_stats(guild.id, interaction.user.id)
 
         await interaction.response.send_message(
             f"Counting-Channel: {channel.mention if channel else f'`#{channel_id}`'}\n"
             f"Letzte korrekte Zahl: **{last}**\n"
             f"Nächste Zahl: **{last + 1}**\n"
-            f"Letzter Zähler: {last_user.mention if last_user else '\u2014'}\n"
+            f"Letzter Zähler: {last_user_display}\n"
             f"Highscore (Server): **{highscore}**\n\n"
             "**Deine Stats:**\n"
             f"- Korrekte Zahlen: **{your_stats['correct']}**\n"

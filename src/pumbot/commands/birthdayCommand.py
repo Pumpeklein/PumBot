@@ -89,6 +89,18 @@ class BirthdayCog(commands.Cog):
     def cog_unload(self):
         self.birthday_check_loop.cancel()
 
+    @commands.Cog.listener()
+    async def on_ready(self) -> None:
+        logger.info("BirthdayCog ready, aktualisiere Geburtstagslisten.")
+        for guild in self.bot.guilds:
+            try:
+                await self._update_birthday_list_message(guild)
+            except Exception:
+                logger.exception(
+                    "Fehler beim initialen Aktualisieren der Geburtstagsliste für Guild %s.",
+                    guild.id,
+                )
+
     async def _get_birthday_list_messages(self, guild: discord.Guild) -> list[dict]:
         g_id = str(guild.id)
         rows = await self.api.get_bot_messages(g_id, "birthday_list")
@@ -152,7 +164,16 @@ class BirthdayCog(commands.Cog):
         g_id = str(guild.id)
         rows = await self._get_birthday_list_messages(guild)
         if not rows:
+            logger.info(
+                "Keine gespeicherten Geburtstagslisten-Nachrichten für Guild %s gefunden.",
+                g_id,
+            )
             return
+        logger.info(
+            "Aktualisiere %d Geburtstagslisten-Nachricht(en) für Guild %s.",
+            len(rows),
+            g_id,
+        )
 
         embed = await self._build_birthday_embed(guild)
         if embed is None:
@@ -168,6 +189,11 @@ class BirthdayCog(commands.Cog):
             channel_id = row.get("channel_id") or fallback_channel_id
             message_id = row.get("message_id")
             if not channel_id or not message_id:
+                logger.warning(
+                    "Geburtstagslisten-Eintrag ohne Channel oder Message-ID in Guild %s: %s",
+                    g_id,
+                    row,
+                )
                 continue
 
             channel = guild.get_channel(int(channel_id))
@@ -175,8 +201,18 @@ class BirthdayCog(commands.Cog):
                 try:
                     channel = await guild.fetch_channel(int(channel_id))
                 except (discord.Forbidden, discord.HTTPException, ValueError):
+                    logger.warning(
+                        "Geburtstagslisten-Channel %s in Guild %s konnte nicht geladen werden.",
+                        channel_id,
+                        g_id,
+                    )
                     continue
             if not isinstance(channel, discord.TextChannel):
+                logger.warning(
+                    "Geburtstagslisten-Channel %s in Guild %s ist kein TextChannel.",
+                    channel_id,
+                    g_id,
+                )
                 continue
 
             try:
@@ -201,6 +237,11 @@ class BirthdayCog(commands.Cog):
                     continue
 
                 await msg.edit(embed=embed)
+                logger.info(
+                    "Geburtstagsliste aktualisiert: Nachricht %s in Guild %s.",
+                    message_id,
+                    g_id,
+                )
                 await self.api.upsert_bot_message(
                     g_id,
                     "birthday_list",

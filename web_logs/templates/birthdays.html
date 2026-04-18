@@ -11,6 +11,7 @@
   {{ stat("Gespeicherte Geburtstage", birthdays|length) }}
   {{ stat("Gratulations-Channel", birthday_channel or "Nicht gesetzt") }}
 </div>
+<div class="mb-6 text-xs text-slate-500">Aktive Geburtstags-Guild: <span class="font-mono text-slate-300">{{ birthdays_guild_id }}</span></div>
 
 {# Settings #}
 <div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">

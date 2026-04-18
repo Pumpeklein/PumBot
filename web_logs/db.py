@@ -66,29 +66,86 @@ def _seed_default_roles() -> None:
 
 
 def _seed_default_bot_messages() -> None:
-    birthday_message_ids = ["1362697161598304439"]
     with _connect() as conn:
-        guild_rows = conn.execute(
+        message_rows = conn.execute(
             """SELECT guild_id, config_value
                FROM guild_config
-               WHERE config_key = 'birthday_list_channel_id'"""
+               WHERE config_key = 'birthday_list_message_id'"""
         ).fetchall()
-        guild_channel_map = {
-            row["guild_id"]: row["config_value"] for row in guild_rows if row["guild_id"]
-        }
-        guild_channel_map.setdefault(DEFAULT_GUILD_ID, guild_channel_map.get(DEFAULT_GUILD_ID))
-
-        for guild_id, channel_id in guild_channel_map.items():
-            for message_id in birthday_message_ids:
-                conn.execute(
-                    """INSERT INTO bot_messages (guild_id, message_type, message_id, channel_id, meta_key)
-                       VALUES (?, ?, ?, ?, ?)
-                       ON CONFLICT(guild_id, message_type, message_id) DO UPDATE SET
-                         channel_id = COALESCE(bot_messages.channel_id, excluded.channel_id),
-                         updated_at = datetime('now')""",
-                    (guild_id, "birthday_list", message_id, channel_id, "birthdays"),
-                )
+        for row in message_rows:
+            guild_id = row["guild_id"]
+            message_id = row["config_value"]
+            if not guild_id or not message_id:
+                continue
+            channel_row = conn.execute(
+                """SELECT config_value
+                   FROM guild_config
+                   WHERE guild_id = ? AND config_key = 'birthday_list_channel_id'""",
+                (guild_id,),
+            ).fetchone()
+            channel_id = channel_row["config_value"] if channel_row else None
+            conn.execute(
+                """INSERT INTO bot_messages (guild_id, message_type, message_id, channel_id, meta_key)
+                   VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT(guild_id, message_type, message_id) DO UPDATE SET
+                     channel_id = COALESCE(excluded.channel_id, bot_messages.channel_id),
+                     updated_at = datetime('now')""",
+                (guild_id, "birthday_list", message_id, channel_id, "birthdays"),
+            )
         conn.commit()
+
+
+def get_birthdays_panel_guild_id(default_guild_id: str) -> str:
+    with _connect() as conn:
+        has_default = conn.execute(
+            """SELECT 1
+               FROM birthdays
+               WHERE guild_id = ?
+               UNION
+               SELECT 1
+               FROM guild_config
+               WHERE guild_id = ? AND config_key LIKE 'birthday_%'
+               UNION
+               SELECT 1
+               FROM bot_messages
+               WHERE guild_id = ? AND message_type = 'birthday_list'
+               LIMIT 1""",
+            (default_guild_id, default_guild_id, default_guild_id),
+        ).fetchone()
+        if has_default:
+            return default_guild_id
+
+        row = conn.execute(
+            """SELECT guild_id
+               FROM birthdays
+               GROUP BY guild_id
+               ORDER BY COUNT(*) DESC, guild_id ASC
+               LIMIT 1"""
+        ).fetchone()
+        if row:
+            return row["guild_id"]
+
+        row = conn.execute(
+            """SELECT guild_id
+               FROM guild_config
+               WHERE config_key LIKE 'birthday_%'
+               ORDER BY guild_id ASC
+               LIMIT 1"""
+        ).fetchone()
+        if row:
+            return row["guild_id"]
+
+        row = conn.execute(
+            """SELECT guild_id
+               FROM bot_messages
+               WHERE message_type = 'birthday_list'
+               ORDER BY guild_id ASC
+               LIMIT 1"""
+        ).fetchone()
+        if row:
+            return row["guild_id"]
+
+        return default_guild_id
 
 
 # ══════════ Users (Discord OAuth2) ══════════

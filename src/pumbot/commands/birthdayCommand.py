@@ -170,6 +170,11 @@ class BirthdayCog(commands.Cog):
                 continue
 
             channel = guild.get_channel(int(channel_id))
+            if channel is None:
+                try:
+                    channel = await guild.fetch_channel(int(channel_id))
+                except (discord.Forbidden, discord.HTTPException, ValueError):
+                    continue
             if not isinstance(channel, discord.TextChannel):
                 continue
 

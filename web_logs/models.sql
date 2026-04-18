@@ -45,6 +45,18 @@ CREATE TABLE IF NOT EXISTS birthdays (
   UNIQUE(guild_id, user_id)
 );
 
+CREATE TABLE IF NOT EXISTS bot_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT NOT NULL,
+  message_type TEXT NOT NULL,
+  message_id TEXT NOT NULL,
+  channel_id TEXT,
+  meta_key TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(guild_id, message_type, message_id)
+);
+
 -- ── Warnings ──
 CREATE TABLE IF NOT EXISTS warnings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -190,4 +202,5 @@ CREATE INDEX IF NOT EXISTS idx_ticket_messages_ticket ON ticket_messages(ticket_
 CREATE INDEX IF NOT EXISTS idx_warnings_guild_user ON warnings(guild_id, user_id);
 CREATE INDEX IF NOT EXISTS idx_birthdays_guild ON birthdays(guild_id);
 CREATE INDEX IF NOT EXISTS idx_birthdays_month_day ON birthdays(month, day);
+CREATE INDEX IF NOT EXISTS idx_bot_messages_guild_type ON bot_messages(guild_id, message_type);
 CREATE INDEX IF NOT EXISTS idx_roles_guild ON roles(guild_id);

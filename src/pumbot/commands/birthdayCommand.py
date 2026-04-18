@@ -88,6 +88,27 @@ class BirthdayCog(commands.Cog):
     def cog_unload(self):
         self.birthday_check_loop.cancel()
 
+    async def _get_birthday_list_messages(self, guild: discord.Guild) -> list[dict]:
+        g_id = str(guild.id)
+        rows = await self.api.get_bot_messages(g_id, "birthday_list")
+
+        if rows:
+            return rows
+
+        list_channel_id = await self.api.get_config(g_id, "birthday_list_channel_id")
+        list_message_id = await self.api.get_config(g_id, "birthday_list_message_id")
+        if not list_message_id:
+            return []
+
+        row = await self.api.upsert_bot_message(
+            g_id,
+            "birthday_list",
+            str(list_message_id),
+            channel_id=str(list_channel_id) if list_channel_id else None,
+            meta_key="birthdays",
+        )
+        return [row] if row else []
+
     async def _build_birthday_embed(self, guild: discord.Guild) -> Optional[discord.Embed]:
         g_id = str(guild.id)
         birthdays = await self.api.get_birthdays(g_id)
@@ -128,14 +149,8 @@ class BirthdayCog(commands.Cog):
 
     async def _update_birthday_list_message(self, guild: discord.Guild) -> None:
         g_id = str(guild.id)
-        list_channel_id = await self.api.get_config(g_id, "birthday_list_channel_id")
-        list_message_id = await self.api.get_config(g_id, "birthday_list_message_id")
-
-        if not list_channel_id or not list_message_id:
-            return
-
-        channel = guild.get_channel(int(list_channel_id))
-        if not isinstance(channel, discord.TextChannel):
+        rows = await self._get_birthday_list_messages(guild)
+        if not rows:
             return
 
         embed = await self._build_birthday_embed(guild)
@@ -146,13 +161,36 @@ class BirthdayCog(commands.Cog):
                 color=discord.Color.gold(),
             )
 
-        try:
-            msg = await channel.fetch_message(int(list_message_id))
-            await msg.edit(embed=embed)
-        except (discord.NotFound, discord.Forbidden):
-            pass
-        except discord.HTTPException:
-            return
+        fallback_channel_id = await self.api.get_config(g_id, "birthday_list_channel_id")
+
+        for row in rows:
+            channel_id = row.get("channel_id") or fallback_channel_id
+            message_id = row.get("message_id")
+            if not channel_id or not message_id:
+                continue
+
+            channel = guild.get_channel(int(channel_id))
+            if not isinstance(channel, discord.TextChannel):
+                continue
+
+            try:
+                msg = await channel.fetch_message(int(message_id))
+                await msg.edit(embed=embed)
+                await self.api.upsert_bot_message(
+                    g_id,
+                    "birthday_list",
+                    str(message_id),
+                    channel_id=str(channel.id),
+                    meta_key="birthdays",
+                )
+            except discord.NotFound:
+                await self.api.delete_bot_message(
+                    g_id, "birthday_list", str(message_id)
+                )
+            except discord.Forbidden:
+                continue
+            except discord.HTTPException:
+                continue
 
     birthdays_group = app_commands.Group(
         name="geburtstage", description="Geburtstage verwalten und anzeigen.",
@@ -227,6 +265,13 @@ class BirthdayCog(commands.Cog):
         g_id = str(guild.id)
         await self.api.set_config(g_id, "birthday_list_channel_id", str(msg.channel.id))
         await self.api.set_config(g_id, "birthday_list_message_id", str(msg.id))
+        await self.api.upsert_bot_message(
+            g_id,
+            "birthday_list",
+            str(msg.id),
+            channel_id=str(msg.channel.id),
+            meta_key="birthdays",
+        )
 
     @birthdays_group.command(
         name="set_user", description="Setzt den Geburtstag eines Users (Staff).",

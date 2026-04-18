@@ -36,6 +36,7 @@ try:
         create_role,
         create_selfrole_panel,
         delete_birthday,
+        delete_bot_message,
         delete_close_reason,
         delete_config,
         delete_role,
@@ -44,6 +45,7 @@ try:
         get_all_selfrole_panels,
         get_auto_publisher_channels,
         get_birthday,
+        list_bot_messages,
         get_birthdays,
         get_birthdays_today,
         get_config,
@@ -78,6 +80,7 @@ try:
         set_log_channel,
         set_server_stats,
         set_twitch_config,
+        upsert_bot_message,
         update_close_reason,
         update_role,
         upsert_ticket,
@@ -106,6 +109,7 @@ except ImportError:
         create_role,
         create_selfrole_panel,
         delete_birthday,
+        delete_bot_message,
         delete_close_reason,
         delete_config,
         delete_role,
@@ -114,6 +118,7 @@ except ImportError:
         get_all_selfrole_panels,
         get_auto_publisher_channels,
         get_birthday,
+        list_bot_messages,
         get_birthdays,
         get_birthdays_today,
         get_config,
@@ -148,6 +153,7 @@ except ImportError:
         set_log_channel,
         set_server_stats,
         set_twitch_config,
+        upsert_bot_message,
         update_close_reason,
         update_role,
         upsert_ticket,
@@ -732,6 +738,24 @@ def birthdays_page():
     )
 
 
+def _trigger_birthday_list_refresh(guild_id: str) -> None:
+    bot = app.config.get("DISCORD_BOT")
+    if not bot or not bot.is_ready():
+        return
+    try:
+        guild = bot.get_guild(int(guild_id))
+        if guild is None:
+            return
+        cog = bot.get_cog("BirthdayCog")
+        if cog is None:
+            return
+        asyncio.run_coroutine_threadsafe(
+            cog._update_birthday_list_message(guild), bot.loop
+        )
+    except Exception:
+        pass
+
+
 @app.post("/birthdays/set-channel")
 @permission_required("config.manage")
 def birthdays_set_channel():
@@ -751,6 +775,7 @@ def birthdays_set(user_id: str):
     year = request.form.get("year", type=int) or None
     if day and month:
         set_birthday(DEFAULT_GUILD_ID, user_id, day, month, year)
+        _trigger_birthday_list_refresh(DEFAULT_GUILD_ID)
     return redirect(url_for("birthdays_page"))
 
 
@@ -763,6 +788,7 @@ def birthdays_add():
     year = request.form.get("year", type=int) or None
     if user_id and day and month:
         set_birthday(DEFAULT_GUILD_ID, user_id, day, month, year)
+        _trigger_birthday_list_refresh(DEFAULT_GUILD_ID)
     return redirect(url_for("birthdays_page"))
 
 
@@ -770,6 +796,7 @@ def birthdays_add():
 @permission_required("config.manage")
 def birthdays_delete(user_id: str):
     delete_birthday(DEFAULT_GUILD_ID, user_id)
+    _trigger_birthday_list_refresh(DEFAULT_GUILD_ID)
     return redirect(url_for("birthdays_page"))
 
 
@@ -985,6 +1012,34 @@ def api_delete_birthday(guild_id: str, user_id: str):
 @api_key_required
 def api_mark_birthday_congrats(guild_id: str, user_id: str):
     mark_birthday_congrats(guild_id, user_id)
+    return jsonify({"ok": True})
+
+
+@app.get("/api/guild/<guild_id>/bot_messages")
+@api_key_required
+def api_get_bot_messages(guild_id: str):
+    message_type = request.args.get("message_type")
+    return jsonify(list_bot_messages(guild_id, message_type))
+
+
+@app.put("/api/guild/<guild_id>/bot_messages/<message_type>/<message_id>")
+@api_key_required
+def api_upsert_bot_message(guild_id: str, message_type: str, message_id: str):
+    data = request.get_json(silent=True) or {}
+    row = upsert_bot_message(
+        guild_id,
+        message_type,
+        message_id,
+        str(data["channel_id"]) if data.get("channel_id") else None,
+        str(data["meta_key"]) if data.get("meta_key") else None,
+    )
+    return jsonify(row)
+
+
+@app.delete("/api/guild/<guild_id>/bot_messages/<message_type>/<message_id>")
+@api_key_required
+def api_delete_bot_message(guild_id: str, message_type: str, message_id: str):
+    delete_bot_message(guild_id, message_type, message_id)
     return jsonify({"ok": True})
 
 

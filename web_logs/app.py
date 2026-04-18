@@ -729,10 +729,12 @@ def birthdays_page():
     ctx = _ctx()
     all_birthdays = _attach_display_name(get_birthdays(DEFAULT_GUILD_ID), "user_id")
     birthday_channel = get_config(DEFAULT_GUILD_ID, "birthday_channel_id")
+    birthday_messages = list_bot_messages(DEFAULT_GUILD_ID, "birthday_list")
     return render_template(
         "birthdays.html",
         birthdays=all_birthdays,
         birthday_channel=birthday_channel,
+        birthday_messages=birthday_messages,
         active_page="birthdays",
         **ctx,
     )
@@ -796,6 +798,31 @@ def birthdays_add():
 @permission_required("config.manage")
 def birthdays_delete(user_id: str):
     delete_birthday(DEFAULT_GUILD_ID, user_id)
+    _trigger_birthday_list_refresh(DEFAULT_GUILD_ID)
+    return redirect(url_for("birthdays_page"))
+
+
+@app.post("/birthdays/messages/add")
+@permission_required("config.manage")
+def birthdays_add_message():
+    message_id = (request.form.get("message_id") or "").strip()
+    channel_id = (request.form.get("channel_id") or "").strip() or None
+    if message_id:
+        upsert_bot_message(
+            DEFAULT_GUILD_ID,
+            "birthday_list",
+            message_id,
+            channel_id=channel_id,
+            meta_key="birthdays",
+        )
+        _trigger_birthday_list_refresh(DEFAULT_GUILD_ID)
+    return redirect(url_for("birthdays_page"))
+
+
+@app.post("/birthdays/messages/<message_id>/delete")
+@permission_required("config.manage")
+def birthdays_delete_message(message_id: str):
+    delete_bot_message(DEFAULT_GUILD_ID, "birthday_list", message_id)
     _trigger_birthday_list_refresh(DEFAULT_GUILD_ID)
     return redirect(url_for("birthdays_page"))
 

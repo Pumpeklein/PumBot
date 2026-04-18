@@ -23,6 +23,58 @@
   </form>
 </div>
 
+<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <h2 class="mb-4 text-sm font-semibold text-white">Listen-Nachrichten</h2>
+  <p class="mb-4 text-sm text-slate-400">Diese Bot-Nachrichten werden bei Änderungen an der Geburtstagsliste automatisch aktualisiert.</p>
+
+  <form method="post" action="{{ url_for('birthdays_add_message') }}" class="mb-5 flex flex-wrap items-end gap-3">
+    <div class="w-64">
+      {{ field("message_id", "Nachrichten-ID", placeholder="z.B. 1362697161598304439", required=true) }}
+    </div>
+    <div class="w-64">
+      {{ field("channel_id", "Channel-ID", placeholder="optional, sonst Fallback aus Config") }}
+    </div>
+    {{ btn("Nachricht hinzufügen") }}
+  </form>
+
+  {% if birthday_messages %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead>
+        <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+          <th class="px-3 py-2.5">Nachrichten-ID</th>
+          <th class="px-3 py-2.5">Channel-ID</th>
+          <th class="px-3 py-2.5">Typ</th>
+          <th class="px-3 py-2.5">Meta</th>
+          <th class="px-3 py-2.5 text-right">Aktionen</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for msg in birthday_messages %}
+        <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]">
+          <td class="px-3 py-2.5 font-mono text-slate-200">{{ msg.message_id }}</td>
+          <td class="px-3 py-2.5 font-mono text-slate-400">{{ msg.channel_id or "Fallback aus Config" }}</td>
+          <td class="px-3 py-2.5 text-slate-300">{{ msg.message_type }}</td>
+          <td class="px-3 py-2.5 text-slate-500">{{ msg.meta_key or "—" }}</td>
+          <td class="px-3 py-2.5 text-right">
+            <form method="post" action="{{ url_for('birthdays_delete_message', message_id=msg.message_id) }}" class="inline"
+              onsubmit="return confirm('Nachrichten-Verknüpfung wirklich entfernen?')">
+              <button type="submit"
+                class="rounded border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-400 transition hover:bg-red-500/20">
+                Entfernen
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  {{ empty_state("Keine Listen-Nachrichten hinterlegt", "Füge oben eine Bot-Nachricht hinzu, die aktualisiert werden soll.") }}
+  {% endif %}
+</div>
+
 {# Add birthday #}
 <div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
   <h2 class="mb-4 text-sm font-semibold text-white">Geburtstag hinzufügen</h2>

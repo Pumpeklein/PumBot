@@ -8,6 +8,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
+from src.pumbot.bot import logger
 from src.pumbot.utils.datetime_format import berlin_today
 
 BIRTHDAY_STAFF_ROLES = {"Admin", "Team", "Twitch Moderator", "Discord Moderator"}
@@ -180,6 +181,25 @@ class BirthdayCog(commands.Cog):
 
             try:
                 msg = await channel.fetch_message(int(message_id))
+                if self.bot.user is None or msg.author.id != self.bot.user.id:
+                    replacement = await channel.send(embed=embed)
+                    await self.api.upsert_bot_message(
+                        g_id,
+                        "birthday_list",
+                        str(replacement.id),
+                        channel_id=str(channel.id),
+                        meta_key="birthdays",
+                    )
+                    await self.api.delete_bot_message(
+                        g_id, "birthday_list", str(message_id)
+                    )
+                    logger.info(
+                        "Geburtstagsliste ersetzt: alte Nachricht %s in Guild %s war nicht vom aktuellen Bot.",
+                        message_id,
+                        g_id,
+                    )
+                    continue
+
                 await msg.edit(embed=embed)
                 await self.api.upsert_bot_message(
                     g_id,
@@ -189,12 +209,36 @@ class BirthdayCog(commands.Cog):
                     meta_key="birthdays",
                 )
             except discord.NotFound:
+                replacement = await channel.send(embed=embed)
+                await self.api.upsert_bot_message(
+                    g_id,
+                    "birthday_list",
+                    str(replacement.id),
+                    channel_id=str(channel.id),
+                    meta_key="birthdays",
+                )
                 await self.api.delete_bot_message(
                     g_id, "birthday_list", str(message_id)
                 )
+                logger.info(
+                    "Geburtstagsliste neu gesendet: alte Nachricht %s in Guild %s wurde nicht gefunden.",
+                    message_id,
+                    g_id,
+                )
             except discord.Forbidden:
+                logger.warning(
+                    "Geburtstagsliste konnte nicht aktualisiert werden: keine Rechte für Channel %s in Guild %s.",
+                    channel.id,
+                    g_id,
+                )
                 continue
             except discord.HTTPException:
+                logger.exception(
+                    "Geburtstagsliste konnte nicht aktualisiert werden (Message %s, Channel %s, Guild %s).",
+                    message_id,
+                    channel.id,
+                    g_id,
+                )
                 continue
 
     birthdays_group = app_commands.Group(

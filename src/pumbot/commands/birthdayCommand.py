@@ -84,6 +84,7 @@ class BirthdayCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.api = bot.api
+        logger.info("BirthdayCog initialisiert aus %s", __file__)
         self.birthday_check_loop.start()
 
     def cog_unload(self):
@@ -419,6 +420,33 @@ class BirthdayCog(commands.Cog):
             f"Birthday-Channel wurde auf {channel.mention} gesetzt.", ephemeral=True
         )
 
+    @birthdays_group.command(
+        name="refresh",
+        description="Aktualisiert die gespeicherten Geburtstagslisten sofort (Staff).",
+    )
+    async def birthdays_refresh(self, interaction: discord.Interaction):
+        if interaction.guild is None:
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True,
+            )
+            return
+        if not is_birthday_staff(interaction.user):
+            await interaction.response.send_message(
+                "Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True
+            )
+            return
+
+        logger.info(
+            "Manueller Geburtstagslisten-Refresh angefordert in Guild %s durch %s (%s).",
+            interaction.guild.id,
+            interaction.user,
+            interaction.user.id,
+        )
+        await self._update_birthday_list_message(interaction.guild)
+        await interaction.response.send_message(
+            "Geburtstagslisten-Refresh ausgeführt.", ephemeral=True
+        )
+
     @tasks.loop(minutes=1)
     async def birthday_check_loop(self):
         await self.bot.wait_until_ready()
@@ -471,4 +499,5 @@ class BirthdayCog(commands.Cog):
 
 
 async def setup(bot: commands.Bot):
+    logger.info("Lade BirthdayCog aus %s", __file__)
     await bot.add_cog(BirthdayCog(bot))

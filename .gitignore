@@ -3,3 +3,6 @@
 *\__pycache__
 /logs
 web_logs/data/*
+*\.bash_history
+*\.cache
+*\.local

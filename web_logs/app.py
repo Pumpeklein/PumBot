@@ -36,6 +36,7 @@ try:
         create_role,
         create_selfrole_panel,
         delete_birthday,
+        delete_bot_message,
         delete_close_reason,
         delete_config,
         delete_role,
@@ -44,6 +45,8 @@ try:
         get_all_selfrole_panels,
         get_auto_publisher_channels,
         get_birthday,
+        get_birthdays_panel_guild_id,
+        list_bot_messages,
         get_birthdays,
         get_birthdays_today,
         get_config,
@@ -78,6 +81,7 @@ try:
         set_log_channel,
         set_server_stats,
         set_twitch_config,
+        upsert_bot_message,
         update_close_reason,
         update_role,
         upsert_ticket,
@@ -106,6 +110,7 @@ except ImportError:
         create_role,
         create_selfrole_panel,
         delete_birthday,
+        delete_bot_message,
         delete_close_reason,
         delete_config,
         delete_role,
@@ -114,6 +119,8 @@ except ImportError:
         get_all_selfrole_panels,
         get_auto_publisher_channels,
         get_birthday,
+        get_birthdays_panel_guild_id,
+        list_bot_messages,
         get_birthdays,
         get_birthdays_today,
         get_config,
@@ -148,6 +155,7 @@ except ImportError:
         set_log_channel,
         set_server_stats,
         set_twitch_config,
+        upsert_bot_message,
         update_close_reason,
         update_role,
         upsert_ticket,
@@ -720,56 +728,122 @@ def counting_reset():
 @app.get("/birthdays")
 @permission_required("config.manage")
 def birthdays_page():
+    birthdays_guild_id = get_birthdays_panel_guild_id(DEFAULT_GUILD_ID)
     ctx = _ctx()
-    all_birthdays = _attach_display_name(get_birthdays(DEFAULT_GUILD_ID), "user_id")
-    birthday_channel = get_config(DEFAULT_GUILD_ID, "birthday_channel_id")
+    legacy_message_id = get_config(birthdays_guild_id, "birthday_list_message_id")
+    legacy_channel_id = get_config(birthdays_guild_id, "birthday_list_channel_id")
+    if legacy_message_id:
+        upsert_bot_message(
+            birthdays_guild_id,
+            "birthday_list",
+            legacy_message_id,
+            channel_id=legacy_channel_id,
+            meta_key="birthdays",
+        )
+    all_birthdays = _attach_display_name(get_birthdays(birthdays_guild_id), "user_id")
+    birthday_channel = get_config(birthdays_guild_id, "birthday_channel_id")
+    birthday_messages = list_bot_messages(birthdays_guild_id, "birthday_list")
     return render_template(
         "birthdays.html",
         birthdays=all_birthdays,
         birthday_channel=birthday_channel,
+        birthday_messages=birthday_messages,
+        birthdays_guild_id=birthdays_guild_id,
         active_page="birthdays",
         **ctx,
     )
 
 
+def _trigger_birthday_list_refresh(guild_id: str) -> None:
+    bot = app.config.get("DISCORD_BOT")
+    if not bot or not bot.is_ready():
+        return
+    try:
+        guild = bot.get_guild(int(guild_id))
+        if guild is None:
+            return
+        cog = bot.get_cog("BirthdayCog")
+        if cog is None:
+            return
+        asyncio.run_coroutine_threadsafe(
+            cog._update_birthday_list_message(guild), bot.loop
+        )
+    except Exception:
+        pass
+
+
 @app.post("/birthdays/set-channel")
 @permission_required("config.manage")
 def birthdays_set_channel():
+    birthdays_guild_id = get_birthdays_panel_guild_id(DEFAULT_GUILD_ID)
     channel_id = (request.form.get("channel_id") or "").strip()
     if channel_id:
-        set_config(DEFAULT_GUILD_ID, "birthday_channel_id", channel_id)
+        set_config(birthdays_guild_id, "birthday_channel_id", channel_id)
     else:
-        delete_config(DEFAULT_GUILD_ID, "birthday_channel_id")
+        delete_config(birthdays_guild_id, "birthday_channel_id")
     return redirect(url_for("birthdays_page"))
 
 
 @app.post("/birthdays/<user_id>/set")
 @permission_required("config.manage")
 def birthdays_set(user_id: str):
+    birthdays_guild_id = get_birthdays_panel_guild_id(DEFAULT_GUILD_ID)
     day = request.form.get("day", type=int)
     month = request.form.get("month", type=int)
     year = request.form.get("year", type=int) or None
     if day and month:
-        set_birthday(DEFAULT_GUILD_ID, user_id, day, month, year)
+        set_birthday(birthdays_guild_id, user_id, day, month, year)
+        _trigger_birthday_list_refresh(birthdays_guild_id)
     return redirect(url_for("birthdays_page"))
 
 
 @app.post("/birthdays/add")
 @permission_required("config.manage")
 def birthdays_add():
+    birthdays_guild_id = get_birthdays_panel_guild_id(DEFAULT_GUILD_ID)
     user_id = (request.form.get("user_id") or "").strip()
     day = request.form.get("day", type=int)
     month = request.form.get("month", type=int)
     year = request.form.get("year", type=int) or None
     if user_id and day and month:
-        set_birthday(DEFAULT_GUILD_ID, user_id, day, month, year)
+        set_birthday(birthdays_guild_id, user_id, day, month, year)
+        _trigger_birthday_list_refresh(birthdays_guild_id)
     return redirect(url_for("birthdays_page"))
 
 
 @app.post("/birthdays/<user_id>/delete")
 @permission_required("config.manage")
 def birthdays_delete(user_id: str):
-    delete_birthday(DEFAULT_GUILD_ID, user_id)
+    birthdays_guild_id = get_birthdays_panel_guild_id(DEFAULT_GUILD_ID)
+    delete_birthday(birthdays_guild_id, user_id)
+    _trigger_birthday_list_refresh(birthdays_guild_id)
+    return redirect(url_for("birthdays_page"))
+
+
+@app.post("/birthdays/messages/add")
+@permission_required("config.manage")
+def birthdays_add_message():
+    birthdays_guild_id = get_birthdays_panel_guild_id(DEFAULT_GUILD_ID)
+    message_id = (request.form.get("message_id") or "").strip()
+    channel_id = (request.form.get("channel_id") or "").strip() or None
+    if message_id:
+        upsert_bot_message(
+            birthdays_guild_id,
+            "birthday_list",
+            message_id,
+            channel_id=channel_id,
+            meta_key="birthdays",
+        )
+        _trigger_birthday_list_refresh(birthdays_guild_id)
+    return redirect(url_for("birthdays_page"))
+
+
+@app.post("/birthdays/messages/<message_id>/delete")
+@permission_required("config.manage")
+def birthdays_delete_message(message_id: str):
+    birthdays_guild_id = get_birthdays_panel_guild_id(DEFAULT_GUILD_ID)
+    delete_bot_message(birthdays_guild_id, "birthday_list", message_id)
+    _trigger_birthday_list_refresh(birthdays_guild_id)
     return redirect(url_for("birthdays_page"))
 
 
@@ -985,6 +1059,34 @@ def api_delete_birthday(guild_id: str, user_id: str):
 @api_key_required
 def api_mark_birthday_congrats(guild_id: str, user_id: str):
     mark_birthday_congrats(guild_id, user_id)
+    return jsonify({"ok": True})
+
+
+@app.get("/api/guild/<guild_id>/bot_messages")
+@api_key_required
+def api_get_bot_messages(guild_id: str):
+    message_type = request.args.get("message_type")
+    return jsonify(list_bot_messages(guild_id, message_type))
+
+
+@app.put("/api/guild/<guild_id>/bot_messages/<message_type>/<message_id>")
+@api_key_required
+def api_upsert_bot_message(guild_id: str, message_type: str, message_id: str):
+    data = request.get_json(silent=True) or {}
+    row = upsert_bot_message(
+        guild_id,
+        message_type,
+        message_id,
+        str(data["channel_id"]) if data.get("channel_id") else None,
+        str(data["meta_key"]) if data.get("meta_key") else None,
+    )
+    return jsonify(row)
+
+
+@app.delete("/api/guild/<guild_id>/bot_messages/<message_type>/<message_id>")
+@api_key_required
+def api_delete_bot_message(guild_id: str, message_type: str, message_id: str):
+    delete_bot_message(guild_id, message_type, message_id)
     return jsonify({"ok": True})
 
 

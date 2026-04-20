@@ -69,6 +69,16 @@ def _fmt_channel_label(ch: discord.abc.GuildChannel) -> str:
     return f"`{ch.id}`"
 
 
+def _fmt_channel_ref(channel: object, channel_id: Optional[int] = None) -> str:
+    if hasattr(channel, "mention"):
+        return str(getattr(channel, "mention"))
+    if channel_id is not None:
+        return f"<#{channel_id}>"
+    if hasattr(channel, "id"):
+        return f"`{getattr(channel, 'id')}`"
+    return "\u2014"
+
+
 def _count_label(voice: discord.VoiceChannel) -> str:
     limit = voice.user_limit if voice.user_limit else "\u221e"
     return f"{len(voice.members)}/{limit}"
@@ -88,6 +98,22 @@ def _kv_block(lines: list[tuple[str, str]]) -> str:
     for k, v in lines:
         out.append(f"**{k}:** {v}")
     return "\n".join(out)
+
+
+def _message_attachments_changed(
+    before: list[discord.Attachment], after: list[discord.Attachment]
+) -> bool:
+    before_pairs = [(a.id, a.filename, a.url) for a in before]
+    after_pairs = [(a.id, a.filename, a.url) for a in after]
+    return before_pairs != after_pairs
+
+
+def _message_embeds_changed(
+    before: list[discord.Embed], after: list[discord.Embed]
+) -> bool:
+    before_data = [e.to_dict() for e in before]
+    after_data = [e.to_dict() for e in after]
+    return before_data != after_data
 
 
 def _green() -> discord.Color:
@@ -131,7 +157,7 @@ class LogsCog(commands.Cog):
 
     async def _send_log(
         self, guild: discord.Guild, log_type: str, embed: discord.Embed
-    ) -> None:
+    ) -> bool:
         api_log_type = f"{log_type}_log"
         try:
             channel_id_str = await self.api.get_log_channel(
@@ -143,18 +169,36 @@ class LogsCog(commands.Cog):
                 log_type,
                 guild.id,
             )
-            return
+            return False
         if not channel_id_str:
-            return
-        channel = await _safe_fetch_channel(guild, int(channel_id_str))
+            return False
+        try:
+            channel_id = int(channel_id_str)
+        except (TypeError, ValueError):
+            logger.error(
+                "Ungültige Log-Channel-ID (%s) für %s in Guild %s",
+                channel_id_str,
+                log_type,
+                guild.id,
+            )
+            return False
+        channel = await _safe_fetch_channel(guild, channel_id)
         if channel is None:
-            return
+            logger.warning(
+                "Log-Channel %s (%s) für Guild %s konnte nicht geladen werden",
+                log_type,
+                channel_id,
+                guild.id,
+            )
+            return False
         try:
             await channel.send(embed=embed)
+            return True
         except Exception:
             logger.exception(
                 "Konnte Log nicht senden (%s) in Guild %s", log_type, guild.id
             )
+            return False
 
     async def _audit_hint_voice(
         self, guild: discord.Guild, target_id: int
@@ -674,6 +718,33 @@ class LogsCog(commands.Cog):
         await self._send_log(message.guild, "message", embed)
 
     @commands.Cog.listener()
+    async def on_raw_message_delete(
+        self, payload: discord.RawMessageDeleteEvent
+    ) -> None:
+        if payload.cached_message is not None:
+            return
+        if payload.guild_id is None:
+            return
+
+        guild = self.bot.get_guild(payload.guild_id)
+        if guild is None:
+            return
+
+        channel = guild.get_channel(payload.channel_id)
+
+        embed = _embed_base("Message deleted", _red())
+        embed.description = _kv_block(
+            [
+                ("Channel", _fmt_channel_ref(channel, payload.channel_id)),
+                ("Message ID", str(payload.message_id)),
+                ("Message author", "Unknown (uncached message)"),
+                ("Message created", "\u2014"),
+            ]
+        )
+
+        await self._send_log(guild, "message", embed)
+
+    @commands.Cog.listener()
     async def on_message_edit(
         self, before: discord.Message, after: discord.Message
     ) -> None:
@@ -681,7 +752,11 @@ class LogsCog(commands.Cog):
             return
         if after.author is None or after.author.bot:
             return
-        if before.content == after.content:
+        if (
+            before.content == after.content
+            and not _message_attachments_changed(before.attachments, after.attachments)
+            and not _message_embeds_changed(before.embeds, after.embeds)
+        ):
             return
 
         embed = _embed_base(
@@ -694,7 +769,7 @@ class LogsCog(commands.Cog):
         lines = [
             (
                 "Channel",
-                f"{after.channel.mention if hasattr(after.channel, 'mention') else f'`{after.channel.id}`'}",
+                _fmt_channel_ref(after.channel),
             ),
             ("Message ID", str(after.id)),
             ("Message author", _fmt_name_and_tag(after.author)),
@@ -723,6 +798,66 @@ class LogsCog(commands.Cog):
         embed.add_field(name="Jump", value=f"{after.jump_url}", inline=False)
 
         await self._send_log(after.guild, "message", embed)
+
+    @commands.Cog.listener()
+    async def on_raw_message_edit(self, payload: discord.RawMessageUpdateEvent) -> None:
+        if payload.cached_message is not None:
+            return
+        if payload.guild_id is None:
+            return
+
+        guild = self.bot.get_guild(payload.guild_id)
+        if guild is None:
+            return
+
+        data = payload.data
+        author = data.get("author") or {}
+        if author.get("bot"):
+            return
+
+        channel = guild.get_channel(payload.channel_id)
+        content = (data.get("content") or "").strip()
+        attachments = data.get("attachments") or []
+
+        embed = _embed_base("Message edited", _yellow())
+        embed.description = _kv_block(
+            [
+                ("Channel", _fmt_channel_ref(channel, payload.channel_id)),
+                ("Message ID", str(payload.message_id)),
+                (
+                    "Message author",
+                    f"@{author.get('username', 'Unknown')} (`{author.get('id', 'unknown')}`)",
+                ),
+                ("Message created", "\u2014"),
+            ]
+        )
+
+        embed.add_field(
+            name="Before",
+            value="```Uncached message: previous content unavailable```",
+            inline=True,
+        )
+        if content:
+            if len(content) > 900:
+                content = content[:900] + "\u2026"
+            embed.add_field(name="After", value=f"```{content}```", inline=True)
+        else:
+            embed.add_field(
+                name="After",
+                value="```Content unavailable or unchanged```",
+                inline=True,
+            )
+
+        if attachments:
+            urls = "\n".join(
+                a.get("url", "") for a in attachments if a.get("url")
+            ).strip()
+            if urls:
+                if len(urls) > 1000:
+                    urls = urls[:1000] + "\u2026"
+                embed.add_field(name="Attachments", value=urls, inline=False)
+
+        await self._send_log(guild, "message", embed)
 
 
 async def setup(bot: commands.Bot) -> None:

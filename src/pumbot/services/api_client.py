@@ -93,6 +93,39 @@ class ApiClient:
 
     # ── Warnings ──
 
+    async def get_bot_messages(
+        self, guild_id: str, message_type: str | None = None
+    ) -> list:
+        params: dict[str, Any] = {}
+        if message_type is not None:
+            params["message_type"] = message_type
+        return await self.get(f"/api/guild/{guild_id}/bot_messages", **params) or []
+
+    async def upsert_bot_message(
+        self,
+        guild_id: str,
+        message_type: str,
+        message_id: str,
+        channel_id: str | None = None,
+        meta_key: str | None = None,
+    ) -> dict | None:
+        data: dict[str, Any] = {}
+        if channel_id is not None:
+            data["channel_id"] = channel_id
+        if meta_key is not None:
+            data["meta_key"] = meta_key
+        return await self.put(
+            f"/api/guild/{guild_id}/bot_messages/{message_type}/{message_id}",
+            data,
+        )
+
+    async def delete_bot_message(
+        self, guild_id: str, message_type: str, message_id: str
+    ) -> None:
+        await self.delete(
+            f"/api/guild/{guild_id}/bot_messages/{message_type}/{message_id}"
+        )
+
     async def get_warnings(self, guild_id: str, user_id: str) -> list:
         return await self.get(f"/api/guild/{guild_id}/warnings/{user_id}") or []
 

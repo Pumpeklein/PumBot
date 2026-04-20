@@ -79,6 +79,7 @@ intents.message_content = True
 
 EXTENSIONS: list[str] = [
     "src.pumbot.commands.announcmentCommand",
+    "src.pumbot.commands.autoRoleCommand",
     "src.pumbot.commands.birthdayCommand",
     "src.pumbot.commands.selfrolesCommand",
     "src.pumbot.commands.TicketSystemCommand",

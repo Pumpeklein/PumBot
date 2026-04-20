@@ -109,7 +109,7 @@ def _yellow() -> discord.Color:
 @dataclass
 class AuditHint:
     action: Optional[discord.AuditLogAction] = None
-    actor: Optional[discord.Member] = None
+    actor: Optional[discord.abc.User] = None
 
 
 class LogsCog(commands.Cog):
@@ -176,11 +176,7 @@ class LogsCog(commands.Cog):
                         _utcnow() - entry.created_at.replace(tzinfo=timezone.utc)
                     ).total_seconds()
                     if age <= 15:
-                        actor = (
-                            entry.user
-                            if isinstance(entry.user, discord.Member)
-                            else None
-                        )
+                        actor = entry.user if isinstance(entry.user, discord.abc.User) else None
                         return AuditHint(action=entry.action, actor=actor)
         except Exception:
             return AuditHint()
@@ -424,10 +420,12 @@ class LogsCog(commands.Cog):
             hint = await self._audit_hint_voice(guild, member.id)
             color = _red()
             title = "User left channel"
+            actor_label = "By"
 
             if hint.action == discord.AuditLogAction.member_disconnect:
-                title = "User left channel"
+                title = "User was disconnected from channel"
                 color = _red()
+                actor_label = "Disconnected by"
 
             embed = _embed_base(title, color, thumb_url=member.display_avatar.url)
             lines = [
@@ -436,7 +434,7 @@ class LogsCog(commands.Cog):
                 ("Users", _count_label(bch)),
             ]
             if hint.actor:
-                lines.append(("By", _fmt_name_and_tag(hint.actor)))
+                lines.append((actor_label, _fmt_name_and_tag(hint.actor)))
             embed.description = _kv_block(lines)
             await self._send_log(guild, "voice", embed)
             return

@@ -55,6 +55,49 @@ class SelfRolesCog(commands.Cog):
         except Exception:
             logger.exception("_enqueue_role_change error")
 
+    async def _fetch_payload_message(
+        self, guild: discord.Guild, channel_id: int, message_id: int
+    ) -> discord.Message | None:
+        channel = guild.get_channel(channel_id)
+        if not isinstance(channel, discord.TextChannel):
+            return None
+        try:
+            return await channel.fetch_message(message_id)
+        except discord.HTTPException:
+            return None
+
+    async def _remove_member_reactions_for_roles(
+        self,
+        guild: discord.Guild,
+        member: discord.Member,
+        panel: Dict[str, Any],
+        role_ids: List[int],
+        channel_id: int,
+        message_id: int,
+    ) -> None:
+        if not role_ids:
+            return
+
+        message = await self._fetch_payload_message(guild, channel_id, message_id)
+        if message is None:
+            return
+
+        roles_map: Dict[str, int] = panel.get("roles", {})
+        role_id_set = set(role_ids)
+        for emoji_str, mapped_role_id in roles_map.items():
+            try:
+                current_role_id = int(mapped_role_id)
+            except (TypeError, ValueError):
+                continue
+
+            if current_role_id not in role_id_set:
+                continue
+
+            try:
+                await message.remove_reaction(emoji_str, member)
+            except discord.HTTPException:
+                continue
+
     async def _role_worker(self):
         try:
             while True:
@@ -414,12 +457,21 @@ class SelfRolesCog(commands.Cog):
 
                 if len(current_roles) >= max_roles:
                     if max_roles == 1:
+                        current_role_ids = [r.id for r in current_roles]
                         await self._enqueue_role_change(
                             guild.id,
                             member.id,
                             "remove",
-                            [r.id for r in current_roles],
+                            current_role_ids,
                             payload.channel_id,
+                        )
+                        await self._remove_member_reactions_for_roles(
+                            guild,
+                            member,
+                            panel,
+                            current_role_ids,
+                            payload.channel_id,
+                            payload.message_id,
                         )
                     else:
                         channel = guild.get_channel(payload.channel_id)

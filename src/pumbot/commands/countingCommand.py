@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import asyncio
 from typing import Any, Dict, Optional
 
 import discord
@@ -15,6 +16,8 @@ def _default_user_stats() -> Dict[str, int]:
 
 
 class CountingCog(commands.Cog):
+    CONFIRM_REACTION_DELAY_SECONDS = 2.0
+
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.api = bot.api
@@ -104,6 +107,7 @@ class CountingCog(commands.Cog):
                 highscore=new_hs,
             )
             await self._update_user_correct(guild_id, message.author.id)
+            await asyncio.sleep(self.CONFIRM_REACTION_DELAY_SECONDS)
             await message.add_reaction("\u2705")
         except Exception:
             logger.exception("Fehler beim Verarbeiten einer korrekten Zahl")

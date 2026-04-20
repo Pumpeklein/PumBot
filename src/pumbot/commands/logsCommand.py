@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional, Tuple
@@ -136,6 +137,8 @@ def _yellow() -> discord.Color:
 class AuditHint:
     action: Optional[discord.AuditLogAction] = None
     actor: Optional[discord.abc.User] = None
+    channel_id: Optional[int] = None
+    count: Optional[int] = None
 
 
 class LogsCog(commands.Cog):
@@ -201,29 +204,46 @@ class LogsCog(commands.Cog):
             return False
 
     async def _audit_hint_voice(
-        self, guild: discord.Guild, target_id: int
+        self,
+        guild: discord.Guild,
+        action: discord.AuditLogAction,
+        channel: Optional[discord.abc.GuildChannel] = None,
     ) -> AuditHint:
-        try:
-            async for entry in guild.audit_logs(limit=6):
-                if (
-                    entry.target is None
-                    or getattr(entry.target, "id", None) != target_id
-                ):
-                    continue
-                if entry.action in (
-                    discord.AuditLogAction.member_move,
-                    discord.AuditLogAction.member_disconnect,
-                ):
+        for attempt in range(3):
+            try:
+                async for entry in guild.audit_logs(limit=6, action=action):
                     if entry.created_at is None:
                         continue
                     age = (
                         _utcnow() - entry.created_at.replace(tzinfo=timezone.utc)
                     ).total_seconds()
-                    if age <= 15:
-                        actor = entry.user if isinstance(entry.user, discord.abc.User) else None
-                        return AuditHint(action=entry.action, actor=actor)
-        except Exception:
-            return AuditHint()
+                    if age > 20:
+                        continue
+
+                    extra = getattr(entry, "extra", None)
+                    audit_channel = getattr(extra, "channel", None)
+                    channel_id = getattr(audit_channel, "id", None)
+                    if channel is not None and channel_id != channel.id:
+                        continue
+
+                    actor = (
+                        entry.user
+                        if isinstance(entry.user, discord.abc.User)
+                        else None
+                    )
+                    count = getattr(extra, "count", None)
+                    return AuditHint(
+                        action=entry.action,
+                        actor=actor,
+                        channel_id=channel_id,
+                        count=count if isinstance(count, int) else None,
+                    )
+            except Exception:
+                return AuditHint()
+
+            if attempt < 2:
+                await asyncio.sleep(0.75)
+
         return AuditHint()
 
     async def _lock_channel(self, channel: discord.TextChannel) -> Tuple[bool, str]:
@@ -461,7 +481,9 @@ class LogsCog(commands.Cog):
             return
 
         if bch is not None and ach is None:
-            hint = await self._audit_hint_voice(guild, member.id)
+            hint = await self._audit_hint_voice(
+                guild, discord.AuditLogAction.member_disconnect
+            )
             color = _red()
             title = "User left channel"
             actor_label = "By"
@@ -484,10 +506,15 @@ class LogsCog(commands.Cog):
             return
 
         if bch is not None and ach is not None and bch.id != ach.id:
-            hint = await self._audit_hint_voice(guild, member.id)
+            hint = await self._audit_hint_voice(
+                guild, discord.AuditLogAction.member_move, channel=ach
+            )
+            is_moved = hint.action == discord.AuditLogAction.member_move
 
             embed = _embed_base(
-                "User switched channel", _blue(), thumb_url=member.display_avatar.url
+                "User was moved to channel" if is_moved else "User switched channel",
+                _blue(),
+                thumb_url=member.display_avatar.url,
             )
             lines = [
                 ("User", _fmt_name_and_tag(member)),

@@ -1,11 +1,21 @@
 from __future__ import annotations
 
+import os
 from typing import Final
 
-# Haupt-server ID
-GUILD_ID: Final[int] = 1441169067326177405
-# willkommen channel ID
-WELCOME_CHANNEL_ID: Final[int] = 1445544411978006588
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
+def _env_int(name: str, default: int = 0) -> int:
+    value = os.getenv(name)
+    if value and value.isdigit():
+        return int(value)
+    return default
+
+
+GUILD_ID: Final[int] = _env_int("DISCORD_GUILD_ID")
 
 WELCOME_BANNER_URL: str | None = None
 

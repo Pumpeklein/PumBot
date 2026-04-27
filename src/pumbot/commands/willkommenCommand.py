@@ -72,15 +72,20 @@ class WelcomeCog(commands.Cog):
     async def _get_welcome_channel(
         self, guild: discord.Guild
     ) -> Optional[discord.abc.Messageable]:
-        channel_id = config.WELCOME_CHANNEL_ID
         try:
             configured_channel_id = await self.bot.api.get_config(
                 str(guild.id), WELCOME_CHANNEL_CONFIG_KEY
             )
-            if configured_channel_id:
-                channel_id = int(configured_channel_id)
+            if not configured_channel_id:
+                logger.info(
+                    "Kein Welcome-Channel für Guild %s gesetzt. Nutze /welcome set.",
+                    guild.id,
+                )
+                return None
+            channel_id = int(configured_channel_id)
         except Exception:
             logger.exception("Welcome-Channel-Konfiguration konnte nicht geladen werden")
+            return None
 
         channel = guild.get_channel(channel_id)
         if channel is not None:
@@ -189,12 +194,12 @@ class WelcomeCog(commands.Cog):
             pass
 
     @welcome.command(
-        name="set_channel",
+        name="set",
         description="Setzt den Channel für Willkommensnachrichten.",
     )
-    @app_commands.describe(channel="Textkanal für Willkommensnachrichten")
+    @app_commands.describe(kanal="Textkanal für Willkommensnachrichten")
     async def welcome_set_channel(
-        self, interaction: discord.Interaction, channel: discord.TextChannel
+        self, interaction: discord.Interaction, kanal: discord.TextChannel
     ) -> None:
         if interaction.guild is None:
             await interaction.response.send_message(
@@ -216,7 +221,7 @@ class WelcomeCog(commands.Cog):
             await self.bot.api.set_config(
                 str(interaction.guild.id),
                 WELCOME_CHANNEL_CONFIG_KEY,
-                str(channel.id),
+                str(kanal.id),
             )
         except Exception:
             logger.exception("Welcome-Channel konnte nicht gespeichert werden")
@@ -227,7 +232,7 @@ class WelcomeCog(commands.Cog):
             return
 
         await interaction.response.send_message(
-            f"Willkommens-Channel wurde auf {channel.mention} gesetzt.",
+            f"Willkommens-Channel wurde auf {kanal.mention} gesetzt.",
             ephemeral=True,
         )
 

@@ -122,12 +122,29 @@ class PumpeBot(commands.Bot):
         self.add_view(TicketCloseView(self))
 
         if guild_obj is not None:
-            self.tree.copy_global_to(guild=guild_obj)
-            synced = await self.tree.sync(guild=guild_obj)
-            logger.info("Guild-Sync fertig (%d Commands).", len(synced))
-        else:
+            try:
+                self.tree.copy_global_to(guild=guild_obj)
+                synced = await self.tree.sync(guild=guild_obj)
+                logger.info("Guild-Sync fertig (%d Commands).", len(synced))
+                return
+            except discord.Forbidden:
+                logger.error(
+                    "Guild-Sync fehlgeschlagen: Missing Access für Guild %s. "
+                    "Prüfe DISCORD_GUILD_ID und ob der Bot auf diesem Server ist. "
+                    "Versuche Global-Sync.",
+                    GUILD_ID,
+                )
+            except discord.HTTPException:
+                logger.exception(
+                    "Guild-Sync fehlgeschlagen für Guild %s. Versuche Global-Sync.",
+                    GUILD_ID,
+                )
+
+        try:
             synced = await self.tree.sync()
             logger.info("Global-Sync fertig (%d Commands).", len(synced))
+        except discord.HTTPException:
+            logger.exception("Global-Sync fehlgeschlagen. Bot startet ohne Command-Sync.")
 
     async def on_ready(self) -> None:
         logger.info(

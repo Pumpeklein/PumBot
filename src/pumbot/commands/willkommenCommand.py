@@ -10,6 +10,19 @@ from discord.ext import commands
 from src.pumbot import config
 from src.pumbot.bot import logger
 
+WELCOME_CHANNEL_CONFIG_KEY = "welcome_channel_id"
+WELCOME_STAFF_ROLES = {"Admin", "Team", "Discord Moderator", "Discord Moderation"}
+
+
+def is_welcome_staff(member: discord.Member) -> bool:
+    try:
+        if member.guild_permissions.administrator or member.guild_permissions.manage_guild:
+            return True
+        return any(role.name in WELCOME_STAFF_ROLES for role in member.roles)
+    except Exception:
+        logger.exception("is_welcome_staff error")
+        return False
+
 
 def _find_project_root(start: Path) -> Path:
     for p in [start, *start.parents]:
@@ -59,15 +72,25 @@ class WelcomeCog(commands.Cog):
     async def _get_welcome_channel(
         self, guild: discord.Guild
     ) -> Optional[discord.abc.Messageable]:
-        channel = guild.get_channel(config.WELCOME_CHANNEL_ID)
+        channel_id = config.WELCOME_CHANNEL_ID
+        try:
+            configured_channel_id = await self.bot.api.get_config(
+                str(guild.id), WELCOME_CHANNEL_CONFIG_KEY
+            )
+            if configured_channel_id:
+                channel_id = int(configured_channel_id)
+        except Exception:
+            logger.exception("Welcome-Channel-Konfiguration konnte nicht geladen werden")
+
+        channel = guild.get_channel(channel_id)
         if channel is not None:
             return channel
         try:
-            return await guild.fetch_channel(config.WELCOME_CHANNEL_ID)
+            return await guild.fetch_channel(channel_id)
         except Exception:
             logger.exception(
                 "Welcome-Channel konnte nicht geladen werden (ID: %s)",
-                config.WELCOME_CHANNEL_ID,
+                channel_id,
             )
             return None
 
@@ -164,6 +187,49 @@ class WelcomeCog(commands.Cog):
                 await interaction.response.send_message(msg, ephemeral=True)
         except Exception:
             pass
+
+    @welcome.command(
+        name="set_channel",
+        description="Setzt den Channel für Willkommensnachrichten.",
+    )
+    @app_commands.describe(channel="Textkanal für Willkommensnachrichten")
+    async def welcome_set_channel(
+        self, interaction: discord.Interaction, channel: discord.TextChannel
+    ) -> None:
+        if interaction.guild is None:
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
+            )
+            return
+
+        if not isinstance(interaction.user, discord.Member) or not is_welcome_staff(
+            interaction.user
+        ):
+            await interaction.response.send_message(
+                "Du hast keine Berechtigung, diesen Befehl zu nutzen.",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            await self.bot.api.set_config(
+                str(interaction.guild.id),
+                WELCOME_CHANNEL_CONFIG_KEY,
+                str(channel.id),
+            )
+        except Exception:
+            logger.exception("Welcome-Channel konnte nicht gespeichert werden")
+            await interaction.response.send_message(
+                "Der Welcome-Channel konnte nicht gespeichert werden.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.send_message(
+            f"Willkommens-Channel wurde auf {channel.mention} gesetzt.",
+            ephemeral=True,
+        )
 
 
 async def setup(bot: commands.Bot) -> None:

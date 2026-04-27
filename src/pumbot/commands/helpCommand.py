@@ -147,6 +147,7 @@ SUBGROUP_LABELS: Dict[str, Tuple[str, str]] = {
     "delete": ("Nachrichten / Cleanup", "🧹"),
     "usermanagement": ("User / Moderation", "🛡️"),
     "announce": ("Announcements", "📢"),
+    "twitch_announce": ("Twitch Announcements", "📢"),
     "logs": ("Logs", "🧾"),
     "birthday": ("Geburtstage", "🎂"),
     "counting": ("Counting", "🔢"),
@@ -157,7 +158,14 @@ SUBGROUP_LABELS: Dict[str, Tuple[str, str]] = {
     "other": ("Andere", "⚙️"),
 }
 
-MOD_GROUPS = {"ticket", "delete", "usermanagement", "announce", "logs"}
+MOD_GROUPS = {
+    "ticket",
+    "delete",
+    "usermanagement",
+    "announce",
+    "twitch_announce",
+    "logs",
+}
 
 CATEGORIES: List[CategoryDef] = [
     CategoryDef(
@@ -281,6 +289,7 @@ def _build_category_embed(
         "ticket",
         "delete",
         "announce",
+        "twitch_announce",
         "logs",
         "birthday",
         "serverstats",

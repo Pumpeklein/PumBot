@@ -15,6 +15,19 @@ from src.pumbot.bot import logger
 from src.pumbot.utils.datetime_format import format_berlin_datetime
 
 ANNOUNCE_STAFF_ROLES = {"Admin", "Team", "Twitch Moderator", "Discord Moderator"}
+TWITCH_PING_ROLE_ID = 1441253029432262787
+TWITCH_ALLOWED_MENTIONS = discord.AllowedMentions(
+    everyone=False,
+    users=False,
+    roles=[discord.Object(id=TWITCH_PING_ROLE_ID)],
+    replied_user=False,
+)
+ANNOUNCE_ALLOWED_MENTIONS = discord.AllowedMentions(
+    everyone=False,
+    users=True,
+    roles=True,
+    replied_user=False,
+)
 
 
 def is_announce_staff(member: discord.Member) -> bool:
@@ -33,7 +46,8 @@ def format_stream_times(started_at_str: str) -> tuple[str, str]:
         if dt_utc.tzinfo is None:
             dt_utc = dt_utc.replace(tzinfo=timezone.utc)
 
-        started_display = format_berlin_datetime(dt_utc, fallback=started_at_str)
+        timestamp = int(dt_utc.timestamp())
+        started_display = f"<t:{timestamp}:F>\n<t:{timestamp}:R>"
         delta = datetime.now(timezone.utc) - dt_utc.astimezone(timezone.utc)
 
         total_seconds = max(0, int(delta.total_seconds()))
@@ -48,7 +62,7 @@ def format_stream_times(started_at_str: str) -> tuple[str, str]:
         return started_display, duration_display
     except Exception:
         logger.exception("format_stream_times error")
-        return started_at_str, "Unbekannt"
+        return format_berlin_datetime(started_at_str, fallback=started_at_str), "Unbekannt"
 
 
 class AnnouncementCog(commands.Cog):
@@ -61,6 +75,7 @@ class AnnouncementCog(commands.Cog):
         self.twitch_user_login = os.getenv("TWITCH_USER_LOGIN")
 
         self.session: Optional[aiohttp.ClientSession] = None
+        self.twitch_message_cache: Dict[int, int] = {}
 
         self.twitch_check_loop.start()
 
@@ -99,6 +114,9 @@ class AnnouncementCog(commands.Cog):
         except Exception:
             logger.exception("get_twitch_announce_channel error")
             return None
+
+    def twitch_ping_content(self) -> str:
+        return f"<@&{TWITCH_PING_ROLE_ID}>"
 
     async def fetch_twitch_stream(self) -> List[Dict[str, Any]]:
         session = await self.get_session()
@@ -149,6 +167,32 @@ class AnnouncementCog(commands.Cog):
             logger.exception("fetch_twitch_game_name error")
             return None
 
+    async def send_or_update_twitch_announcement(
+        self,
+        channel: discord.TextChannel,
+        stream: Dict[str, Any],
+        *,
+        force_new: bool = False,
+    ) -> Optional[discord.Message]:
+        embed = await self.build_twitch_embed(stream)
+        cached_message_id = self.twitch_message_cache.get(channel.guild.id)
+
+        if cached_message_id and not force_new:
+            try:
+                message = await channel.fetch_message(cached_message_id)
+                await message.edit(embed=embed)
+                return message
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                self.twitch_message_cache.pop(channel.guild.id, None)
+
+        message = await channel.send(
+            content=self.twitch_ping_content(),
+            embed=embed,
+            allowed_mentions=TWITCH_ALLOWED_MENTIONS,
+        )
+        self.twitch_message_cache[channel.guild.id] = message.id
+        return message
+
     async def build_twitch_embed(self, stream: Dict[str, Any]) -> discord.Embed:
         try:
             title = stream.get("title") or "Live auf Twitch"
@@ -164,9 +208,10 @@ class AnnouncementCog(commands.Cog):
 
             embed = discord.Embed(
                 title=f"{self.twitch_user_login} ist live auf Twitch!",
-                description=f"**{title}**\n\nKlicke hier, um zuzuschauen: {url}",
+                description=f"**{title}**\n\n[Jetzt live zuschauen]({url})",
                 color=discord.Color.purple(),
                 url=url,
+                timestamp=datetime.now(timezone.utc),
             )
 
             if game_name:
@@ -192,13 +237,54 @@ class AnnouncementCog(commands.Cog):
                 url=f"https://twitch.tv/{self.twitch_user_login}",
             )
 
-    announce_group = app_commands.Group(
-        name="announce",
+    twitch_announce_group = app_commands.Group(
+        name="twitch_announce",
         description="Announcement- und Twitch-Settings.",
     )
 
-    @announce_group.command(
-        name="twitch_channel",
+    @app_commands.command(
+        name="announce",
+        description="Sendet eine sichtbare Ankündigung in diesen Channel.",
+    )
+    @app_commands.describe(text="Text der Ankündigung")
+    async def announce(self, interaction: discord.Interaction, text: str):
+        if interaction.guild is None:
+            await interaction.response.send_message(
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
+            )
+            return
+
+        if not is_announce_staff(interaction.user):
+            await interaction.response.send_message(
+                "Du hast keine Berechtigung, diesen Befehl zu nutzen.", ephemeral=True
+            )
+            return
+
+        embed = discord.Embed(
+            title="Ankündigung",
+            description=text,
+            color=discord.Color.blurple(),
+            timestamp=datetime.now(timezone.utc),
+        )
+        if interaction.guild.icon:
+            embed.set_thumbnail(url=interaction.guild.icon.url)
+        embed.set_author(
+            name=interaction.guild.name,
+            icon_url=interaction.guild.icon.url if interaction.guild.icon else None,
+        )
+        embed.set_footer(
+            text=f"Gesendet von {interaction.user.display_name}",
+            icon_url=interaction.user.display_avatar.url,
+        )
+
+        await interaction.response.send_message(
+            embed=embed,
+            allowed_mentions=ANNOUNCE_ALLOWED_MENTIONS,
+        )
+
+    @twitch_announce_group.command(
+        name="channel",
         description="Setzt den Channel für Twitch-Live-Announcements.",
     )
     @app_commands.describe(channel="Textkanal")
@@ -227,8 +313,8 @@ class AnnouncementCog(commands.Cog):
             ephemeral=True,
         )
 
-    @announce_group.command(
-        name="twitch_now",
+    @twitch_announce_group.command(
+        name="now",
         description="Sendet sofort einen Twitch-Live-Announcement, falls du live bist.",
     )
     async def twitch_announce_now(self, interaction: discord.Interaction):
@@ -261,7 +347,6 @@ class AnnouncementCog(commands.Cog):
             return
 
         stream = streams[0]
-        embed = await self.build_twitch_embed(stream)
         channel = await self.get_twitch_announce_channel(interaction.guild)
         if channel is None:
             await interaction.response.send_message(
@@ -270,7 +355,14 @@ class AnnouncementCog(commands.Cog):
             return
 
         try:
-            await channel.send(embed=embed)
+            await self.send_or_update_twitch_announcement(
+                channel, stream, force_new=True
+            )
+            stream_id = stream.get("id")
+            if stream_id:
+                await self.api.set_twitch_config(
+                    str(interaction.guild.id), last_stream_id=stream_id
+                )
         except (discord.Forbidden, discord.HTTPException):
             await interaction.response.send_message(
                 "Ich konnte im Announcement-Channel nicht senden.", ephemeral=True
@@ -308,21 +400,31 @@ class AnnouncementCog(commands.Cog):
 
                 streams = await self.fetch_twitch_stream()
                 if not streams:
+                    self.twitch_message_cache.pop(guild.id, None)
                     continue
 
                 stream = streams[0]
                 stream_id = stream.get("id")
 
                 if stream_id and stream_id != last_stream_id:
-                    embed = await self.build_twitch_embed(stream)
                     try:
-                        await channel.send(embed=embed)
+                        await self.send_or_update_twitch_announcement(
+                            channel, stream, force_new=True
+                        )
                     except (discord.Forbidden, discord.HTTPException):
                         logger.exception(
                             "Twitch announce send fehlgeschlagen (guild=%s)", guild.id
                         )
 
                     await self.api.set_twitch_config(g_id, last_stream_id=stream_id)
+                elif stream_id and guild.id in self.twitch_message_cache:
+                    try:
+                        await self.send_or_update_twitch_announcement(channel, stream)
+                    except (discord.Forbidden, discord.HTTPException):
+                        logger.exception(
+                            "Twitch announce update fehlgeschlagen (guild=%s)",
+                            guild.id,
+                        )
 
             except Exception:
                 logger.exception("twitch_check_loop guild error (guild=%s)", guild.id)

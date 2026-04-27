@@ -16,7 +16,7 @@ def _default_user_stats() -> Dict[str, int]:
 
 
 class CountingCog(commands.Cog):
-    CONFIRM_REACTION_DELAY_SECONDS = 2.0
+    CONFIRM_REACTION_DELAY_SECONDS = 0.5
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot

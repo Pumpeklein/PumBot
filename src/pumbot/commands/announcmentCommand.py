@@ -15,19 +15,23 @@ from src.pumbot.bot import logger
 from src.pumbot.utils.datetime_format import format_berlin_datetime
 
 ANNOUNCE_STAFF_ROLES = {"Admin", "Team", "Twitch Moderator", "Discord Moderator"}
-TWITCH_PING_ROLE_ID = 1441253029432262787
-TWITCH_ALLOWED_MENTIONS = discord.AllowedMentions(
-    everyone=False,
-    users=False,
-    roles=[discord.Object(id=TWITCH_PING_ROLE_ID)],
-    replied_user=False,
-)
+DEFAULT_TWITCH_PING_ROLE_ID = 1261003159896195154
 ANNOUNCE_ALLOWED_MENTIONS = discord.AllowedMentions(
     everyone=False,
     users=True,
     roles=True,
     replied_user=False,
 )
+
+
+def env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value and value.strip().isdigit():
+        return int(value)
+    return default
+
+
+TWITCH_PING_ROLE_ID = env_int("TWITCH_PING_ROLE_ID", DEFAULT_TWITCH_PING_ROLE_ID)
 
 
 def is_announce_staff(member: discord.Member) -> bool:
@@ -115,8 +119,26 @@ class AnnouncementCog(commands.Cog):
             logger.exception("get_twitch_announce_channel error")
             return None
 
-    def twitch_ping_content(self) -> str:
-        return f"<@&{TWITCH_PING_ROLE_ID}>"
+    def get_twitch_ping_role(self, guild: discord.Guild) -> Optional[discord.Role]:
+        role = guild.get_role(TWITCH_PING_ROLE_ID)
+        if role is None:
+            logger.warning(
+                "[Twitch] Ping-Rolle %s wurde in Guild %s nicht gefunden. "
+                "Bitte TWITCH_PING_ROLE_ID auf eine Rollen-ID aus diesem Server setzen.",
+                TWITCH_PING_ROLE_ID,
+                guild.id,
+            )
+        return role
+
+    def twitch_allowed_mentions(
+        self, role: Optional[discord.Role]
+    ) -> discord.AllowedMentions:
+        return discord.AllowedMentions(
+            everyone=False,
+            users=False,
+            roles=[role] if role else False,
+            replied_user=False,
+        )
 
     async def fetch_twitch_stream(self) -> List[Dict[str, Any]]:
         session = await self.get_session()
@@ -175,23 +197,48 @@ class AnnouncementCog(commands.Cog):
         force_new: bool = False,
     ) -> Optional[discord.Message]:
         embed = await self.build_twitch_embed(stream)
+        ping_role = self.get_twitch_ping_role(channel.guild)
         cached_message_id = self.twitch_message_cache.get(channel.guild.id)
 
         if cached_message_id and not force_new:
             try:
                 message = await channel.fetch_message(cached_message_id)
-                await message.edit(embed=embed)
+                await message.edit(
+                    content=ping_role.mention if ping_role else None,
+                    embed=embed,
+                    allowed_mentions=self.twitch_allowed_mentions(ping_role),
+                )
                 return message
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 self.twitch_message_cache.pop(channel.guild.id, None)
 
         message = await channel.send(
-            content=self.twitch_ping_content(),
+            content=ping_role.mention if ping_role else None,
             embed=embed,
-            allowed_mentions=TWITCH_ALLOWED_MENTIONS,
+            allowed_mentions=self.twitch_allowed_mentions(ping_role),
         )
         self.twitch_message_cache[channel.guild.id] = message.id
         return message
+
+    async def mark_twitch_announcement_offline(
+        self, channel: discord.TextChannel
+    ) -> Optional[discord.Message]:
+        cached_message_id = self.twitch_message_cache.get(channel.guild.id)
+        if not cached_message_id:
+            return None
+
+        try:
+            message = await channel.fetch_message(cached_message_id)
+            await message.edit(
+                content=None,
+                embed=self.build_twitch_offline_embed(),
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            self.twitch_message_cache.pop(channel.guild.id, None)
+            return message
+        except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+            self.twitch_message_cache.pop(channel.guild.id, None)
+            raise
 
     async def build_twitch_embed(self, stream: Dict[str, Any]) -> discord.Embed:
         try:
@@ -236,6 +283,19 @@ class AnnouncementCog(commands.Cog):
                 color=discord.Color.purple(),
                 url=f"https://twitch.tv/{self.twitch_user_login}",
             )
+
+    def build_twitch_offline_embed(self) -> discord.Embed:
+        url = f"https://twitch.tv/{self.twitch_user_login}"
+        embed = discord.Embed(
+            title=f"{self.twitch_user_login} ist aktuell offline",
+            description=f"Der Stream ist momentan offline.\n\n[Twitch-Kanal öffnen]({url})",
+            color=discord.Color.dark_grey(),
+            url=url,
+            timestamp=datetime.now(timezone.utc),
+        )
+        embed.add_field(name="Status", value="⚫ **Offline**", inline=True)
+        embed.set_footer(text="Twitch Announcement")
+        return embed
 
     twitch_announce_group = app_commands.Group(
         name="twitch_announce",
@@ -400,7 +460,14 @@ class AnnouncementCog(commands.Cog):
 
                 streams = await self.fetch_twitch_stream()
                 if not streams:
-                    self.twitch_message_cache.pop(guild.id, None)
+                    if guild.id in self.twitch_message_cache:
+                        try:
+                            await self.mark_twitch_announcement_offline(channel)
+                        except (discord.Forbidden, discord.HTTPException):
+                            logger.exception(
+                                "Twitch announce offline update fehlgeschlagen (guild=%s)",
+                                guild.id,
+                            )
                     continue
 
                 stream = streams[0]

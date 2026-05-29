@@ -1,19 +1,15 @@
 {% extends "base.html" %}
 {% from "_macros.html" import page_header, field, btn, stat, empty_state %}
 
-{% set month_names = {1: "Januar", 2: "Februar", 3: "März", 4: "April", 5: "Mai", 6: "Juni", 7: "Juli", 8: "August", 9: "September", 10: "Oktober", 11: "November", 12: "Dezember"} %}
-
 {% block content %}
-{{ page_header("Geburtstage", "Übersicht aller gespeicherten Geburtstage.", "Verwalte Geburtstage und den Gratulations-Channel.") }}
+{{ page_header("Geburtstage", "Uebersicht aller gespeicherten Geburtstage.", "Verwalte Geburtstage und den Gratulations-Channel.") }}
 
-{# Stats #}
 <div class="mb-6 grid gap-4 sm:grid-cols-2">
-  {{ stat("Gespeicherte Geburtstage", birthdays|length) }}
+  {{ stat("Gespeicherte Geburtstage", birthday_count) }}
   {{ stat("Gratulations-Channel", birthday_channel or "Nicht gesetzt") }}
 </div>
 <div class="mb-6 text-xs text-slate-500">Aktive Geburtstags-Guild: <span class="font-mono text-slate-300">{{ birthdays_guild_id }}</span></div>
 
-{# Settings #}
 <div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
   <h2 class="mb-4 text-sm font-semibold text-white">Einstellungen</h2>
   <form method="post" action="{{ url_for('birthdays_set_channel') }}" class="flex items-end gap-3">
@@ -26,16 +22,10 @@
 
 <div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
   <h2 class="mb-4 text-sm font-semibold text-white">Listen-Nachrichten</h2>
-  <p class="mb-4 text-sm text-slate-400">Diese Bot-Nachrichten werden bei Änderungen an der Geburtstagsliste automatisch aktualisiert.</p>
-
   <form method="post" action="{{ url_for('birthdays_add_message') }}" class="mb-5 flex flex-wrap items-end gap-3">
-    <div class="w-64">
-      {{ field("message_id", "Nachrichten-ID", placeholder="z.B. 1362697161598304439", required=true) }}
-    </div>
-    <div class="w-64">
-      {{ field("channel_id", "Channel-ID", placeholder="optional, sonst Fallback aus Config") }}
-    </div>
-    {{ btn("Nachricht hinzufügen") }}
+    <div class="w-64">{{ field("message_id", "Nachrichten-ID", placeholder="z.B. 1362697161598304439", required=true) }}</div>
+    <div class="w-64">{{ field("channel_id", "Channel-ID", placeholder="optional, sonst Fallback aus Config") }}</div>
+    {{ btn("Nachricht hinzufuegen") }}
   </form>
 
   {% if birthday_messages %}
@@ -56,14 +46,11 @@
           <td class="px-3 py-2.5 font-mono text-slate-200">{{ msg.message_id }}</td>
           <td class="px-3 py-2.5 font-mono text-slate-400">{{ msg.channel_id or "Fallback aus Config" }}</td>
           <td class="px-3 py-2.5 text-slate-300">{{ msg.message_type }}</td>
-          <td class="px-3 py-2.5 text-slate-500">{{ msg.meta_key or "—" }}</td>
+          <td class="px-3 py-2.5 text-slate-500">{{ msg.meta_key or "-" }}</td>
           <td class="px-3 py-2.5 text-right">
             <form method="post" action="{{ url_for('birthdays_delete_message', message_id=msg.message_id) }}" class="inline"
-              onsubmit="return confirm('Nachrichten-Verknüpfung wirklich entfernen?')">
-              <button type="submit"
-                class="rounded border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-400 transition hover:bg-red-500/20">
-                Entfernen
-              </button>
+              onsubmit="return confirm('Nachrichten-Verknuepfung wirklich entfernen?')">
+              <button type="submit" class="rounded border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-400 transition hover:bg-red-500/20">Entfernen</button>
             </form>
           </td>
         </tr>
@@ -72,34 +59,33 @@
     </table>
   </div>
   {% else %}
-  {{ empty_state("Keine Listen-Nachrichten hinterlegt", "Füge oben eine Bot-Nachricht hinzu, die aktualisiert werden soll.") }}
+  {{ empty_state("Keine Listen-Nachrichten hinterlegt", "Fuege oben eine Bot-Nachricht hinzu, die aktualisiert werden soll.") }}
   {% endif %}
 </div>
 
-{# Add birthday #}
 <div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-  <h2 class="mb-4 text-sm font-semibold text-white">Geburtstag hinzufügen</h2>
+  <h2 class="mb-4 text-sm font-semibold text-white">Geburtstag hinzufuegen</h2>
   <form method="post" action="{{ url_for('birthdays_add') }}" class="flex flex-wrap items-end gap-3">
-    <div class="w-52">
-      {{ field("user_id", "User ID", placeholder="z.B. 123456789012345678", required=true) }}
-    </div>
-    <div class="w-20">
-      {{ field("day", "Tag", type="number", min=1, max=31, required=true) }}
-    </div>
-    <div class="w-20">
-      {{ field("month", "Monat", type="number", min=1, max=12, required=true) }}
-    </div>
-    <div class="w-24">
-      {{ field("year", "Jahr", type="number", required=false, placeholder="optional") }}
-    </div>
-    {{ btn("Hinzufügen") }}
+    <div class="w-52">{{ field("user_id", "User ID", placeholder="z.B. 123456789012345678", required=true) }}</div>
+    <div class="w-20">{{ field("day", "Tag", type="number", min=1, max=31, required=true) }}</div>
+    <div class="w-20">{{ field("month", "Monat", type="number", min=1, max=12, required=true) }}</div>
+    <div class="w-24">{{ field("year", "Jahr", type="number", required=false, placeholder="optional") }}</div>
+    {{ btn("Hinzufuegen") }}
   </form>
 </div>
 
-{# Birthday list by month #}
-<div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+<div data-paginated-table data-endpoint="{{ url_for('panel_api_birthdays') }}" data-form="#birthdays-filter" data-page-size="25" class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <script type="application/json">
+    [
+      {"type":"user","nameKey":"user_display_name","subKey":"user_id","avatarKey":"user_avatar_url","class":"px-3 py-2.5"},
+      {"key":"date_label","class":"px-3 py-2.5 text-white font-medium"},
+      {"key":"month_name","class":"px-3 py-2.5 text-slate-400"},
+      {"key":"last_congrats","type":"date","class":"px-3 py-2.5 text-slate-500 text-xs"},
+      {"type":"delete","urlKey":"delete_url","label":"Loeschen","confirm":"Geburtstag wirklich loeschen?","class":"px-3 py-2.5 text-right"}
+    ]
+  </script>
+  <form id="birthdays-filter"><input type="hidden" name="guild_id" value="{{ birthdays_guild_id }}"></form>
   <h2 class="mb-4 text-sm font-semibold text-white">Alle Geburtstage</h2>
-  {% if birthdays %}
   <div class="overflow-x-auto">
     <table class="w-full text-left text-sm">
       <thead>
@@ -111,31 +97,21 @@
           <th class="px-3 py-2.5 text-right">Aktionen</th>
         </tr>
       </thead>
-      <tbody>
-        {% for b in birthdays %}
-        <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]">
-          <td class="px-3 py-2.5 text-slate-200">{{ b.display_name or b.user_id }}</td>
-          <td class="px-3 py-2.5 text-white font-medium">
-            {{ "%02d"|format(b.day) }}.{{ "%02d"|format(b.month) }}{% if b.year %}.{{ b.year }}{% endif %}
-          </td>
-          <td class="px-3 py-2.5 text-slate-400">{{ month_names.get(b.month, "?") }}</td>
-          <td class="px-3 py-2.5 text-slate-500 text-xs">{{ b.last_congrats|date_de if b.last_congrats else "—" }}</td>
-          <td class="px-3 py-2.5 text-right">
-            <form method="post" action="{{ url_for('birthdays_delete', user_id=b.user_id) }}" class="inline"
-              onsubmit="return confirm('Geburtstag wirklich löschen?')">
-              <button type="submit"
-                class="rounded border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-400 transition hover:bg-red-500/20">
-                Löschen
-              </button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
+      <tbody data-table-body></tbody>
     </table>
   </div>
-  {% else %}
-  {{ empty_state("Keine Geburtstage gespeichert", "Füge oben einen neuen Geburtstag hinzu.") }}
-  {% endif %}
+  <div data-table-empty class="hidden">{{ empty_state("Keine Geburtstage gespeichert", "Fuege oben einen neuen Geburtstag hinzu.") }}</div>
+  <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400">
+    <span data-table-status></span>
+    <div class="flex items-center gap-2">
+      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option>10</option><option selected>25</option><option>50</option><option>100</option></select>
+      <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurueck</button>
+      <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
+    </div>
+  </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
 {% endblock %}

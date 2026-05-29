@@ -405,12 +405,9 @@ def get_guild_member(guild_id: str, user_id: str) -> dict | None:
         return dict(row) if row else None
 
 
-def list_guild_members(
-    guild_id: str,
-    q: str = "",
-    status: str = "all",
-    limit: int = 200,
-) -> list[dict]:
+def _guild_members_where(
+    guild_id: str, q: str = "", status: str = "all"
+) -> tuple[list[str], list[Any]]:
     clauses = ["guild_id = ?"]
     params: list[Any] = [guild_id]
     if status in {"active", "left"}:
@@ -422,17 +419,39 @@ def list_guild_members(
             "(user_id LIKE ? OR username LIKE ? OR global_name LIKE ? OR display_name LIKE ?)"
         )
         params.extend([q_like, q_like, q_like, q_like])
+    return clauses, params
+
+
+def list_guild_members(
+    guild_id: str,
+    q: str = "",
+    status: str = "all",
+    limit: int = 200,
+    offset: int = 0,
+) -> list[dict]:
+    clauses, params = _guild_members_where(guild_id, q, status)
     params.append(limit)
+    params.append(offset)
     with _connect() as conn:
         rows = conn.execute(
             f"""SELECT *
                 FROM guild_members
                 WHERE {' AND '.join(clauses)}
                 ORDER BY status ASC, display_name COLLATE NOCASE ASC
-                LIMIT ?""",
+                LIMIT ? OFFSET ?""",
             params,
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def count_guild_members(guild_id: str, q: str = "", status: str = "all") -> int:
+    clauses, params = _guild_members_where(guild_id, q, status)
+    with _connect() as conn:
+        row = conn.execute(
+            f"SELECT COUNT(*) AS total FROM guild_members WHERE {' AND '.join(clauses)}",
+            params,
+        ).fetchone()
+        return int(row["total"] if row else 0)
 
 
 def get_guild_member_name_history(guild_id: str, user_id: str) -> list[dict]:
@@ -570,12 +589,30 @@ def delete_config(guild_id: str, key: str) -> None:
 
 # ══════════ Birthdays ══════════
 
-def get_birthdays(guild_id: str) -> list[dict]:
+def get_birthdays(guild_id: str, limit: int | None = None, offset: int = 0) -> list[dict]:
     with _connect() as conn:
-        rows = conn.execute(
-            "SELECT * FROM birthdays WHERE guild_id = ? ORDER BY month, day", (guild_id,)
-        ).fetchall()
+        if limit is None:
+            rows = conn.execute(
+                "SELECT * FROM birthdays WHERE guild_id = ? ORDER BY month, day",
+                (guild_id,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT * FROM birthdays
+                   WHERE guild_id = ?
+                   ORDER BY month, day
+                   LIMIT ? OFFSET ?""",
+                (guild_id, limit, offset),
+            ).fetchall()
         return [dict(r) for r in rows]
+
+
+def count_birthdays(guild_id: str) -> int:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS total FROM birthdays WHERE guild_id = ?", (guild_id,)
+        ).fetchone()
+        return int(row["total"] if row else 0)
 
 
 def get_birthday(guild_id: str, user_id: str) -> dict | None:
@@ -681,12 +718,23 @@ def delete_bot_message(guild_id: str, message_type: str, message_id: str) -> Non
 
 # ══════════ Warnings ══════════
 
-def get_warnings(guild_id: str, user_id: str) -> list[dict]:
+def get_warnings(
+    guild_id: str, user_id: str, limit: int | None = None, offset: int = 0
+) -> list[dict]:
     with _connect() as conn:
-        rows = conn.execute(
-            "SELECT * FROM warnings WHERE guild_id = ? AND user_id = ? ORDER BY created_at DESC",
-            (guild_id, user_id),
-        ).fetchall()
+        if limit is None:
+            rows = conn.execute(
+                "SELECT * FROM warnings WHERE guild_id = ? AND user_id = ? ORDER BY created_at DESC",
+                (guild_id, user_id),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT * FROM warnings
+                   WHERE guild_id = ? AND user_id = ?
+                   ORDER BY created_at DESC
+                   LIMIT ? OFFSET ?""",
+                (guild_id, user_id, limit, offset),
+            ).fetchall()
         return [dict(r) for r in rows]
 
 
@@ -716,13 +764,31 @@ def clear_warnings(guild_id: str, user_id: str) -> int:
         return cursor.rowcount
 
 
-def list_all_warnings(guild_id: str, limit: int = 200) -> list[dict]:
+def list_all_warnings(guild_id: str, limit: int = 200, offset: int = 0) -> list[dict]:
     with _connect() as conn:
         rows = conn.execute(
-            "SELECT * FROM warnings WHERE guild_id = ? ORDER BY created_at DESC LIMIT ?",
-            (guild_id, limit),
+            """SELECT * FROM warnings
+               WHERE guild_id = ?
+               ORDER BY created_at DESC
+               LIMIT ? OFFSET ?""",
+            (guild_id, limit, offset),
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def count_warnings(guild_id: str, user_id: str | None = None) -> int:
+    with _connect() as conn:
+        if user_id:
+            row = conn.execute(
+                "SELECT COUNT(*) AS total FROM warnings WHERE guild_id = ? AND user_id = ?",
+                (guild_id, user_id),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT COUNT(*) AS total FROM warnings WHERE guild_id = ?",
+                (guild_id,),
+            ).fetchone()
+        return int(row["total"] if row else 0)
 
 
 # ══════════ Counting ══════════
@@ -808,7 +874,7 @@ def set_counting_stats(guild_id: str, user_id: str, **kwargs: Any) -> None:
                 conn.commit()
 
 
-def get_counting_leaderboard(guild_id: str, limit: int = 10) -> list[dict]:
+def get_counting_leaderboard(guild_id: str, limit: int = 10, offset: int = 0) -> list[dict]:
     with _connect() as conn:
         rows = conn.execute(
             """SELECT s.*, m.display_name, m.username, m.status AS member_status
@@ -817,10 +883,19 @@ def get_counting_leaderboard(guild_id: str, limit: int = 10) -> list[dict]:
                  ON m.guild_id = s.guild_id AND m.user_id = s.user_id
                WHERE s.guild_id = ?
                ORDER BY s.correct DESC
-               LIMIT ?""",
-            (guild_id, limit),
+               LIMIT ? OFFSET ?""",
+            (guild_id, limit, offset),
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def count_counting_leaderboard(guild_id: str) -> int:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS total FROM counting_user_stats WHERE guild_id = ?",
+            (guild_id,),
+        ).fetchone()
+        return int(row["total"] if row else 0)
 
 
 # ══════════ Auto Publisher ══════════
@@ -1087,16 +1162,27 @@ def get_ticket(ticket_id: str) -> dict[str, Any] | None:
         return dict(row) if row else None
 
 
-def list_tickets(q: str = "", limit: int = 200) -> list[dict[str, Any]]:
+def list_tickets(q: str = "", limit: int = 200, offset: int = 0) -> list[dict[str, Any]]:
     q_like = f"%{q}%"
     with _connect() as conn:
         rows = conn.execute(
             """SELECT * FROM tickets
                WHERE ticket_id LIKE ? OR subject LIKE ? OR creator_user_id LIKE ? OR creator_username LIKE ?
-               ORDER BY updated_at DESC LIMIT ?""",
-            (q_like, q_like, q_like, q_like, limit),
+               ORDER BY updated_at DESC LIMIT ? OFFSET ?""",
+            (q_like, q_like, q_like, q_like, limit, offset),
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def count_tickets(q: str = "") -> int:
+    q_like = f"%{q}%"
+    with _connect() as conn:
+        row = conn.execute(
+            """SELECT COUNT(*) AS total FROM tickets
+               WHERE ticket_id LIKE ? OR subject LIKE ? OR creator_user_id LIKE ? OR creator_username LIKE ?""",
+            (q_like, q_like, q_like, q_like),
+        ).fetchone()
+        return int(row["total"] if row else 0)
 
 
 # ══════════ Ticket Messages ══════════

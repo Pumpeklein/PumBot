@@ -32,6 +32,11 @@ try:
         add_selfrole_mapping,
         add_ticket_message,
         add_warning,
+        count_birthdays,
+        count_counting_leaderboard,
+        count_guild_members,
+        count_tickets,
+        count_warnings,
         clear_warnings,
         create_role,
         create_selfrole_panel,
@@ -96,7 +101,6 @@ try:
     from .auth import (
         current_user,
         discord_login_url,
-        fetch_guild_member_display_name,
         has_permission,
         login_required,
         login_user_from_oauth,
@@ -113,6 +117,11 @@ except ImportError:
         add_selfrole_mapping,
         add_ticket_message,
         add_warning,
+        count_birthdays,
+        count_counting_leaderboard,
+        count_guild_members,
+        count_tickets,
+        count_warnings,
         clear_warnings,
         create_role,
         create_selfrole_panel,
@@ -177,7 +186,6 @@ except ImportError:
     from auth import (
         current_user,
         discord_login_url,
-        fetch_guild_member_display_name,
         has_permission,
         login_required,
         login_user_from_oauth,
@@ -252,26 +260,60 @@ def _format_date_fields(rows: list[dict], *fields: str) -> list[dict]:
 
 
 def _resolve_display_name(
-    user_id: str | int | None, cache: dict[str, str | None] | None = None
+    user_id: str | int | None,
+    cache: dict[str, str | None] | None = None,
+    guild_id: str | None = None,
 ) -> str | None:
     if user_id in (None, ""):
         return None
 
     key = str(user_id)
-    if cache is not None and key in cache:
-        return cache[key]
+    cache_key = f"{guild_id or DEFAULT_GUILD_ID}:{key}"
+    if cache is not None and cache_key in cache:
+        return cache[cache_key]
 
-    cached_member = get_guild_member(DEFAULT_GUILD_ID, key)
+    cached_member = get_guild_member(guild_id or DEFAULT_GUILD_ID, key)
     display_name = cached_member.get("display_name") if cached_member else None
     if not display_name:
-        display_name = fetch_guild_member_display_name(key)
-    if not display_name:
-        cached_user = get_user_by_discord_id(key)
-        display_name = cached_user.get("discord_username") if cached_user else key
+        display_name = key
 
     if cache is not None:
-        cache[key] = display_name
+        cache[cache_key] = display_name
     return display_name
+
+
+def _member_profile(guild_id: str, user_id: str | int | None) -> dict:
+    if user_id in (None, ""):
+        return {"display_name": None, "avatar_url": None, "username": None, "status": None}
+    member = get_guild_member(guild_id, str(user_id))
+    if not member:
+        return {
+            "display_name": str(user_id),
+            "avatar_url": None,
+            "username": None,
+            "status": None,
+        }
+    return {
+        "display_name": member.get("display_name") or member.get("username") or str(user_id),
+        "avatar_url": member.get("avatar_url"),
+        "username": member.get("username"),
+        "status": member.get("status"),
+    }
+
+
+def _attach_member_profile(
+    row: dict,
+    guild_id: str,
+    user_field: str,
+    prefix: str = "user",
+) -> dict:
+    profile = _member_profile(guild_id, row.get(user_field))
+    item = dict(row)
+    item[f"{prefix}_display_name"] = profile["display_name"]
+    item[f"{prefix}_avatar_url"] = profile["avatar_url"]
+    item[f"{prefix}_username"] = profile["username"]
+    item[f"{prefix}_status"] = profile["status"]
+    return item
 
 
 def _attach_display_name(
@@ -279,12 +321,15 @@ def _attach_display_name(
     user_field: str,
     target_field: str = "display_name",
     cache: dict[str, str | None] | None = None,
+    guild_id: str | None = None,
 ) -> list[dict]:
     local_cache = cache if cache is not None else {}
     enriched = []
     for row in rows:
         item = dict(row)
-        item[target_field] = _resolve_display_name(item.get(user_field), local_cache)
+        item[target_field] = _resolve_display_name(
+            item.get(user_field), local_cache, guild_id=guild_id
+        )
         enriched.append(item)
     return enriched
 
@@ -305,6 +350,29 @@ def _active_panel_guild_id() -> str:
             return str(guilds[0].id)
 
     return stored_guild_id
+
+
+def _pagination_args(default_page_size: int = 25) -> tuple[int, int, int]:
+    page = request.args.get("page", 1, type=int) or 1
+    page_size = request.args.get("page_size", default_page_size, type=int) or default_page_size
+    page = max(1, page)
+    page_size = max(1, min(100, page_size))
+    offset = (page - 1) * page_size
+    return page, page_size, offset
+
+
+def _paginated_response(items: list[dict], total: int, page: int, page_size: int):
+    return jsonify(
+        {
+            "items": items,
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total": total,
+                "pages": max(1, (total + page_size - 1) // page_size),
+            },
+        }
+    )
 
 
 # ════════════════ API KEY SECURITY ════════════════
@@ -375,24 +443,10 @@ def home():
 def tickets_page():
     ctx = _ctx()
     q = request.args.get("q", "")
-    limit_raw = request.args.get("limit", "200")
-    try:
-        limit = max(1, min(1000, int(limit_raw)))
-    except ValueError:
-        limit = 200
-    items = []
-    cache: dict[str, str] = {}
-    for ticket in list_tickets(q=q, limit=limit):
-        item = dict(ticket)
-        item["creator_display_name"] = _resolve_display_name(
-            item.get("creator_user_id"), cache
-        )
-        items.append(item)
     return render_template(
         "tickets.html",
-        items=items,
         q=q,
-        limit=limit,
+        total=count_tickets(q=q),
         active_page="tickets",
         **ctx,
     )
@@ -407,7 +461,9 @@ def ticket_detail(ticket_id: str):
         abort(404)
     t = {
         **t,
-        "creator_display_name": _resolve_display_name(t.get("creator_user_id")),
+        "creator_display_name": _resolve_display_name(
+            t.get("creator_user_id"), guild_id=t.get("guild_id") or DEFAULT_GUILD_ID
+        ),
     }
     logs = list_logs_for_ticket(ticket_id, limit=200)
     messages = get_ticket_messages(ticket_id)
@@ -724,20 +780,13 @@ def counting_page():
     state = {
         **state,
         "last_user_display_name": _resolve_display_name(
-            state.get("last_user_id"), cache
+            state.get("last_user_id"), cache, guild_id=DEFAULT_GUILD_ID
         ),
     }
-    leaderboard = []
-    for entry in get_counting_leaderboard(DEFAULT_GUILD_ID, limit=50):
-        item = dict(entry)
-        item["display_name"] = item.get("display_name") or _resolve_display_name(
-            item.get("user_id"), cache
-        )
-        leaderboard.append(item)
     return render_template(
         "counting.html",
         state=state,
-        leaderboard=leaderboard,
+        guild_id=DEFAULT_GUILD_ID,
         active_page="counting",
         **ctx,
     )
@@ -768,23 +817,13 @@ def users_page():
     status = request.args.get("status", "all")
     if status not in {"all", "active", "left"}:
         status = "all"
-    limit_raw = request.args.get("limit", "300")
-    try:
-        limit = max(1, min(1000, int(limit_raw)))
-    except ValueError:
-        limit = 300
-    members = list_guild_members(guild_id, q=q, status=status, limit=limit)
-    active_count = len(list_guild_members(guild_id, status="active", limit=1000))
-    left_count = len(list_guild_members(guild_id, status="left", limit=1000))
+    active_count = count_guild_members(guild_id, status="active")
+    left_count = count_guild_members(guild_id, status="left")
     return render_template(
         "users.html",
-        members=_format_date_fields(
-            members, "joined_at", "left_at", "first_seen_at", "last_seen_at", "updated_at"
-        ),
         q=q,
         guild_id=guild_id,
         status=status,
-        limit=limit,
         active_count=active_count,
         left_count=left_count,
         active_page="users",
@@ -830,12 +869,11 @@ def birthdays_page():
             channel_id=legacy_channel_id,
             meta_key="birthdays",
         )
-    all_birthdays = _attach_display_name(get_birthdays(birthdays_guild_id), "user_id")
     birthday_channel = get_config(birthdays_guild_id, "birthday_channel_id")
     birthday_messages = list_bot_messages(birthdays_guild_id, "birthday_list")
     return render_template(
         "birthdays.html",
-        birthdays=all_birthdays,
+        birthday_count=count_birthdays(birthdays_guild_id),
         birthday_channel=birthday_channel,
         birthday_messages=birthday_messages,
         birthdays_guild_id=birthdays_guild_id,
@@ -946,17 +984,12 @@ def warnings_page():
     ctx = _ctx()
     q_user = request.args.get("user_id", "").strip()
     cache: dict[str, str | None] = {}
-    if q_user:
-        warns = get_warnings(DEFAULT_GUILD_ID, q_user)
-    else:
-        warns = list_all_warnings(DEFAULT_GUILD_ID, limit=200)
-    warns = _attach_display_name(warns, "user_id", "user_display_name", cache)
-    warns = _attach_display_name(warns, "moderator_id", "moderator_display_name", cache)
     return render_template(
         "warnings.html",
-        warnings=warns,
+        warning_count=count_warnings(DEFAULT_GUILD_ID, q_user or None),
         q_user=q_user,
-        q_user_display_name=_resolve_display_name(q_user, cache) if q_user else None,
+        q_user_display_name=_resolve_display_name(q_user, cache, guild_id=DEFAULT_GUILD_ID) if q_user else None,
+        guild_id=DEFAULT_GUILD_ID,
         active_page="warnings",
         **ctx,
     )
@@ -1080,6 +1113,105 @@ def server_stats_save():
             pass
 
     return redirect(url_for("server_stats_page"))
+
+
+@app.get("/panel-api/tickets")
+@login_required
+def panel_api_tickets():
+    q = request.args.get("q", "").strip()
+    page, page_size, offset = _pagination_args()
+    rows = []
+    for ticket in list_tickets(q=q, limit=page_size, offset=offset):
+        guild_id = ticket.get("guild_id") or DEFAULT_GUILD_ID
+        item = _attach_member_profile(ticket, guild_id, "creator_user_id", "creator")
+        item["detail_url"] = url_for("ticket_detail", ticket_id=item["ticket_id"])
+        rows.append(item)
+    return _paginated_response(rows, count_tickets(q=q), page, page_size)
+
+
+@app.get("/panel-api/users")
+@permission_required("users.view")
+def panel_api_users():
+    guild_id = _active_panel_guild_id()
+    q = request.args.get("q", "").strip()
+    status = request.args.get("status", "all")
+    if status not in {"all", "active", "left"}:
+        status = "all"
+    page, page_size, offset = _pagination_args()
+    rows = list_guild_members(
+        guild_id, q=q, status=status, limit=page_size, offset=offset
+    )
+    for row in rows:
+        row["detail_url"] = url_for(
+            "user_detail_page", user_id=row["user_id"], guild_id=guild_id
+        )
+    return _paginated_response(
+        _format_date_fields(rows, "joined_at", "left_at", "first_seen_at", "last_seen_at", "updated_at"),
+        count_guild_members(guild_id, q=q, status=status),
+        page,
+        page_size,
+    )
+
+
+@app.get("/panel-api/birthdays")
+@permission_required("config.manage")
+def panel_api_birthdays():
+    guild_id = request.args.get("guild_id") or get_birthdays_panel_guild_id(DEFAULT_GUILD_ID)
+    page, page_size, offset = _pagination_args()
+    month_names = {
+        1: "Januar", 2: "Februar", 3: "Maerz", 4: "April",
+        5: "Mai", 6: "Juni", 7: "Juli", 8: "August",
+        9: "September", 10: "Oktober", 11: "November", 12: "Dezember",
+    }
+    rows = []
+    for row in get_birthdays(guild_id, limit=page_size, offset=offset):
+        item = _attach_member_profile(row, guild_id, "user_id", "user")
+        item["date_label"] = f"{int(item['day']):02d}.{int(item['month']):02d}" + (
+            f".{item['year']}" if item.get("year") else ""
+        )
+        item["month_name"] = month_names.get(item.get("month"), "?")
+        item["delete_url"] = url_for("birthdays_delete", user_id=item["user_id"])
+        rows.append(item)
+    return _paginated_response(rows, count_birthdays(guild_id), page, page_size)
+
+
+@app.get("/panel-api/warnings")
+@permission_required("users.warn")
+def panel_api_warnings():
+    guild_id = request.args.get("guild_id") or DEFAULT_GUILD_ID
+    q_user = request.args.get("user_id", "").strip()
+    page, page_size, offset = _pagination_args()
+    if q_user:
+        warnings = get_warnings(guild_id, q_user, limit=page_size, offset=offset)
+    else:
+        warnings = list_all_warnings(guild_id, limit=page_size, offset=offset)
+    rows = []
+    for warning in warnings:
+        item = _attach_member_profile(warning, guild_id, "user_id", "user")
+        item = _attach_member_profile(item, guild_id, "moderator_id", "moderator")
+        item["delete_url"] = url_for("warnings_delete", warning_id=item["id"])
+        rows.append(item)
+    return _paginated_response(
+        rows, count_warnings(guild_id, q_user or None), page, page_size
+    )
+
+
+@app.get("/panel-api/counting/leaderboard")
+@permission_required("config.manage")
+def panel_api_counting_leaderboard():
+    guild_id = request.args.get("guild_id") or DEFAULT_GUILD_ID
+    page, page_size, offset = _pagination_args()
+    rows = []
+    for index, entry in enumerate(
+        get_counting_leaderboard(guild_id, limit=page_size, offset=offset),
+        start=offset + 1,
+    ):
+        item = _attach_member_profile(entry, guild_id, "user_id", "user")
+        item["rank"] = index
+        rows.append(item)
+    return _paginated_response(
+        rows, count_counting_leaderboard(guild_id), page, page_size
+    )
 
 
 # ════════════════════════════════════════════════════════

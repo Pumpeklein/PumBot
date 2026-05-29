@@ -66,6 +66,22 @@ class ApiClient:
     async def set_config(self, guild_id: str, key: str, value: str) -> None:
         await self.put(f"/api/guild/{guild_id}/config/{key}", {"value": value})
 
+    async def sync_guild_members(
+        self, guild_id: str, members: list[dict], mark_missing_left: bool = True
+    ) -> dict | None:
+        return await self.post(
+            f"/api/guild/{guild_id}/members/sync",
+            {"members": members, "mark_missing_left": mark_missing_left},
+        )
+
+    async def upsert_guild_member(
+        self, guild_id: str, user_id: str, data: dict
+    ) -> dict | None:
+        return await self.put(f"/api/guild/{guild_id}/members/{user_id}", data)
+
+    async def mark_guild_member_left(self, guild_id: str, user_id: str) -> None:
+        await self.post(f"/api/guild/{guild_id}/members/{user_id}/left")
+
     # ── Birthdays ──
 
     async def get_birthdays(self, guild_id: str) -> list:

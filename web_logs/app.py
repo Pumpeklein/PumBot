@@ -53,6 +53,8 @@ try:
         get_counting,
         get_counting_leaderboard,
         get_counting_stats,
+        get_guild_member,
+        get_guild_member_name_history,
         get_log_channel,
         get_selfrole_panel,
         get_server_stats,
@@ -65,10 +67,12 @@ try:
         insert_ticket_log,
         list_all_warnings,
         list_close_reasons,
+        list_guild_members,
         list_logs_for_ticket,
         list_roles,
         list_tickets,
         mark_birthday_congrats,
+        mark_guild_member_left,
         remove_auto_publisher_channel,
         remove_log_channel,
         remove_selfrole_mapping,
@@ -81,6 +85,8 @@ try:
         set_log_channel,
         set_server_stats,
         set_twitch_config,
+        sync_guild_members,
+        upsert_guild_member,
         upsert_bot_message,
         update_close_reason,
         update_role,
@@ -127,6 +133,8 @@ except ImportError:
         get_counting,
         get_counting_leaderboard,
         get_counting_stats,
+        get_guild_member,
+        get_guild_member_name_history,
         get_log_channel,
         get_selfrole_panel,
         get_server_stats,
@@ -139,10 +147,12 @@ except ImportError:
         insert_ticket_log,
         list_all_warnings,
         list_close_reasons,
+        list_guild_members,
         list_logs_for_ticket,
         list_roles,
         list_tickets,
         mark_birthday_congrats,
+        mark_guild_member_left,
         remove_auto_publisher_channel,
         remove_log_channel,
         remove_selfrole_mapping,
@@ -155,6 +165,8 @@ except ImportError:
         set_log_channel,
         set_server_stats,
         set_twitch_config,
+        sync_guild_members,
+        upsert_guild_member,
         upsert_bot_message,
         update_close_reason,
         update_role,
@@ -247,7 +259,10 @@ def _resolve_display_name(
     if cache is not None and key in cache:
         return cache[key]
 
-    display_name = fetch_guild_member_display_name(key)
+    cached_member = get_guild_member(DEFAULT_GUILD_ID, key)
+    display_name = cached_member.get("display_name") if cached_member else None
+    if not display_name:
+        display_name = fetch_guild_member_display_name(key)
     if not display_name:
         cached_user = get_user_by_discord_id(key)
         display_name = cached_user.get("discord_username") if cached_user else key
@@ -695,7 +710,9 @@ def counting_page():
     leaderboard = []
     for entry in get_counting_leaderboard(DEFAULT_GUILD_ID, limit=50):
         item = dict(entry)
-        item["display_name"] = _resolve_display_name(item.get("user_id"), cache)
+        item["display_name"] = item.get("display_name") or _resolve_display_name(
+            item.get("user_id"), cache
+        )
         leaderboard.append(item)
     return render_template(
         "counting.html",
@@ -720,6 +737,56 @@ def counting_set_channel():
 def counting_reset():
     set_counting(DEFAULT_GUILD_ID, last_number=0, last_user_id=None, highscore=0)
     return redirect(url_for("counting_page"))
+
+
+@app.get("/users")
+@permission_required("users.view")
+def users_page():
+    ctx = _ctx()
+    q = request.args.get("q", "").strip()
+    status = request.args.get("status", "all")
+    if status not in {"all", "active", "left"}:
+        status = "all"
+    limit_raw = request.args.get("limit", "300")
+    try:
+        limit = max(1, min(1000, int(limit_raw)))
+    except ValueError:
+        limit = 300
+    members = list_guild_members(DEFAULT_GUILD_ID, q=q, status=status, limit=limit)
+    active_count = len(list_guild_members(DEFAULT_GUILD_ID, status="active", limit=1000))
+    left_count = len(list_guild_members(DEFAULT_GUILD_ID, status="left", limit=1000))
+    return render_template(
+        "users.html",
+        members=_format_date_fields(
+            members, "joined_at", "left_at", "first_seen_at", "last_seen_at", "updated_at"
+        ),
+        q=q,
+        status=status,
+        limit=limit,
+        active_count=active_count,
+        left_count=left_count,
+        active_page="users",
+        **ctx,
+    )
+
+
+@app.get("/users/<user_id>")
+@permission_required("users.view")
+def user_detail_page(user_id: str):
+    ctx = _ctx()
+    member = get_guild_member(DEFAULT_GUILD_ID, user_id)
+    if not member:
+        abort(404)
+    history = get_guild_member_name_history(DEFAULT_GUILD_ID, user_id)
+    return render_template(
+        "user_detail.html",
+        member=_format_date_fields(
+            [member], "joined_at", "left_at", "first_seen_at", "last_seen_at", "updated_at"
+        )[0],
+        history=_format_date_fields(history, "changed_at"),
+        active_page="users",
+        **ctx,
+    )
 
 
 # ── Birthdays Overview Page ──
@@ -1023,6 +1090,61 @@ def api_set_config(guild_id: str, key: str):
 @api_key_required
 def api_get_birthdays(guild_id: str):
     return jsonify(get_birthdays(guild_id))
+
+
+@app.get("/api/guild/<guild_id>/members")
+@api_key_required
+def api_get_guild_members(guild_id: str):
+    q = request.args.get("q", "").strip()
+    status = request.args.get("status", "all")
+    limit = request.args.get("limit", 500, type=int)
+    limit = max(1, min(2000, limit or 500))
+    return jsonify(list_guild_members(guild_id, q=q, status=status, limit=limit))
+
+
+@app.post("/api/guild/<guild_id>/members/sync")
+@api_key_required
+def api_sync_guild_members(guild_id: str):
+    data = request.get_json(silent=True) or {}
+    members = data.get("members") or []
+    if not isinstance(members, list):
+        return jsonify({"ok": False, "error": "members_must_be_list"}), 400
+    result = sync_guild_members(
+        guild_id,
+        members,
+        mark_missing_left=bool(data.get("mark_missing_left", True)),
+    )
+    return jsonify({"ok": True, **result})
+
+
+@app.get("/api/guild/<guild_id>/members/<user_id>")
+@api_key_required
+def api_get_guild_member(guild_id: str, user_id: str):
+    member = get_guild_member(guild_id, user_id)
+    if not member:
+        return jsonify({"ok": False}), 404
+    return jsonify(member)
+
+
+@app.put("/api/guild/<guild_id>/members/<user_id>")
+@api_key_required
+def api_upsert_guild_member(guild_id: str, user_id: str):
+    data = request.get_json(silent=True) or {}
+    row = upsert_guild_member(guild_id, {**data, "user_id": user_id})
+    return jsonify(row)
+
+
+@app.post("/api/guild/<guild_id>/members/<user_id>/left")
+@api_key_required
+def api_mark_guild_member_left(guild_id: str, user_id: str):
+    mark_guild_member_left(guild_id, user_id)
+    return jsonify({"ok": True})
+
+
+@app.get("/api/guild/<guild_id>/members/<user_id>/name-history")
+@api_key_required
+def api_get_guild_member_name_history(guild_id: str, user_id: str):
+    return jsonify(get_guild_member_name_history(guild_id, user_id))
 
 
 @app.get("/api/guild/<guild_id>/birthdays/today")

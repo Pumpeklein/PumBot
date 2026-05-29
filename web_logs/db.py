@@ -178,6 +178,247 @@ def list_users() -> list[dict]:
         return [dict(r) for r in rows]
 
 
+def _member_name_changed(existing: sqlite3.Row, member: dict[str, Any]) -> bool:
+    return any(
+        (existing[key] or "") != (member.get(key) or "")
+        for key in ("username", "global_name", "display_name")
+    )
+
+
+def upsert_guild_member(guild_id: str, member: dict[str, Any]) -> dict:
+    user_id = str(member["user_id"])
+    username = str(member.get("username") or user_id)
+    display_name = str(member.get("display_name") or member.get("global_name") or username)
+    global_name = member.get("global_name")
+    discriminator = member.get("discriminator")
+    avatar_url = member.get("avatar_url")
+    is_bot = 1 if member.get("is_bot") else 0
+    status = member.get("status") or "active"
+    joined_at = member.get("joined_at")
+    left_at = member.get("left_at")
+
+    with _connect() as conn:
+        existing = conn.execute(
+            "SELECT * FROM guild_members WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id),
+        ).fetchone()
+        if existing and _member_name_changed(
+            existing,
+            {
+                "username": username,
+                "global_name": global_name,
+                "display_name": display_name,
+            },
+        ):
+            conn.execute(
+                """INSERT INTO guild_member_name_history (
+                     guild_id, user_id, old_username, old_global_name, old_display_name,
+                     new_username, new_global_name, new_display_name
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    guild_id,
+                    user_id,
+                    existing["username"],
+                    existing["global_name"],
+                    existing["display_name"],
+                    username,
+                    global_name,
+                    display_name,
+                ),
+            )
+
+        conn.execute(
+            """INSERT INTO guild_members (
+                 guild_id, user_id, username, global_name, display_name, discriminator,
+                 avatar_url, is_bot, status, joined_at, left_at, first_seen_at,
+                 last_seen_at, updated_at
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), datetime('now'))
+               ON CONFLICT(guild_id, user_id) DO UPDATE SET
+                 username = excluded.username,
+                 global_name = excluded.global_name,
+                 display_name = excluded.display_name,
+                 discriminator = excluded.discriminator,
+                 avatar_url = excluded.avatar_url,
+                 is_bot = excluded.is_bot,
+                 status = excluded.status,
+                 joined_at = COALESCE(excluded.joined_at, guild_members.joined_at),
+                 left_at = excluded.left_at,
+                 last_seen_at = datetime('now'),
+                 updated_at = datetime('now')""",
+            (
+                guild_id,
+                user_id,
+                username,
+                global_name,
+                display_name,
+                discriminator,
+                avatar_url,
+                is_bot,
+                status,
+                joined_at,
+                left_at,
+            ),
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT * FROM guild_members WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id),
+        ).fetchone()
+        return dict(row)
+
+
+def sync_guild_members(
+    guild_id: str, members: list[dict[str, Any]], mark_missing_left: bool = True
+) -> dict:
+    seen_ids = {str(member["user_id"]) for member in members if member.get("user_id")}
+    with _connect() as conn:
+        for member in members:
+            member = {**member, "status": "active", "left_at": None}
+            user_id = str(member["user_id"])
+            username = str(member.get("username") or user_id)
+            display_name = str(member.get("display_name") or member.get("global_name") or username)
+            existing = conn.execute(
+                "SELECT * FROM guild_members WHERE guild_id = ? AND user_id = ?",
+                (guild_id, user_id),
+            ).fetchone()
+            if existing and _member_name_changed(
+                existing,
+                {
+                    "username": username,
+                    "global_name": member.get("global_name"),
+                    "display_name": display_name,
+                },
+            ):
+                conn.execute(
+                    """INSERT INTO guild_member_name_history (
+                         guild_id, user_id, old_username, old_global_name, old_display_name,
+                         new_username, new_global_name, new_display_name
+                       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        guild_id,
+                        user_id,
+                        existing["username"],
+                        existing["global_name"],
+                        existing["display_name"],
+                        username,
+                        member.get("global_name"),
+                        display_name,
+                    ),
+                )
+            conn.execute(
+                """INSERT INTO guild_members (
+                     guild_id, user_id, username, global_name, display_name, discriminator,
+                     avatar_url, is_bot, status, joined_at, left_at, first_seen_at,
+                     last_seen_at, updated_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, NULL, datetime('now'), datetime('now'), datetime('now'))
+                   ON CONFLICT(guild_id, user_id) DO UPDATE SET
+                     username = excluded.username,
+                     global_name = excluded.global_name,
+                     display_name = excluded.display_name,
+                     discriminator = excluded.discriminator,
+                     avatar_url = excluded.avatar_url,
+                     is_bot = excluded.is_bot,
+                     status = 'active',
+                     joined_at = COALESCE(excluded.joined_at, guild_members.joined_at),
+                     left_at = NULL,
+                     last_seen_at = datetime('now'),
+                     updated_at = datetime('now')""",
+                (
+                    guild_id,
+                    user_id,
+                    username,
+                    member.get("global_name"),
+                    display_name,
+                    member.get("discriminator"),
+                    member.get("avatar_url"),
+                    1 if member.get("is_bot") else 0,
+                    member.get("joined_at"),
+                ),
+            )
+
+        missing_ids: list[str] = []
+        if mark_missing_left:
+            active_before = conn.execute(
+                "SELECT user_id FROM guild_members WHERE guild_id = ? AND status = 'active'",
+                (guild_id,),
+            ).fetchall()
+            missing_ids = [
+                row["user_id"] for row in active_before if row["user_id"] not in seen_ids
+            ]
+        if missing_ids:
+            placeholders = ",".join("?" * len(missing_ids))
+            conn.execute(
+                f"""UPDATE guild_members
+                    SET status = 'left', left_at = datetime('now'), updated_at = datetime('now')
+                    WHERE guild_id = ? AND user_id IN ({placeholders})""",
+                [guild_id] + missing_ids,
+            )
+        conn.commit()
+        return {"synced": len(seen_ids), "marked_left": len(missing_ids)}
+
+
+def mark_guild_member_left(guild_id: str, user_id: str) -> None:
+    with _connect() as conn:
+        conn.execute(
+            """UPDATE guild_members
+               SET status = 'left', left_at = datetime('now'), updated_at = datetime('now')
+               WHERE guild_id = ? AND user_id = ?""",
+            (guild_id, user_id),
+        )
+        conn.commit()
+
+
+def get_guild_member(guild_id: str, user_id: str) -> dict | None:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM guild_members WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def list_guild_members(
+    guild_id: str,
+    q: str = "",
+    status: str = "all",
+    limit: int = 200,
+) -> list[dict]:
+    clauses = ["guild_id = ?"]
+    params: list[Any] = [guild_id]
+    if status in {"active", "left"}:
+        clauses.append("status = ?")
+        params.append(status)
+    if q:
+        q_like = f"%{q}%"
+        clauses.append(
+            "(user_id LIKE ? OR username LIKE ? OR global_name LIKE ? OR display_name LIKE ?)"
+        )
+        params.extend([q_like, q_like, q_like, q_like])
+    params.append(limit)
+    with _connect() as conn:
+        rows = conn.execute(
+            f"""SELECT *
+                FROM guild_members
+                WHERE {' AND '.join(clauses)}
+                ORDER BY status ASC, display_name COLLATE NOCASE ASC
+                LIMIT ?""",
+            params,
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_guild_member_name_history(guild_id: str, user_id: str) -> list[dict]:
+    with _connect() as conn:
+        rows = conn.execute(
+            """SELECT *
+               FROM guild_member_name_history
+               WHERE guild_id = ? AND user_id = ?
+               ORDER BY changed_at DESC""",
+            (guild_id, user_id),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
 # ══════════ Roles & Permissions ══════════
 
 ALL_PERMISSIONS = [
@@ -542,7 +783,13 @@ def set_counting_stats(guild_id: str, user_id: str, **kwargs: Any) -> None:
 def get_counting_leaderboard(guild_id: str, limit: int = 10) -> list[dict]:
     with _connect() as conn:
         rows = conn.execute(
-            "SELECT * FROM counting_user_stats WHERE guild_id = ? ORDER BY correct DESC LIMIT ?",
+            """SELECT s.*, m.display_name, m.username, m.status AS member_status
+               FROM counting_user_stats s
+               LEFT JOIN guild_members m
+                 ON m.guild_id = s.guild_id AND m.user_id = s.user_id
+               WHERE s.guild_id = ?
+               ORDER BY s.correct DESC
+               LIMIT ?""",
             (guild_id, limit),
         ).fetchall()
         return [dict(r) for r in rows]

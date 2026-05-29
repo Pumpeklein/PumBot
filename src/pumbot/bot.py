@@ -106,6 +106,73 @@ class PumpeBot(commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.api = ApiClient()
+        self._member_sync_done = False
+
+    @staticmethod
+    def _avatar_url(member: discord.Member) -> str | None:
+        return str(member.display_avatar.url) if member.display_avatar else None
+
+    def _member_payload(
+        self, member: discord.Member, status: str = "active"
+    ) -> dict[str, object | None]:
+        return {
+            "user_id": str(member.id),
+            "username": member.name,
+            "global_name": member.global_name,
+            "display_name": member.display_name,
+            "discriminator": member.discriminator,
+            "avatar_url": self._avatar_url(member),
+            "is_bot": member.bot,
+            "status": status,
+            "joined_at": member.joined_at.isoformat() if member.joined_at else None,
+        }
+
+    async def _sync_guild_members(self, guild: discord.Guild) -> None:
+        try:
+            with contextlib.suppress(discord.HTTPException):
+                await guild.chunk(cache=True)
+            members = [self._member_payload(member) for member in guild.members]
+            expected_count = guild.member_count or len(members)
+            if len(members) < expected_count:
+                with contextlib.suppress(discord.HTTPException):
+                    fetched_members = [
+                        self._member_payload(member)
+                        async for member in guild.fetch_members(limit=None)
+                    ]
+                    if len(fetched_members) > len(members):
+                        members = fetched_members
+            has_complete_member_list = len(members) >= expected_count
+            if not has_complete_member_list:
+                logger.warning(
+                    "User-Sync fuer Guild %s nur teilweise: %s/%s Member im Cache. "
+                    "Fehlende User werden nicht als verlassen markiert.",
+                    guild.id,
+                    len(members),
+                    expected_count,
+                )
+            result = await self.api.sync_guild_members(
+                str(guild.id),
+                members,
+                mark_missing_left=has_complete_member_list,
+            )
+            logger.info(
+                "User-Sync fuer Guild %s fertig: %s Member, %s als verlassen markiert.",
+                guild.id,
+                result.get("synced") if result else len(members),
+                result.get("marked_left") if result else "unbekannt",
+            )
+        except Exception:
+            logger.exception("User-Sync fuer Guild %s fehlgeschlagen", guild.id)
+
+    async def _upsert_member(self, member: discord.Member, status: str = "active") -> None:
+        try:
+            await self.api.upsert_guild_member(
+                str(member.guild.id),
+                str(member.id),
+                self._member_payload(member, status=status),
+            )
+        except Exception:
+            logger.exception("User-Upsert fuer %s fehlgeschlagen", member.id)
 
     async def setup_hook(self) -> None:
         guild_obj = discord.Object(id=int(GUILD_ID)) if GUILD_ID is not None else None
@@ -152,6 +219,37 @@ class PumpeBot(commands.Bot):
             self.user,
             self.user.id if self.user else "unbekannt",
         )
+        if self._member_sync_done:
+            return
+        self._member_sync_done = True
+        for guild in self.guilds:
+            await self._sync_guild_members(guild)
+
+    async def on_member_join(self, member: discord.Member) -> None:
+        await self._upsert_member(member, status="active")
+
+    async def on_member_remove(self, member: discord.Member) -> None:
+        await self._upsert_member(member, status="left")
+        await self.api.mark_guild_member_left(str(member.guild.id), str(member.id))
+
+    async def on_member_update(
+        self, before: discord.Member, after: discord.Member
+    ) -> None:
+        if (
+            before.name != after.name
+            or before.global_name != after.global_name
+            or before.display_name != after.display_name
+            or before.display_avatar.url != after.display_avatar.url
+        ):
+            await self._upsert_member(after, status="active")
+
+    async def on_user_update(self, before: discord.User, after: discord.User) -> None:
+        if before.name == after.name and before.global_name == after.global_name:
+            return
+        for guild in self.guilds:
+            member = guild.get_member(after.id)
+            if member:
+                await self._upsert_member(member, status="active")
 
 
 bot = PumpeBot(

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header, field, btn, stat, badge, empty_state %}
+
+{% block content %}
+{{ page_header("User", "Useruebersicht", "Aktive und ehemalige Discord-Servermitglieder aus der lokalen Datenbank.") }}
+
+<div class="mb-6 grid gap-4 sm:grid-cols-3">
+  {{ stat("Aktiv", active_count) }}
+  {{ stat("Verlassen", left_count) }}
+  {{ stat("Angezeigt", members|length) }}
+</div>
+
+<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <form method="get" action="{{ url_for('users_page') }}" class="grid gap-4 md:grid-cols-[1fr_180px_120px_auto] md:items-end">
+    {{ field("q", "Suche", placeholder="Name oder User ID", required=false, value=q) }}
+    <div>
+      <label for="status" class="mb-1.5 block text-sm font-medium text-slate-400">Status</label>
+      <select id="status" name="status"
+        class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
+        <option value="all" {% if status == "all" %}selected{% endif %}>Alle</option>
+        <option value="active" {% if status == "active" %}selected{% endif %}>Aktiv</option>
+        <option value="left" {% if status == "left" %}selected{% endif %}>Verlassen</option>
+      </select>
+    </div>
+    {{ field("limit", "Limit", type="number", min=1, max=1000, value=limit) }}
+    {{ btn("Filtern") }}
+  </form>
+</div>
+
+<div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <h2 class="mb-4 text-sm font-semibold text-white">Mitglieder</h2>
+  {% if members %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead>
+        <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+          <th class="px-3 py-2.5">User</th>
+          <th class="px-3 py-2.5">ID</th>
+          <th class="px-3 py-2.5">Status</th>
+          <th class="px-3 py-2.5">Beigetreten</th>
+          <th class="px-3 py-2.5">Letzter Sync</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in members %}
+        <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]">
+          <td class="px-3 py-2.5">
+            <a href="{{ url_for('user_detail_page', user_id=m.user_id) }}" class="flex items-center gap-3 text-slate-200 hover:text-white">
+              {% if m.avatar_url %}
+              <img src="{{ m.avatar_url }}" alt="" class="h-8 w-8 rounded-full">
+              {% else %}
+              <span class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-xs font-semibold text-white">{{ (m.display_name or m.username)[:2]|upper }}</span>
+              {% endif %}
+              <span>
+                <span class="block font-medium">{{ m.display_name or m.username }}</span>
+                <span class="block text-xs text-slate-500">{{ m.username }}</span>
+              </span>
+            </a>
+          </td>
+          <td class="px-3 py-2.5 font-mono text-xs text-slate-400">{{ m.user_id }}</td>
+          <td class="px-3 py-2.5">
+            {% if m.status == "active" %}
+            {{ badge("Aktiv", "success") }}
+            {% else %}
+            {{ badge("Verlassen", "default") }}
+            {% endif %}
+          </td>
+          <td class="px-3 py-2.5 text-slate-300">{{ m.joined_at or "-" }}</td>
+          <td class="px-3 py-2.5 text-slate-400">{{ m.updated_at or "-" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  {{ empty_state("Keine User gefunden", "Der Bot-Sync hat noch keine passenden User in der Datenbank.") }}
+  {% endif %}
+</div>
+{% endblock %}

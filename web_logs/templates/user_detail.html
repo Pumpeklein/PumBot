@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header, stat, badge, empty_state %}
+
+{% block content %}
+{{ page_header("User", member.display_name or member.username, "Profil und Namenshistorie aus der lokalen Datenbank.") }}
+
+<div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  {{ stat("User ID", member.user_id) }}
+  {{ stat("Username", member.username) }}
+  {{ stat("Global Name", member.global_name or "-") }}
+  {{ stat("Bot", "Ja" if member.is_bot else "Nein") }}
+</div>
+
+<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <div class="flex flex-wrap items-center gap-4">
+    {% if member.avatar_url %}
+    <img src="{{ member.avatar_url }}" alt="" class="h-16 w-16 rounded-full">
+    {% endif %}
+    <div>
+      <div class="text-lg font-semibold text-white">{{ member.display_name or member.username }}</div>
+      <div class="mt-1 font-mono text-xs text-slate-500">{{ member.user_id }}</div>
+      <div class="mt-3">
+        {% if member.status == "active" %}
+        {{ badge("Aktiv", "success") }}
+        {% else %}
+        {{ badge("Verlassen", "default") }}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <dl class="mt-6 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+    <div>
+      <dt class="text-slate-500">Beigetreten</dt>
+      <dd class="mt-1 text-slate-200">{{ member.joined_at or "-" }}</dd>
+    </div>
+    <div>
+      <dt class="text-slate-500">Verlassen</dt>
+      <dd class="mt-1 text-slate-200">{{ member.left_at or "-" }}</dd>
+    </div>
+    <div>
+      <dt class="text-slate-500">Erst gesehen</dt>
+      <dd class="mt-1 text-slate-200">{{ member.first_seen_at or "-" }}</dd>
+    </div>
+    <div>
+      <dt class="text-slate-500">Aktualisiert</dt>
+      <dd class="mt-1 text-slate-200">{{ member.updated_at or "-" }}</dd>
+    </div>
+  </dl>
+</div>
+
+<div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <h2 class="mb-4 text-sm font-semibold text-white">Namenshistorie</h2>
+  {% if history %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead>
+        <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+          <th class="px-3 py-2.5">Zeitpunkt</th>
+          <th class="px-3 py-2.5">Alter Anzeigename</th>
+          <th class="px-3 py-2.5">Neuer Anzeigename</th>
+          <th class="px-3 py-2.5">Alter Username</th>
+          <th class="px-3 py-2.5">Neuer Username</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for h in history %}
+        <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]">
+          <td class="px-3 py-2.5 text-slate-400">{{ h.changed_at }}</td>
+          <td class="px-3 py-2.5 text-slate-300">{{ h.old_display_name or "-" }}</td>
+          <td class="px-3 py-2.5 text-white">{{ h.new_display_name or "-" }}</td>
+          <td class="px-3 py-2.5 text-slate-400">{{ h.old_username or "-" }}</td>
+          <td class="px-3 py-2.5 text-slate-300">{{ h.new_username or "-" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  {{ empty_state("Keine Namensaenderungen", "Fuer diesen User wurde noch keine Namensaenderung gespeichert.") }}
+  {% endif %}
+</div>
+{% endblock %}

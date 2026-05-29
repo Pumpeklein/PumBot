@@ -13,6 +13,38 @@ CREATE TABLE IF NOT EXISTS users (
   last_login TEXT
 );
 
+CREATE TABLE IF NOT EXISTS guild_members (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  username TEXT NOT NULL,
+  global_name TEXT,
+  display_name TEXT NOT NULL,
+  discriminator TEXT,
+  avatar_url TEXT,
+  is_bot INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'active',
+  joined_at TEXT,
+  left_at TEXT,
+  first_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+  last_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(guild_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS guild_member_name_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  old_username TEXT,
+  old_global_name TEXT,
+  old_display_name TEXT,
+  new_username TEXT,
+  new_global_name TEXT,
+  new_display_name TEXT,
+  changed_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- ── Roles & Permissions ──
 CREATE TABLE IF NOT EXISTS roles (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -204,3 +236,6 @@ CREATE INDEX IF NOT EXISTS idx_birthdays_guild ON birthdays(guild_id);
 CREATE INDEX IF NOT EXISTS idx_birthdays_month_day ON birthdays(month, day);
 CREATE INDEX IF NOT EXISTS idx_bot_messages_guild_type ON bot_messages(guild_id, message_type);
 CREATE INDEX IF NOT EXISTS idx_roles_guild ON roles(guild_id);
+CREATE INDEX IF NOT EXISTS idx_guild_members_guild_status ON guild_members(guild_id, status);
+CREATE INDEX IF NOT EXISTS idx_guild_members_user ON guild_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_guild_member_name_history_user ON guild_member_name_history(guild_id, user_id, changed_at);

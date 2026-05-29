@@ -11,10 +11,10 @@ from flask import abort, redirect, request, session, url_for
 
 try:
     from .config import Config, DEFAULT_GUILD_ID
-    from .db import get_permissions_for_discord_roles, get_user_by_discord_id, upsert_user
+    from .db import get_guild_member, get_permissions_for_discord_roles, get_user_by_discord_id, upsert_user
 except ImportError:
     from config import Config, DEFAULT_GUILD_ID
-    from db import get_permissions_for_discord_roles, get_user_by_discord_id, upsert_user
+    from db import get_guild_member, get_permissions_for_discord_roles, get_user_by_discord_id, upsert_user
 
 logger = logging.getLogger("web_logs.auth")
 
@@ -134,8 +134,11 @@ def fetch_guild_member_display_name(discord_user_id: str) -> str | None:
     if memory_cached_name is not _CACHE_MISS:
         return memory_cached_name
 
-    cached_user = get_user_by_discord_id(discord_user_id)
-    cached_name = cached_user.get("discord_username") if cached_user else None
+    cached_member = get_guild_member(DEFAULT_GUILD_ID, discord_user_id)
+    cached_name = cached_member.get("display_name") if cached_member else None
+    if not cached_name:
+        cached_user = get_user_by_discord_id(discord_user_id)
+        cached_name = cached_user.get("discord_username") if cached_user else None
     if cached_name:
         _set_cached_display_name(discord_user_id, cached_name)
         return cached_name

@@ -227,8 +227,7 @@ class CountingCog(commands.Cog):
         last_uid = state.get("last_user_id")
         highscore = int(state.get("highscore", 0))
         channel = guild.get_channel(channel_id)
-        last_user = guild.get_member(int(last_uid)) if last_uid else None
-        last_user_display = last_user.mention if last_user else chr(8212)
+        last_user_display = f"<@{last_uid}>" if last_uid else chr(8212)
         your_stats = await self._get_user_stats(guild.id, interaction.user.id)
 
         await interaction.response.send_message(
@@ -269,8 +268,7 @@ class CountingCog(commands.Cog):
 
         lines = []
         for rank, e in enumerate(entries, start=1):
-            member = guild.get_member(int(e["user_id"]))
-            name = member.mention if member else f"`{e['user_id']}`"
+            name = f"<@{e['user_id']}>"
             lines.append(
                 f"**#{rank}** {name} \u2013 \u2705 {e.get('correct', 0)} | Best-Streak: {e.get('best_streak', 0)}"
             )

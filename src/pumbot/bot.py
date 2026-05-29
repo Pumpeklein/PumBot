@@ -18,6 +18,11 @@ from src.pumbot import config
 from src.pumbot.services.api_client import ApiClient
 from web_logs.app import create_app
 from web_logs.config import Config as WebConfig
+from web_logs.db import (
+    mark_guild_member_left,
+    sync_guild_members,
+    upsert_guild_member,
+)
 
 
 LOGS_DIR = Path("logs")
@@ -107,6 +112,7 @@ class PumpeBot(commands.Bot):
         super().__init__(*args, **kwargs)
         self.api = ApiClient()
         self._member_sync_done = False
+        self._member_sync_task: asyncio.Task | None = None
 
     @staticmethod
     def _avatar_url(member: discord.Member) -> str | None:
@@ -127,8 +133,13 @@ class PumpeBot(commands.Bot):
             "joined_at": member.joined_at.isoformat() if member.joined_at else None,
         }
 
-    async def _sync_guild_members(self, guild: discord.Guild) -> None:
+    async def _sync_guild_members(self, guild: discord.Guild) -> bool:
         try:
+            if not guild.chunked:
+                logger.info(
+                    "User-Sync fuer Guild %s: lade Memberliste von Discord.",
+                    guild.id,
+                )
             with contextlib.suppress(discord.HTTPException):
                 await guild.chunk(cache=True)
             members = [self._member_payload(member) for member in guild.members]
@@ -150,10 +161,11 @@ class PumpeBot(commands.Bot):
                     len(members),
                     expected_count,
                 )
-            result = await self.api.sync_guild_members(
+            result = await asyncio.to_thread(
+                sync_guild_members,
                 str(guild.id),
                 members,
-                mark_missing_left=has_complete_member_list,
+                has_complete_member_list,
             )
             logger.info(
                 "User-Sync fuer Guild %s fertig: %s Member, %s als verlassen markiert.",
@@ -161,15 +173,38 @@ class PumpeBot(commands.Bot):
                 result.get("synced") if result else len(members),
                 result.get("marked_left") if result else "unbekannt",
             )
+            return True
         except Exception:
             logger.exception("User-Sync fuer Guild %s fehlgeschlagen", guild.id)
+            return False
+
+    async def _sync_all_guild_members_with_retries(self) -> None:
+        for attempt in range(1, 4):
+            results = [await self._sync_guild_members(guild) for guild in self.guilds]
+            if results and all(results):
+                self._member_sync_done = True
+                return
+            wait_seconds = attempt * 5
+            logger.warning(
+                "User-Sync nicht vollstaendig. Neuer Versuch %s/3 in %s Sekunden.",
+                attempt + 1,
+                wait_seconds,
+            )
+            await asyncio.sleep(wait_seconds)
 
     async def _upsert_member(self, member: discord.Member, status: str = "active") -> None:
         try:
-            await self.api.upsert_guild_member(
+            await asyncio.to_thread(
+                upsert_guild_member,
                 str(member.guild.id),
-                str(member.id),
                 self._member_payload(member, status=status),
+            )
+            logger.info(
+                "User %s (%s) fuer Guild %s als %s gespeichert.",
+                member.display_name,
+                member.id,
+                member.guild.id,
+                status,
             )
         except Exception:
             logger.exception("User-Upsert fuer %s fehlgeschlagen", member.id)
@@ -219,18 +254,23 @@ class PumpeBot(commands.Bot):
             self.user,
             self.user.id if self.user else "unbekannt",
         )
-        if self._member_sync_done:
+        if self._member_sync_done or (
+            self._member_sync_task is not None and not self._member_sync_task.done()
+        ):
             return
-        self._member_sync_done = True
-        for guild in self.guilds:
-            await self._sync_guild_members(guild)
+        self._member_sync_task = asyncio.create_task(
+            self._sync_all_guild_members_with_retries()
+        )
 
     async def on_member_join(self, member: discord.Member) -> None:
         await self._upsert_member(member, status="active")
 
+    async def on_guild_join(self, guild: discord.Guild) -> None:
+        await self._sync_guild_members(guild)
+
     async def on_member_remove(self, member: discord.Member) -> None:
         await self._upsert_member(member, status="left")
-        await self.api.mark_guild_member_left(str(member.guild.id), str(member.id))
+        await asyncio.to_thread(mark_guild_member_left, str(member.guild.id), str(member.id))
 
     async def on_member_update(
         self, before: discord.Member, after: discord.Member

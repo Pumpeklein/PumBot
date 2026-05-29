@@ -352,7 +352,7 @@ def _active_panel_guild_id() -> str:
     return stored_guild_id
 
 
-def _pagination_args(default_page_size: int = 25) -> tuple[int, int, int]:
+def _pagination_args(default_page_size: int = 10) -> tuple[int, int, int]:
     page = request.args.get("page", 1, type=int) or 1
     page_size = request.args.get("page_size", default_page_size, type=int) or default_page_size
     page = max(1, page)

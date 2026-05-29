@@ -96,7 +96,7 @@
     const load = async () => {
       const params = collectParams(form);
       params.set("page", page);
-      params.set("page_size", pageSize ? pageSize.value : root.dataset.pageSize || "25");
+      params.set("page_size", pageSize ? pageSize.value : root.dataset.pageSize || "10");
       body.innerHTML = `<tr><td colspan="${columns.length}" class="px-3 py-8 text-center text-slate-500">Laedt...</td></tr>`;
       const response = await fetch(`${endpoint}?${params.toString()}`, { headers: { Accept: "application/json" } });
       const data = await response.json();

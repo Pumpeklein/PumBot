@@ -55,6 +55,7 @@ try:
         get_counting_stats,
         get_guild_member,
         get_guild_member_name_history,
+        get_guild_members_panel_guild_id,
         get_log_channel,
         get_selfrole_panel,
         get_server_stats,
@@ -135,6 +136,7 @@ except ImportError:
         get_counting_stats,
         get_guild_member,
         get_guild_member_name_history,
+        get_guild_members_panel_guild_id,
         get_log_channel,
         get_selfrole_panel,
         get_server_stats,
@@ -285,6 +287,24 @@ def _attach_display_name(
         item[target_field] = _resolve_display_name(item.get(user_field), local_cache)
         enriched.append(item)
     return enriched
+
+
+def _active_panel_guild_id() -> str:
+    requested_guild_id = (request.args.get("guild_id") or "").strip()
+    if requested_guild_id:
+        return requested_guild_id
+
+    stored_guild_id = get_guild_members_panel_guild_id(DEFAULT_GUILD_ID)
+    if stored_guild_id != DEFAULT_GUILD_ID or list_guild_members(stored_guild_id, limit=1):
+        return stored_guild_id
+
+    bot = app.config.get("DISCORD_BOT")
+    if bot and getattr(bot, "is_ready", lambda: False)():
+        guilds = getattr(bot, "guilds", []) or []
+        if guilds:
+            return str(guilds[0].id)
+
+    return stored_guild_id
 
 
 # ════════════════ API KEY SECURITY ════════════════
@@ -743,6 +763,7 @@ def counting_reset():
 @permission_required("users.view")
 def users_page():
     ctx = _ctx()
+    guild_id = _active_panel_guild_id()
     q = request.args.get("q", "").strip()
     status = request.args.get("status", "all")
     if status not in {"all", "active", "left"}:
@@ -752,15 +773,16 @@ def users_page():
         limit = max(1, min(1000, int(limit_raw)))
     except ValueError:
         limit = 300
-    members = list_guild_members(DEFAULT_GUILD_ID, q=q, status=status, limit=limit)
-    active_count = len(list_guild_members(DEFAULT_GUILD_ID, status="active", limit=1000))
-    left_count = len(list_guild_members(DEFAULT_GUILD_ID, status="left", limit=1000))
+    members = list_guild_members(guild_id, q=q, status=status, limit=limit)
+    active_count = len(list_guild_members(guild_id, status="active", limit=1000))
+    left_count = len(list_guild_members(guild_id, status="left", limit=1000))
     return render_template(
         "users.html",
         members=_format_date_fields(
             members, "joined_at", "left_at", "first_seen_at", "last_seen_at", "updated_at"
         ),
         q=q,
+        guild_id=guild_id,
         status=status,
         limit=limit,
         active_count=active_count,
@@ -774,10 +796,11 @@ def users_page():
 @permission_required("users.view")
 def user_detail_page(user_id: str):
     ctx = _ctx()
-    member = get_guild_member(DEFAULT_GUILD_ID, user_id)
+    guild_id = _active_panel_guild_id()
+    member = get_guild_member(guild_id, user_id)
     if not member:
         abort(404)
-    history = get_guild_member_name_history(DEFAULT_GUILD_ID, user_id)
+    history = get_guild_member_name_history(guild_id, user_id)
     return render_template(
         "user_detail.html",
         member=_format_date_fields(

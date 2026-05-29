@@ -9,9 +9,11 @@
   {{ stat("Verlassen", left_count) }}
   {{ stat("Angezeigt", members|length) }}
 </div>
+<div class="mb-4 text-xs text-slate-500">Guild ID: {{ guild_id }}</div>
 
 <div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
   <form method="get" action="{{ url_for('users_page') }}" class="grid gap-4 md:grid-cols-[1fr_180px_120px_auto] md:items-end">
+    <input type="hidden" name="guild_id" value="{{ guild_id }}">
     {{ field("q", "Suche", placeholder="Name oder User ID", required=false, value=q) }}
     <div>
       <label for="status" class="mb-1.5 block text-sm font-medium text-slate-400">Status</label>
@@ -45,7 +47,7 @@
         {% for m in members %}
         <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]">
           <td class="px-3 py-2.5">
-            <a href="{{ url_for('user_detail_page', user_id=m.user_id) }}" class="flex items-center gap-3 text-slate-200 hover:text-white">
+            <a href="{{ url_for('user_detail_page', user_id=m.user_id, guild_id=guild_id) }}" class="flex items-center gap-3 text-slate-200 hover:text-white">
               {% if m.avatar_url %}
               <img src="{{ m.avatar_url }}" alt="" class="h-8 w-8 rounded-full">
               {% else %}

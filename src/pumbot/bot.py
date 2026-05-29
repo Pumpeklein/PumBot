@@ -112,7 +112,6 @@ class PumpeBot(commands.Bot):
         super().__init__(*args, **kwargs)
         self.api = ApiClient()
         self._member_sync_done = False
-        self._member_sync_task: asyncio.Task | None = None
 
     @staticmethod
     def _avatar_url(member: discord.Member) -> str | None:
@@ -135,7 +134,7 @@ class PumpeBot(commands.Bot):
 
     async def _sync_guild_members(self, guild: discord.Guild) -> bool:
         try:
-            if not guild.chunked:
+            if not getattr(guild, "chunked", False):
                 logger.info(
                     "User-Sync fuer Guild %s: lade Memberliste von Discord.",
                     guild.id,
@@ -179,6 +178,11 @@ class PumpeBot(commands.Bot):
             return False
 
     async def _sync_all_guild_members_with_retries(self) -> None:
+        guild_ids = [str(guild.id) for guild in self.guilds]
+        if not guild_ids:
+            logger.warning("User-Sync uebersprungen: Bot ist in keiner Guild.")
+            return
+        logger.info("Starte User-Sync fuer Guild(s): %s", ", ".join(guild_ids))
         for attempt in range(1, 4):
             results = [await self._sync_guild_members(guild) for guild in self.guilds]
             if results and all(results):
@@ -254,13 +258,9 @@ class PumpeBot(commands.Bot):
             self.user,
             self.user.id if self.user else "unbekannt",
         )
-        if self._member_sync_done or (
-            self._member_sync_task is not None and not self._member_sync_task.done()
-        ):
+        if self._member_sync_done:
             return
-        self._member_sync_task = asyncio.create_task(
-            self._sync_all_guild_members_with_retries()
-        )
+        await self._sync_all_guild_members_with_retries()
 
     async def on_member_join(self, member: discord.Member) -> None:
         await self._upsert_member(member, status="active")

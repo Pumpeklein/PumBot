@@ -148,6 +148,34 @@ def get_birthdays_panel_guild_id(default_guild_id: str) -> str:
         return default_guild_id
 
 
+def get_guild_members_panel_guild_id(default_guild_id: str) -> str:
+    with _connect() as conn:
+        has_default = conn.execute(
+            """SELECT 1
+               FROM guild_members
+               WHERE guild_id = ?
+               LIMIT 1""",
+            (default_guild_id,),
+        ).fetchone()
+        if has_default:
+            return default_guild_id
+
+        row = conn.execute(
+            """SELECT guild_id
+               FROM guild_members
+               GROUP BY guild_id
+               ORDER BY
+                 SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) DESC,
+                 COUNT(*) DESC,
+                 guild_id ASC
+               LIMIT 1"""
+        ).fetchone()
+        if row:
+            return row["guild_id"]
+
+        return default_guild_id
+
+
 # ══════════ Users (Discord OAuth2) ══════════
 
 def upsert_user(discord_id: str, discord_username: str, discord_avatar: str | None = None) -> dict:

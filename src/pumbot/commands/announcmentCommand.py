@@ -5,6 +5,7 @@ import json
 import asyncio
 from typing import Any, Dict, Optional, List
 from datetime import datetime, timezone
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import aiohttp
 import discord
@@ -16,6 +17,7 @@ from src.pumbot.utils.datetime_format import format_berlin_datetime
 
 ANNOUNCE_STAFF_ROLES = {"Admin", "Team", "Twitch Moderator", "Discord Moderator"}
 DEFAULT_TWITCH_PING_ROLE_ID = 1261003159896195154
+TWITCH_THUMBNAIL_REFRESH_SECONDS = 15 * 60
 ANNOUNCE_ALLOWED_MENTIONS = discord.AllowedMentions(
     everyone=False,
     users=True,
@@ -69,6 +71,19 @@ def format_stream_times(started_at_str: str) -> tuple[str, str]:
         return format_berlin_datetime(started_at_str, fallback=started_at_str), "Unbekannt"
 
 
+def current_twitch_thumbnail_refresh_bucket() -> int:
+    return int(datetime.now(timezone.utc).timestamp()) // TWITCH_THUMBNAIL_REFRESH_SECONDS
+
+
+def add_twitch_thumbnail_refresh(url: str, refresh_bucket: int) -> str:
+    parts = urlsplit(url)
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    query["pumbot_refresh"] = str(refresh_bucket)
+    return urlunsplit(
+        (parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment)
+    )
+
+
 class AnnouncementCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -80,6 +95,7 @@ class AnnouncementCog(commands.Cog):
 
         self.session: Optional[aiohttp.ClientSession] = None
         self.twitch_message_cache: Dict[int, int] = {}
+        self.twitch_thumbnail_refresh_cache: Dict[int, int] = {}
 
         self.twitch_check_loop.start()
 
@@ -195,22 +211,24 @@ class AnnouncementCog(commands.Cog):
         stream: Dict[str, Any],
         *,
         force_new: bool = False,
+        refresh_bucket: Optional[int] = None,
     ) -> Optional[discord.Message]:
-        embed = await self.build_twitch_embed(stream)
+        if refresh_bucket is None:
+            refresh_bucket = current_twitch_thumbnail_refresh_bucket()
+
+        embed = await self.build_twitch_embed(stream, refresh_bucket=refresh_bucket)
         ping_role = self.get_twitch_ping_role(channel.guild)
         cached_message_id = self.twitch_message_cache.get(channel.guild.id)
 
         if cached_message_id and not force_new:
             try:
                 message = await channel.fetch_message(cached_message_id)
-                await message.edit(
-                    content=ping_role.mention if ping_role else None,
-                    embed=embed,
-                    allowed_mentions=self.twitch_allowed_mentions(ping_role),
-                )
+                await message.edit(embed=embed)
+                self.twitch_thumbnail_refresh_cache[channel.guild.id] = refresh_bucket
                 return message
             except (discord.NotFound, discord.Forbidden, discord.HTTPException):
                 self.twitch_message_cache.pop(channel.guild.id, None)
+                self.twitch_thumbnail_refresh_cache.pop(channel.guild.id, None)
 
         message = await channel.send(
             content=ping_role.mention if ping_role else None,
@@ -218,6 +236,7 @@ class AnnouncementCog(commands.Cog):
             allowed_mentions=self.twitch_allowed_mentions(ping_role),
         )
         self.twitch_message_cache[channel.guild.id] = message.id
+        self.twitch_thumbnail_refresh_cache[channel.guild.id] = refresh_bucket
         return message
 
     async def mark_twitch_announcement_offline(
@@ -235,13 +254,20 @@ class AnnouncementCog(commands.Cog):
                 allowed_mentions=discord.AllowedMentions.none(),
             )
             self.twitch_message_cache.pop(channel.guild.id, None)
+            self.twitch_thumbnail_refresh_cache.pop(channel.guild.id, None)
             return message
         except (discord.NotFound, discord.Forbidden, discord.HTTPException):
             self.twitch_message_cache.pop(channel.guild.id, None)
+            self.twitch_thumbnail_refresh_cache.pop(channel.guild.id, None)
             raise
 
-    async def build_twitch_embed(self, stream: Dict[str, Any]) -> discord.Embed:
+    async def build_twitch_embed(
+        self, stream: Dict[str, Any], *, refresh_bucket: Optional[int] = None
+    ) -> discord.Embed:
         try:
+            if refresh_bucket is None:
+                refresh_bucket = current_twitch_thumbnail_refresh_bucket()
+
             title = stream.get("title") or "Live auf Twitch"
             game_name = await self.fetch_twitch_game_name(stream.get("game_id", ""))
             started_at = stream.get("started_at")
@@ -251,6 +277,8 @@ class AnnouncementCog(commands.Cog):
                 .replace("{width}", "1920")
                 .replace("{height}", "1080")
             )
+            if thumb:
+                thumb = add_twitch_thumbnail_refresh(thumb, refresh_bucket)
             url = f"https://twitch.tv/{self.twitch_user_login}"
 
             embed = discord.Embed(
@@ -472,11 +500,15 @@ class AnnouncementCog(commands.Cog):
 
                 stream = streams[0]
                 stream_id = stream.get("id")
+                refresh_bucket = current_twitch_thumbnail_refresh_bucket()
 
                 if stream_id and stream_id != last_stream_id:
                     try:
                         await self.send_or_update_twitch_announcement(
-                            channel, stream, force_new=True
+                            channel,
+                            stream,
+                            force_new=True,
+                            refresh_bucket=refresh_bucket,
                         )
                     except (discord.Forbidden, discord.HTTPException):
                         logger.exception(
@@ -485,8 +517,18 @@ class AnnouncementCog(commands.Cog):
 
                     await self.api.set_twitch_config(g_id, last_stream_id=stream_id)
                 elif stream_id and guild.id in self.twitch_message_cache:
+                    last_refresh_bucket = self.twitch_thumbnail_refresh_cache.get(
+                        guild.id
+                    )
+                    if last_refresh_bucket == refresh_bucket:
+                        continue
+
                     try:
-                        await self.send_or_update_twitch_announcement(channel, stream)
+                        await self.send_or_update_twitch_announcement(
+                            channel,
+                            stream,
+                            refresh_bucket=refresh_bucket,
+                        )
                     except (discord.Forbidden, discord.HTTPException):
                         logger.exception(
                             "Twitch announce update fehlgeschlagen (guild=%s)",

@@ -307,12 +307,18 @@ def _attach_member_profile(
     user_field: str,
     prefix: str = "user",
 ) -> dict:
-    profile = _member_profile(guild_id, row.get(user_field))
+    user_id = row.get(user_field)
+    profile = _member_profile(guild_id, user_id)
     item = dict(row)
     item[f"{prefix}_display_name"] = profile["display_name"]
     item[f"{prefix}_avatar_url"] = profile["avatar_url"]
     item[f"{prefix}_username"] = profile["username"]
     item[f"{prefix}_status"] = profile["status"]
+    item[f"{prefix}_detail_url"] = (
+        url_for("user_detail_page", user_id=str(user_id), guild_id=guild_id)
+        if user_id not in (None, "")
+        else None
+    )
     return item
 
 

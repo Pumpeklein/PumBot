@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import asyncio
+import re
 from typing import Any, Dict, Optional
 
 import discord
@@ -13,6 +14,13 @@ from src.pumbot.bot import logger
 
 def _default_user_stats() -> Dict[str, int]:
     return {"correct": 0, "fails": 0, "best_streak": 0, "current_streak": 0}
+
+
+def _extract_counting_number(content: str) -> Optional[int]:
+    matches = re.findall(r"\d+", content)
+    if len(matches) != 1:
+        return None
+    return int(matches[0])
 
 
 class CountingCog(commands.Cog):
@@ -281,11 +289,11 @@ class CountingCog(commands.Cog):
             last_number = int(state.get("last_number", 0))
             expected = last_number + 1
 
-            if not content.isdigit():
+            number = _extract_counting_number(content)
+            if number is None:
                 await self._handle_wrong_number(message, expected, "Keine gültige Zahl")
                 return
 
-            number = int(content)
             if number <= 0:
                 await self._handle_wrong_number(
                     message, expected, "Zahl muss positiv sein"

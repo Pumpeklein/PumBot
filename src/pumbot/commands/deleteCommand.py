@@ -9,6 +9,7 @@ from discord.ext import commands
 from src.pumbot.bot import logger
 
 ALLOWED_ROLES = {"Admin", "Team", "Twitch Moderator", "Discord Moderator"}
+DELETE_CHANNEL_TYPES = (discord.TextChannel, discord.VoiceChannel)
 
 
 def is_delete_staff(member: discord.Member) -> bool:
@@ -56,9 +57,9 @@ class DeleteCog(commands.Cog):
             return
 
         channel = interaction.channel
-        if not isinstance(channel, discord.TextChannel):
+        if not isinstance(channel, DELETE_CHANNEL_TYPES):
             await interaction.response.send_message(
-                "Dieser Befehl kann nur in Text-Channels verwendet werden.",
+                "Dieser Befehl kann nur in Text- oder Voice-Channels verwendet werden.",
                 ephemeral=True,
             )
             return
@@ -131,9 +132,9 @@ class DeleteCog(commands.Cog):
             return
 
         channel = interaction.channel
-        if not isinstance(channel, discord.TextChannel):
+        if not isinstance(channel, DELETE_CHANNEL_TYPES):
             await interaction.response.send_message(
-                "Dieser Befehl kann nur in Text-Channels verwendet werden.",
+                "Dieser Befehl kann nur in Text- oder Voice-Channels verwendet werden.",
                 ephemeral=True,
             )
             return

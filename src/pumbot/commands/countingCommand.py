@@ -16,11 +16,18 @@ def _default_user_stats() -> Dict[str, int]:
     return {"correct": 0, "fails": 0, "best_streak": 0, "current_streak": 0}
 
 
+IGNORED_COUNTING_TOKENS_RE = re.compile(
+    r"<(?:#|@!?|@&)\d+>|<a?:[A-Za-z0-9_]+:\d+>|:[^:\s]+:"
+)
+COUNTING_NUMBER_RE = re.compile(r"\d+")
+
+
 def _extract_counting_number(content: str) -> Optional[int]:
-    matches = re.findall(r"\d+", content)
-    if len(matches) != 1:
+    cleaned = IGNORED_COUNTING_TOKENS_RE.sub(" ", content)
+    match = COUNTING_NUMBER_RE.search(cleaned)
+    if match is None:
         return None
-    return int(matches[0])
+    return int(match.group(0))
 
 
 class CountingCog(commands.Cog):

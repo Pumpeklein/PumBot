@@ -108,6 +108,9 @@ async def reply_ephemeral(interaction: discord.Interaction, content: str) -> Non
 
 
 class PumpeBot(commands.Bot):
+    MEMBER_CHUNK_TIMEOUT_SECONDS = 20
+    MEMBER_FETCH_TIMEOUT_SECONDS = 90
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.api = ApiClient()
@@ -132,25 +135,84 @@ class PumpeBot(commands.Bot):
             "joined_at": member.joined_at.isoformat() if member.joined_at else None,
         }
 
+    async def _fetch_all_member_payloads(self, guild: discord.Guild) -> list[dict[str, object | None]]:
+        payloads: list[dict[str, object | None]] = []
+        async for member in guild.fetch_members(limit=None):
+            payloads.append(self._member_payload(member))
+        return payloads
+
     async def _sync_guild_members(self, guild: discord.Guild) -> bool:
         try:
+            expected_count = guild.member_count or 0
+            logger.info(
+                "User-Sync fuer Guild %s gestartet. Erwartete Member laut Discord: %s.",
+                guild.id,
+                expected_count or "unbekannt",
+            )
             if not getattr(guild, "chunked", False):
                 logger.info(
                     "User-Sync fuer Guild %s: lade Memberliste von Discord.",
                     guild.id,
                 )
-            with contextlib.suppress(discord.HTTPException):
-                await guild.chunk(cache=True)
+            try:
+                await asyncio.wait_for(
+                    guild.chunk(cache=True),
+                    timeout=self.MEMBER_CHUNK_TIMEOUT_SECONDS,
+                )
+            except TimeoutError:
+                logger.warning(
+                    "User-Sync fuer Guild %s: chunk timeout nach %s Sekunden.",
+                    guild.id,
+                    self.MEMBER_CHUNK_TIMEOUT_SECONDS,
+                )
+            except discord.HTTPException:
+                logger.exception("User-Sync fuer Guild %s: chunk fehlgeschlagen.", guild.id)
+
             members = [self._member_payload(member) for member in guild.members]
-            expected_count = guild.member_count or len(members)
+            logger.info(
+                "User-Sync fuer Guild %s: %s Member im Cache nach chunk.",
+                guild.id,
+                len(members),
+            )
+
             if len(members) < expected_count:
-                with contextlib.suppress(discord.HTTPException):
-                    fetched_members = [
-                        self._member_payload(member)
-                        async for member in guild.fetch_members(limit=None)
-                    ]
+                logger.info(
+                    "User-Sync fuer Guild %s: hole vollstaendige Memberliste per REST.",
+                    guild.id,
+                )
+                try:
+                    fetched_members = await asyncio.wait_for(
+                        self._fetch_all_member_payloads(guild),
+                        timeout=self.MEMBER_FETCH_TIMEOUT_SECONDS,
+                    )
+                    logger.info(
+                        "User-Sync fuer Guild %s: %s Member per REST geladen.",
+                        guild.id,
+                        len(fetched_members),
+                    )
                     if len(fetched_members) > len(members):
                         members = fetched_members
+                except TimeoutError:
+                    logger.warning(
+                        "User-Sync fuer Guild %s: REST fetch timeout nach %s Sekunden.",
+                        guild.id,
+                        self.MEMBER_FETCH_TIMEOUT_SECONDS,
+                    )
+                except discord.Forbidden:
+                    logger.exception(
+                        "User-Sync fuer Guild %s: REST fetch verboten. Pruefe Server Members Intent und Bot-Rechte.",
+                        guild.id,
+                    )
+                except discord.HTTPException:
+                    logger.exception("User-Sync fuer Guild %s: REST fetch fehlgeschlagen.", guild.id)
+
+            if not members:
+                logger.warning(
+                    "User-Sync fuer Guild %s ohne Memberdaten beendet. Es wurde nichts gespeichert.",
+                    guild.id,
+                )
+                return False
+
             has_complete_member_list = len(members) >= expected_count
             if not has_complete_member_list:
                 logger.warning(

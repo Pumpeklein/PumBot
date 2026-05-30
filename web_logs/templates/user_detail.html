@@ -57,6 +57,7 @@
     <dl class="mt-6 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
       <div><dt class="text-slate-500">Global Name</dt><dd class="mt-1 text-slate-200">{{ member.global_name or "-" }}</dd></div>
       <div><dt class="text-slate-500">Locale</dt><dd class="mt-1 text-slate-200">{{ member.locale or "-" }}</dd></div>
+      <div><dt class="text-slate-500">Geburtstag</dt><dd class="mt-1 text-slate-200">{{ birthday_label or "-" }}</dd></div>
       <div><dt class="text-slate-500">Beigetreten</dt><dd class="mt-1 text-slate-200">{{ member.joined_at or "-" }}</dd></div>
       <div><dt class="text-slate-500">Letzte Nachricht</dt><dd class="mt-1 text-slate-200">{{ message_stats.last_message_at or "-" }}</dd></div>
       <div><dt class="text-slate-500">Letztes Ticket</dt><dd class="mt-1 text-slate-200">{{ ticket_stats.last_ticket_at or "-" }}</dd></div>

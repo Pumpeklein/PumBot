@@ -6,7 +6,7 @@ import logging
 import os
 from pathlib import Path
 from threading import Thread
-from typing import Final, Optional
+from typing import Any, Final, Optional
 
 import discord
 from discord import app_commands
@@ -19,9 +19,12 @@ from src.pumbot.services.api_client import ApiClient
 from web_logs.app import create_app
 from web_logs.config import Config as WebConfig
 from web_logs.db import (
+    get_all_log_channels,
     mark_guild_member_left,
     mark_guild_message_deleted,
     sync_guild_members,
+    upsert_discord_log_entries,
+    upsert_discord_log_entry,
     upsert_guild_member,
     upsert_guild_message,
 )
@@ -84,6 +87,17 @@ ENABLE_PRESENCE_INTENT = os.getenv("ENABLE_PRESENCE_INTENT", "1").strip().lower(
     "on",
 }
 
+
+def _int_env(name: str, default: int, minimum: int) -> int:
+    try:
+        return max(minimum, int(os.getenv(name, str(default))))
+    except (TypeError, ValueError):
+        return default
+
+
+LOG_CHANNEL_HISTORY_LIMIT = _int_env("LOG_CHANNEL_HISTORY_LIMIT", 1000, 1)
+MEMBER_RESYNC_INTERVAL_SECONDS = _int_env("MEMBER_RESYNC_INTERVAL_SECONDS", 1800, 300)
+
 intents = discord.Intents.default()
 intents.guilds = True
 intents.members = True
@@ -118,13 +132,15 @@ async def reply_ephemeral(interaction: discord.Interaction, content: str) -> Non
 
 
 class PumpeBot(commands.Bot):
-    MEMBER_CHUNK_TIMEOUT_SECONDS = 20
-    MEMBER_FETCH_TIMEOUT_SECONDS = 90
+    MEMBER_CHUNK_TIMEOUT_SECONDS = 45
+    MEMBER_FETCH_TIMEOUT_SECONDS = 180
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.api = ApiClient()
         self._member_sync_done = False
+        self._member_resync_task: asyncio.Task | None = None
+        self._log_sync_running: set[str] = set()
 
     @staticmethod
     def _avatar_url(member: discord.Member) -> str | None:
@@ -179,6 +195,116 @@ class PumpeBot(commands.Bot):
             "deleted_at": None,
         }
 
+    @staticmethod
+    def _embed_text(embed: discord.Embed) -> str:
+        parts: list[str] = []
+        if embed.title:
+            parts.append(embed.title)
+        if embed.description:
+            parts.append(embed.description)
+        for field in embed.fields:
+            if field.name:
+                parts.append(str(field.name))
+            if field.value:
+                parts.append(str(field.value))
+        if embed.footer and embed.footer.text:
+            parts.append(embed.footer.text)
+        return "\n".join(part for part in parts if part).strip()
+
+    def log_message_payload(self, message: discord.Message) -> dict[str, Any]:
+        channel = message.channel
+        content = message.content or ""
+        embed_texts = [self._embed_text(embed) for embed in message.embeds]
+        embed_text = "\n\n".join(text for text in embed_texts if text)
+        if embed_text:
+            content = f"{content}\n\n{embed_text}".strip()
+        return {
+            "channel_id": str(channel.id),
+            "channel_name": getattr(channel, "name", str(channel.id)),
+            "message_id": str(message.id),
+            "author_id": str(message.author.id) if message.author else None,
+            "author_name": str(message.author) if message.author else None,
+            "content": content,
+            "embed_count": len(message.embeds),
+            "attachment_count": len(message.attachments),
+            "jump_url": message.jump_url,
+            "created_at": message.created_at.isoformat() if message.created_at else None,
+            "edited_at": message.edited_at.isoformat() if message.edited_at else None,
+        }
+
+    async def _store_log_message(self, message: discord.Message) -> None:
+        if not message.guild:
+            return
+        try:
+            log_channels = await asyncio.to_thread(
+                get_all_log_channels,
+                str(message.guild.id),
+            )
+            channel_to_type = {str(channel_id): log_type for log_type, channel_id in log_channels.items()}
+            log_type = channel_to_type.get(str(message.channel.id))
+            if not log_type:
+                return
+            await asyncio.to_thread(
+                upsert_discord_log_entry,
+                str(message.guild.id),
+                log_type,
+                self.log_message_payload(message),
+            )
+        except Exception:
+            logger.exception("Log-Message-Upsert fuer %s fehlgeschlagen", message.id)
+
+    async def sync_log_channels(self, guild_id: str | None = None) -> None:
+        guilds = [
+            guild
+            for guild in self.guilds
+            if guild_id is None or str(guild.id) == str(guild_id)
+        ]
+        for guild in guilds:
+            lock_key = str(guild.id)
+            if lock_key in self._log_sync_running:
+                continue
+            self._log_sync_running.add(lock_key)
+            try:
+                log_channels = await asyncio.to_thread(get_all_log_channels, str(guild.id))
+                if not log_channels:
+                    logger.info("Log-Sync fuer Guild %s uebersprungen: keine Log Channels konfiguriert.", guild.id)
+                    continue
+                total = 0
+                for log_type, channel_id in log_channels.items():
+                    try:
+                        channel = guild.get_channel(int(channel_id)) or await self.fetch_channel(int(channel_id))
+                    except (TypeError, ValueError, discord.HTTPException, discord.Forbidden):
+                        logger.exception("Log-Sync fuer %s: Channel %s konnte nicht geladen werden.", log_type, channel_id)
+                        continue
+                    if not hasattr(channel, "history"):
+                        logger.warning("Log-Sync fuer %s uebersprungen: Channel %s hat keine History.", log_type, channel_id)
+                        continue
+                    try:
+                        entries = []
+                        async for message in channel.history(limit=LOG_CHANNEL_HISTORY_LIMIT, oldest_first=False):
+                            entries.append(self.log_message_payload(message))
+                    except (discord.HTTPException, discord.Forbidden):
+                        logger.exception("Log-Sync fuer %s: History fuer Channel %s fehlgeschlagen.", log_type, channel_id)
+                        continue
+                    saved = await asyncio.to_thread(
+                        upsert_discord_log_entries,
+                        str(guild.id),
+                        log_type,
+                        entries,
+                    )
+                    total += saved
+                    logger.info(
+                        "Log-Sync fuer Guild %s/%s: %s Nachrichten gespeichert.",
+                        guild.id,
+                        log_type,
+                        saved,
+                    )
+                logger.info("Log-Sync fuer Guild %s fertig: %s Nachrichten verarbeitet.", guild.id, total)
+            except Exception:
+                logger.exception("Log-Sync fuer Guild %s fehlgeschlagen", guild.id)
+            finally:
+                self._log_sync_running.discard(lock_key)
+
     async def _store_message(self, message: discord.Message) -> None:
         if not message.guild or message.author.bot:
             return
@@ -226,14 +352,17 @@ class PumpeBot(commands.Bot):
             except discord.HTTPException:
                 logger.exception("User-Sync fuer Guild %s: chunk fehlgeschlagen.", guild.id)
 
-            members = [self._member_payload(member) for member in guild.members]
+            members_by_id = {
+                str(member.id): self._member_payload(member)
+                for member in guild.members
+            }
             logger.info(
                 "User-Sync fuer Guild %s: %s Member im Cache nach chunk.",
                 guild.id,
-                len(members),
+                len(members_by_id),
             )
 
-            if len(members) < expected_count:
+            if not expected_count or len(members_by_id) < expected_count:
                 logger.info(
                     "User-Sync fuer Guild %s: hole vollstaendige Memberliste per REST.",
                     guild.id,
@@ -248,8 +377,10 @@ class PumpeBot(commands.Bot):
                         guild.id,
                         len(fetched_members),
                     )
-                    if len(fetched_members) > len(members):
-                        members = fetched_members
+                    for member in fetched_members:
+                        user_id = str(member.get("user_id"))
+                        if user_id:
+                            members_by_id[user_id] = member
                 except TimeoutError:
                     logger.warning(
                         "User-Sync fuer Guild %s: REST fetch timeout nach %s Sekunden.",
@@ -264,6 +395,7 @@ class PumpeBot(commands.Bot):
                 except discord.HTTPException:
                     logger.exception("User-Sync fuer Guild %s: REST fetch fehlgeschlagen.", guild.id)
 
+            members = list(members_by_id.values())
             if not members:
                 logger.warning(
                     "User-Sync fuer Guild %s ohne Memberdaten beendet. Es wurde nichts gespeichert.",
@@ -271,7 +403,7 @@ class PumpeBot(commands.Bot):
                 )
                 return False
 
-            has_complete_member_list = len(members) >= expected_count
+            has_complete_member_list = not expected_count or len(members) >= expected_count
             if not has_complete_member_list:
                 logger.warning(
                     "User-Sync fuer Guild %s nur teilweise: %s/%s Member im Cache. "
@@ -315,6 +447,12 @@ class PumpeBot(commands.Bot):
                 wait_seconds,
             )
             await asyncio.sleep(wait_seconds)
+
+    async def _periodic_member_sync(self) -> None:
+        await self.wait_until_ready()
+        while not self.is_closed():
+            await asyncio.sleep(MEMBER_RESYNC_INTERVAL_SECONDS)
+            await self._sync_all_guild_members_with_retries()
 
     async def _upsert_member(self, member: discord.Member, status: str = "active") -> None:
         try:
@@ -378,9 +516,11 @@ class PumpeBot(commands.Bot):
             self.user,
             self.user.id if self.user else "unbekannt",
         )
-        if self._member_sync_done:
-            return
-        await self._sync_all_guild_members_with_retries()
+        if not self._member_sync_done:
+            await self._sync_all_guild_members_with_retries()
+        await self.sync_log_channels()
+        if self._member_resync_task is None or self._member_resync_task.done():
+            self._member_resync_task = asyncio.create_task(self._periodic_member_sync())
 
     async def on_member_join(self, member: discord.Member) -> None:
         await self._upsert_member(member, status="active")
@@ -419,15 +559,19 @@ class PumpeBot(commands.Bot):
             await self._upsert_member(after, status="active")
 
     async def on_message(self, message: discord.Message) -> None:
+        await self._store_log_message(message)
         await self._store_message(message)
         await self.process_commands(message)
 
     async def on_message_edit(
         self, before: discord.Message, after: discord.Message
     ) -> None:
-        if not after.guild or after.author.bot:
+        if not after.guild:
             return
         try:
+            await self._store_log_message(after)
+            if after.author.bot:
+                return
             await asyncio.to_thread(
                 upsert_guild_message,
                 str(after.guild.id),

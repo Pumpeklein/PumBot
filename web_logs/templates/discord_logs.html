@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header, empty_state, btn %}
+
+{% block content %}
+{{ page_header("Logs", "Discord Logs", "Gespeicherte Nachrichten aus den konfigurierten Log Channels.") }}
+
+<div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  <div class="rounded-xl border border-white/5 bg-white/[0.03] p-4">
+    <div class="text-xs font-medium uppercase tracking-wider text-slate-500">Eintraege</div>
+    <div class="mt-1 text-xl font-bold text-white" data-log-overview="total">{{ overview.total or 0 }}</div>
+  </div>
+  <div class="rounded-xl border border-white/5 bg-white/[0.03] p-4">
+    <div class="text-xs font-medium uppercase tracking-wider text-slate-500">Log Channels</div>
+    <div class="mt-1 text-xl font-bold text-white" data-log-overview="channel_count">{{ channels|length }}</div>
+  </div>
+  <div class="rounded-xl border border-white/5 bg-white/[0.03] p-4">
+    <div class="text-xs font-medium uppercase tracking-wider text-slate-500">Letzter Log</div>
+    <div class="mt-1 text-xl font-bold text-white" data-log-overview="latest_created_at">{{ overview.latest_created_at or "-" }}</div>
+  </div>
+  <div class="rounded-xl border border-white/5 bg-white/[0.03] p-4">
+    <div class="text-xs font-medium uppercase tracking-wider text-slate-500">Letzter Sync</div>
+    <div class="mt-1 text-xl font-bold text-white" data-log-overview="latest_synced_at">{{ overview.latest_synced_at or "-" }}</div>
+  </div>
+</div>
+
+<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <h2 class="mb-4 text-sm font-semibold text-white">Ausgewertete Log Channels</h2>
+  {% if channels %}
+  <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+    {% for log_type, channel_id in channels.items() %}
+    <div class="rounded-lg border border-white/[0.06] bg-black/10 px-3 py-2">
+      <div class="text-xs uppercase text-slate-500">{{ log_type }}</div>
+      <div class="mt-1 font-mono text-sm text-slate-200">{{ channel_id }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  {{ empty_state("Keine Log Channels", "Unter Log Channels wurden noch keine Discord Channels hinterlegt.") }}
+  {% endif %}
+</div>
+
+<div data-paginated-table data-endpoint="{{ url_for('panel_api_discord_logs') }}" data-form="#discord-log-filter" data-page-size="25" data-auto-refresh-ms="5000" class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <script type="application/json">
+    [
+      {"key":"created_at","type":"date","class":"px-3 py-2.5 text-slate-500 whitespace-nowrap"},
+      {"key":"log_type_label","type":"badge","class":"px-3 py-2.5"},
+      {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},
+      {"key":"author_label","fallback":"-","class":"px-3 py-2.5 text-slate-300"},
+      {"key":"content","type":"message","editedAtKey":"edited_at","fallback":"-","class":"px-3 py-2.5"},
+      {"key":"message_id","type":"link","urlKey":"message_url","class":"px-3 py-2.5 font-mono text-xs"}
+    ]
+  </script>
+  <form id="discord-log-filter" class="mb-4 grid gap-3 lg:grid-cols-[160px_1fr_auto]">
+    <input type="hidden" name="guild_id" value="{{ guild_id }}">
+    <select name="log_type" class="rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
+      <option value="">Alle Typen</option>
+      {% for log_type in channels.keys() %}
+      <option value="{{ log_type }}">{{ log_type }}</option>
+      {% endfor %}
+    </select>
+    <input name="q" data-live-search type="search" placeholder="Suche nach Inhalt, Autor oder Channel" class="rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-white placeholder-slate-500 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
+    {{ btn("Filtern") }}
+  </form>
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead>
+        <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+          <th class="px-3 py-2.5">Zeitpunkt</th>
+          <th class="px-3 py-2.5">Typ</th>
+          <th class="px-3 py-2.5">Channel</th>
+          <th class="px-3 py-2.5">Autor</th>
+          <th class="px-3 py-2.5">Inhalt</th>
+          <th class="px-3 py-2.5">Nachricht</th>
+        </tr>
+      </thead>
+      <tbody data-table-body></tbody>
+    </table>
+  </div>
+  <div data-table-empty class="hidden">{{ empty_state("Keine Logs", "Es wurden noch keine Log Nachrichten synchronisiert.") }}</div>
+  <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400">
+    <span data-table-status></span>
+    <div class="flex items-center gap-2">
+      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option>10</option><option selected>25</option><option>50</option><option>100</option></select>
+      <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurueck</button>
+      <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='paginated-table.js') }}"></script>
+<script>
+  (() => {
+    const endpoint = "{{ url_for('panel_api_discord_logs_overview') }}?guild_id={{ guild_id }}";
+    const update = async () => {
+      if (document.hidden) return;
+      const response = await fetch(endpoint, { headers: { Accept: "application/json" } });
+      if (!response.ok) return;
+      const data = await response.json();
+      document.querySelectorAll("[data-log-overview]").forEach((node) => {
+        const key = node.dataset.logOverview;
+        node.textContent = data[key] || data[key] === 0 ? data[key] : "-";
+      });
+    };
+    window.setInterval(update, 5000);
+  })();
+</script>
+{% endblock %}

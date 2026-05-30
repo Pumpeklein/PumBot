@@ -212,6 +212,25 @@ CREATE TABLE IF NOT EXISTS log_channels (
   UNIQUE KEY uq_log_channels_type (guild_id, log_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS discord_log_entries (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  guild_id VARCHAR(32) NOT NULL,
+  log_type VARCHAR(64) NOT NULL,
+  channel_id VARCHAR(32) NOT NULL,
+  channel_name VARCHAR(255),
+  message_id VARCHAR(32) NOT NULL,
+  author_id VARCHAR(32),
+  author_name VARCHAR(255),
+  content LONGTEXT,
+  embed_count INT NOT NULL DEFAULT 0,
+  attachment_count INT NOT NULL DEFAULT 0,
+  jump_url TEXT,
+  created_at DATETIME NULL,
+  edited_at DATETIME NULL,
+  synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_discord_log_entries_message (guild_id, channel_id, message_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS twitch_config (
   guild_id VARCHAR(32) PRIMARY KEY,
   channel_id VARCHAR(32),
@@ -287,3 +306,5 @@ CREATE INDEX idx_guild_messages_channel ON guild_messages(guild_id, channel_id, 
 CREATE INDEX idx_guild_message_history_message ON guild_message_history(guild_id, channel_id, message_id, event_at);
 CREATE INDEX idx_guild_message_history_user ON guild_message_history(guild_id, user_id, event_at);
 CREATE INDEX idx_guild_message_history_type ON guild_message_history(guild_id, event_type, event_at);
+CREATE INDEX idx_discord_log_entries_type_created ON discord_log_entries(guild_id, log_type, created_at);
+CREATE INDEX idx_discord_log_entries_author ON discord_log_entries(guild_id, author_id);

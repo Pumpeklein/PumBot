@@ -127,6 +127,16 @@ def init_db() -> None:
             "channel_type": "VARCHAR(32)",
             "parent_channel_id": "VARCHAR(32)",
         })
+        _ensure_columns(conn, "discord_log_entries", {
+            "channel_name": "VARCHAR(255)",
+            "author_id": "VARCHAR(32)",
+            "author_name": "VARCHAR(255)",
+            "content": "LONGTEXT",
+            "embed_count": "INT NOT NULL DEFAULT 0",
+            "attachment_count": "INT NOT NULL DEFAULT 0",
+            "jump_url": "TEXT",
+            "edited_at": "DATETIME NULL",
+        })
         conn.commit()
     _seed_default_roles()
     _seed_default_bot_messages()
@@ -1873,6 +1883,171 @@ def get_all_log_channels(guild_id: str) -> dict[str, str]:
             "SELECT log_type, channel_id FROM log_channels WHERE guild_id = ?", (guild_id,)
         ).fetchall()
         return {row["log_type"]: row["channel_id"] for row in rows}
+
+
+# ══════════ Discord Log Entries ══════════
+
+def _discord_log_where(
+    guild_id: str,
+    log_type: str | None = None,
+    q: str | None = None,
+) -> tuple[str, list[Any]]:
+    clauses = ["guild_id = ?"]
+    params: list[Any] = [guild_id]
+    if log_type:
+        clauses.append("log_type = ?")
+        params.append(log_type)
+    if q:
+        pattern = f"%{q}%"
+        clauses.append(
+            "(content LIKE ? OR author_name LIKE ? OR author_id LIKE ? OR channel_name LIKE ?)"
+        )
+        params.extend([pattern, pattern, pattern, pattern])
+    return " AND ".join(clauses), params
+
+
+def upsert_discord_log_entry(guild_id: str, log_type: str, entry: dict[str, Any]) -> None:
+    with _connect() as conn:
+        conn.execute(
+            """INSERT INTO discord_log_entries
+               (guild_id, log_type, channel_id, channel_name, message_id, author_id,
+                author_name, content, embed_count, attachment_count, jump_url, created_at, edited_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON DUPLICATE KEY UPDATE
+                 log_type = VALUES(log_type),
+                 channel_name = VALUES(channel_name),
+                 author_id = VALUES(author_id),
+                 author_name = VALUES(author_name),
+                 content = VALUES(content),
+                 embed_count = VALUES(embed_count),
+                 attachment_count = VALUES(attachment_count),
+                 jump_url = VALUES(jump_url),
+                 created_at = VALUES(created_at),
+                 edited_at = VALUES(edited_at)""",
+            (
+                guild_id,
+                log_type,
+                entry.get("channel_id"),
+                entry.get("channel_name"),
+                entry.get("message_id"),
+                entry.get("author_id"),
+                entry.get("author_name"),
+                entry.get("content") or "",
+                int(entry.get("embed_count") or 0),
+                int(entry.get("attachment_count") or 0),
+                entry.get("jump_url"),
+                entry.get("created_at"),
+                entry.get("edited_at"),
+            ),
+        )
+        conn.commit()
+
+
+def upsert_discord_log_entries(
+    guild_id: str,
+    log_type: str,
+    entries: list[dict[str, Any]],
+) -> int:
+    if not entries:
+        return 0
+    with _connect() as conn:
+        for entry in entries:
+            conn.execute(
+                """INSERT INTO discord_log_entries
+                   (guild_id, log_type, channel_id, channel_name, message_id, author_id,
+                    author_name, content, embed_count, attachment_count, jump_url, created_at, edited_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   ON DUPLICATE KEY UPDATE
+                     log_type = VALUES(log_type),
+                     channel_name = VALUES(channel_name),
+                     author_id = VALUES(author_id),
+                     author_name = VALUES(author_name),
+                     content = VALUES(content),
+                     embed_count = VALUES(embed_count),
+                     attachment_count = VALUES(attachment_count),
+                     jump_url = VALUES(jump_url),
+                     created_at = VALUES(created_at),
+                     edited_at = VALUES(edited_at)""",
+                (
+                    guild_id,
+                    log_type,
+                    entry.get("channel_id"),
+                    entry.get("channel_name"),
+                    entry.get("message_id"),
+                    entry.get("author_id"),
+                    entry.get("author_name"),
+                    entry.get("content") or "",
+                    int(entry.get("embed_count") or 0),
+                    int(entry.get("attachment_count") or 0),
+                    entry.get("jump_url"),
+                    entry.get("created_at"),
+                    entry.get("edited_at"),
+                ),
+            )
+        conn.commit()
+        return len(entries)
+
+
+def list_discord_log_entries(
+    guild_id: str,
+    log_type: str | None = None,
+    q: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[dict]:
+    where_sql, params = _discord_log_where(guild_id, log_type, q)
+    with _connect() as conn:
+        rows = conn.execute(
+            f"""SELECT *
+                FROM discord_log_entries
+                WHERE {where_sql}
+                ORDER BY created_at DESC, id DESC
+                LIMIT ? OFFSET ?""",
+            (*params, limit, offset),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
+def count_discord_log_entries(
+    guild_id: str,
+    log_type: str | None = None,
+    q: str | None = None,
+) -> int:
+    where_sql, params = _discord_log_where(guild_id, log_type, q)
+    with _connect() as conn:
+        row = conn.execute(
+            f"SELECT COUNT(*) AS total FROM discord_log_entries WHERE {where_sql}",
+            params,
+        ).fetchone()
+        return int(row["total"] if row else 0)
+
+
+def get_discord_log_overview(guild_id: str) -> dict:
+    with _connect() as conn:
+        total = conn.execute(
+            "SELECT COUNT(*) AS total FROM discord_log_entries WHERE guild_id = ?",
+            (guild_id,),
+        ).fetchone()
+        latest = conn.execute(
+            """SELECT MAX(created_at) AS latest_created_at, MAX(synced_at) AS latest_synced_at
+               FROM discord_log_entries
+               WHERE guild_id = ?""",
+            (guild_id,),
+        ).fetchone()
+        by_type_rows = conn.execute(
+            """SELECT log_type, COUNT(*) AS total
+               FROM discord_log_entries
+               WHERE guild_id = ?
+               GROUP BY log_type
+               ORDER BY log_type""",
+            (guild_id,),
+        ).fetchall()
+        return {
+            "total": int(total["total"] if total else 0),
+            "latest_created_at": latest["latest_created_at"] if latest else None,
+            "latest_synced_at": latest["latest_synced_at"] if latest else None,
+            "by_type": [dict(row) for row in by_type_rows],
+        }
 
 
 # ══════════ Twitch Config ══════════

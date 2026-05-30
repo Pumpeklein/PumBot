@@ -229,6 +229,25 @@ CREATE TABLE IF NOT EXISTS log_channels (
 );
 
 -- ── Twitch Announcement Config ──
+CREATE TABLE IF NOT EXISTS discord_log_entries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT NOT NULL,
+  log_type TEXT NOT NULL,
+  channel_id TEXT NOT NULL,
+  channel_name TEXT,
+  message_id TEXT NOT NULL,
+  author_id TEXT,
+  author_name TEXT,
+  content TEXT,
+  embed_count INTEGER NOT NULL DEFAULT 0,
+  attachment_count INTEGER NOT NULL DEFAULT 0,
+  jump_url TEXT,
+  created_at TEXT,
+  edited_at TEXT,
+  synced_at TEXT DEFAULT (datetime('now')),
+  UNIQUE(guild_id, channel_id, message_id)
+);
+
 CREATE TABLE IF NOT EXISTS twitch_config (
   guild_id TEXT PRIMARY KEY,
   channel_id TEXT,
@@ -308,3 +327,5 @@ CREATE INDEX IF NOT EXISTS idx_guild_messages_channel ON guild_messages(guild_id
 CREATE INDEX IF NOT EXISTS idx_guild_message_history_message ON guild_message_history(guild_id, channel_id, message_id, event_at);
 CREATE INDEX IF NOT EXISTS idx_guild_message_history_user ON guild_message_history(guild_id, user_id, event_at);
 CREATE INDEX IF NOT EXISTS idx_guild_message_history_type ON guild_message_history(guild_id, event_type, event_at);
+CREATE INDEX IF NOT EXISTS idx_discord_log_entries_type_created ON discord_log_entries(guild_id, log_type, created_at);
+CREATE INDEX IF NOT EXISTS idx_discord_log_entries_author ON discord_log_entries(guild_id, author_id);

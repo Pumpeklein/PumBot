@@ -36,6 +36,7 @@ try:
         count_birthdays,
         count_counting_leaderboard,
         count_guild_members,
+        count_discord_log_entries,
         count_guild_message_history,
         count_guild_messages,
         count_tickets,
@@ -63,6 +64,7 @@ try:
         get_counting_stats,
         get_guild_member,
         get_guild_member_name_history,
+        get_discord_log_overview,
         get_guild_members_panel_guild_id,
         get_guild_message_chart_data,
         get_guild_message_overview,
@@ -83,6 +85,7 @@ try:
         list_all_warnings,
         list_close_reasons,
         list_guild_members,
+        list_discord_log_entries,
         list_guild_message_history,
         list_guild_messages,
         list_message_filter_channels,
@@ -142,6 +145,7 @@ except ImportError:
         count_birthdays,
         count_counting_leaderboard,
         count_guild_members,
+        count_discord_log_entries,
         count_guild_message_history,
         count_guild_messages,
         count_tickets,
@@ -169,6 +173,7 @@ except ImportError:
         get_counting_stats,
         get_guild_member,
         get_guild_member_name_history,
+        get_discord_log_overview,
         get_guild_members_panel_guild_id,
         get_guild_message_chart_data,
         get_guild_message_overview,
@@ -189,6 +194,7 @@ except ImportError:
         list_all_warnings,
         list_close_reasons,
         list_guild_members,
+        list_discord_log_entries,
         list_guild_message_history,
         list_guild_messages,
         list_message_filter_channels,
@@ -455,6 +461,42 @@ def _run_bot_coro(coro):
         return future.result(timeout=15), None
     except Exception as exc:
         return None, str(exc)
+
+
+def _schedule_bot_coro(coro) -> str | None:
+    bot = app.config.get("DISCORD_BOT")
+    if not bot or not bot.is_ready():
+        if hasattr(coro, "close"):
+            coro.close()
+        return "Bot ist nicht verbunden."
+    try:
+        asyncio.run_coroutine_threadsafe(coro, bot.loop)
+        return None
+    except Exception as exc:
+        return str(exc)
+
+
+def _birthday_label(birthday: dict | None) -> str | None:
+    if not birthday:
+        return None
+    try:
+        day = int(birthday.get("day") or 0)
+        month = int(birthday.get("month") or 0)
+    except (TypeError, ValueError):
+        return None
+    if not day or not month:
+        return None
+    year = birthday.get("year")
+    return f"{day:02d}.{month:02d}" + (f".{year}" if year else "")
+
+
+def _trigger_discord_log_sync(guild_id: str) -> None:
+    bot = app.config.get("DISCORD_BOT")
+    if not bot or not bot.is_ready() or not hasattr(bot, "sync_log_channels"):
+        return
+    error = _schedule_bot_coro(bot.sync_log_channels(guild_id))
+    if error:
+        app.logger.warning("Discord log sync trigger failed: %s", error)
 
 
 def _role_dict(role, *, actor_member=None, bot_member=None) -> dict:
@@ -1184,6 +1226,7 @@ def user_detail_page(user_id: str):
     message_stats = get_user_message_stats(guild_id, user_id)
     channel_stats = get_user_channel_message_stats(guild_id, user_id)
     ticket_stats = get_ticket_stats_for_user(guild_id, user_id)
+    birthday = get_birthday(get_birthdays_panel_guild_id(DEFAULT_GUILD_ID), user_id)
     return render_template(
         "user_detail.html",
         member=_format_date_fields(
@@ -1211,6 +1254,8 @@ def user_detail_page(user_id: str):
             role for role in discord_roles if role["id"] not in current_role_ids and role.get("manageable")
         ],
         connections=list_user_connections(user_id),
+        birthday=birthday,
+        birthday_label=_birthday_label(birthday),
         message_stats=_format_date_fields([message_stats], "last_message_at")[0],
         channel_stats=_format_date_fields(channel_stats, "last_message_at"),
         ticket_stats=_format_date_fields([ticket_stats], "last_ticket_at")[0],
@@ -1514,6 +1559,24 @@ def log_channels_page():
     )
 
 
+@app.get("/discord-logs")
+@permission_required("logs.view")
+def discord_logs_page():
+    ctx = _ctx()
+    guild_id = _active_panel_guild_id()
+    _trigger_discord_log_sync(guild_id)
+    channels = get_all_log_channels(guild_id)
+    overview = get_discord_log_overview(guild_id)
+    return render_template(
+        "discord_logs.html",
+        guild_id=guild_id,
+        channels=channels,
+        overview=_format_date_fields([overview], "latest_created_at", "latest_synced_at")[0],
+        active_page="discord_logs",
+        **ctx,
+    )
+
+
 @app.post("/log-channels/set")
 @permission_required("config.manage")
 def log_channels_set():
@@ -1773,6 +1836,44 @@ def panel_api_message_history():
         page,
         page_size,
     )
+
+
+@app.get("/panel-api/discord-logs")
+@permission_required("logs.view")
+def panel_api_discord_logs():
+    guild_id = request.args.get("guild_id") or _active_panel_guild_id()
+    log_type = request.args.get("log_type", "").strip() or None
+    q = request.args.get("q", "").strip()
+    page, page_size, offset = _pagination_args(default_page_size=25)
+    rows = []
+    for entry in list_discord_log_entries(
+        guild_id,
+        log_type=log_type,
+        q=q,
+        limit=page_size,
+        offset=offset,
+    ):
+        item = dict(entry)
+        item["log_type_label"] = item.get("log_type") or "-"
+        item["author_label"] = item.get("author_name") or item.get("author_id") or "-"
+        item["message_url"] = item.get("jump_url")
+        rows.append(item)
+    return _paginated_response(
+        _format_date_fields(rows, "created_at", "edited_at", "synced_at"),
+        count_discord_log_entries(guild_id, log_type=log_type, q=q),
+        page,
+        page_size,
+    )
+
+
+@app.get("/panel-api/discord-logs/overview")
+@permission_required("logs.view")
+def panel_api_discord_logs_overview():
+    guild_id = request.args.get("guild_id") or _active_panel_guild_id()
+    overview = get_discord_log_overview(guild_id)
+    overview = _format_date_fields([overview], "latest_created_at", "latest_synced_at")[0]
+    overview["channel_count"] = len(get_all_log_channels(guild_id))
+    return jsonify(overview)
 
 
 @app.get("/panel-api/birthdays")

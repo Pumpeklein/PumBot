@@ -135,6 +135,18 @@
           <span class="text-[10px] font-semibold uppercase tracking-widest text-slate-600">Konfiguration</span>
         </div>
 
+        {% if "logs.view" in permissions or "admin" in permissions %}
+        <a href="{{ url_for('discord_logs_page') }}"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
+              {{ 'bg-white/[0.08] text-white' if active_page == 'discord_logs' else 'text-slate-400 hover:bg-white/[0.04] hover:text-white' }}">
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M9 12h6m-6 4h6M5 7h14M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z" />
+          </svg>
+          Discord Logs
+        </a>
+        {% endif %}
+
         <a href="{{ url_for('log_channels_page') }}"
           class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
               {{ 'bg-white/[0.08] text-white' if active_page == 'log_channels' else 'text-slate-400 hover:bg-white/[0.04] hover:text-white' }}">

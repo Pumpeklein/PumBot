@@ -257,7 +257,7 @@
       const cells = columns
         .map(
           (column) =>
-            `<td class="${column.class || "px-3 py-2.5"}">&nbsp;</td>`,
+            `<td class="${column.class || "px-3 py-2.5"}"><div class="h-8">&nbsp;</div></td>`,
         )
         .join("");
       let html = "";
@@ -271,7 +271,7 @@
       const cells = columns
         .map(
           (column) =>
-            `<td class="${column.class || "px-3 py-2.5"}"><div class="h-3 w-full max-w-[180px] animate-pulse rounded bg-white/[0.06]"></div></td>`,
+            `<td class="${column.class || "px-3 py-2.5"}"><div class="flex h-8 items-center"><div class="h-3 w-full max-w-[180px] animate-pulse rounded bg-white/[0.06]"></div></div></td>`,
         )
         .join("");
       let html = "";

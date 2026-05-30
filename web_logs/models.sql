@@ -24,6 +24,10 @@ CREATE TABLE IF NOT EXISTS guild_members (
   avatar_url TEXT,
   is_bot INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'active',
+  presence_status TEXT,
+  activity_name TEXT,
+  activity_type TEXT,
+  status_updated_at TEXT,
   joined_at TEXT,
   left_at TEXT,
   first_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -43,6 +47,23 @@ CREATE TABLE IF NOT EXISTS guild_member_name_history (
   new_global_name TEXT,
   new_display_name TEXT,
   changed_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS guild_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT NOT NULL,
+  channel_id TEXT NOT NULL,
+  channel_name TEXT,
+  message_id TEXT NOT NULL,
+  user_id TEXT NOT NULL,
+  content TEXT,
+  attachment_count INTEGER NOT NULL DEFAULT 0,
+  jump_url TEXT,
+  created_at TEXT NOT NULL,
+  edited_at TEXT,
+  deleted_at TEXT,
+  synced_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(guild_id, channel_id, message_id)
 );
 
 -- ── Roles & Permissions ──
@@ -239,3 +260,6 @@ CREATE INDEX IF NOT EXISTS idx_roles_guild ON roles(guild_id);
 CREATE INDEX IF NOT EXISTS idx_guild_members_guild_status ON guild_members(guild_id, status);
 CREATE INDEX IF NOT EXISTS idx_guild_members_user ON guild_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_guild_member_name_history_user ON guild_member_name_history(guild_id, user_id, changed_at);
+CREATE INDEX IF NOT EXISTS idx_guild_messages_guild_created ON guild_messages(guild_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_guild_messages_user ON guild_messages(guild_id, user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_guild_messages_channel ON guild_messages(guild_id, channel_id, created_at);

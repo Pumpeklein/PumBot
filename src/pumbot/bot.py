@@ -20,8 +20,10 @@ from web_logs.app import create_app
 from web_logs.config import Config as WebConfig
 from web_logs.db import (
     mark_guild_member_left,
+    mark_guild_message_deleted,
     sync_guild_members,
     upsert_guild_member,
+    upsert_guild_message,
 )
 
 
@@ -81,6 +83,7 @@ intents.guilds = True
 intents.members = True
 intents.messages = True
 intents.message_content = True
+intents.presences = True
 
 EXTENSIONS: list[str] = [
     "src.pumbot.commands.announcmentCommand",
@@ -97,6 +100,7 @@ EXTENSIONS: list[str] = [
     "src.pumbot.commands.countingCommand",
     "src.pumbot.commands.serverinfoCommand",
     "src.pumbot.commands.logsCommand",
+    "src.pumbot.commands.messageSyncCommand",
 ]
 
 
@@ -123,6 +127,7 @@ class PumpeBot(commands.Bot):
     def _member_payload(
         self, member: discord.Member, status: str = "active"
     ) -> dict[str, object | None]:
+        activity = next((a for a in member.activities if a), None)
         return {
             "user_id": str(member.id),
             "username": member.name,
@@ -132,8 +137,40 @@ class PumpeBot(commands.Bot):
             "avatar_url": self._avatar_url(member),
             "is_bot": member.bot,
             "status": status,
+            "presence_status": str(member.status) if getattr(member, "status", None) else None,
+            "activity_name": getattr(activity, "name", None) if activity else None,
+            "activity_type": activity.type.name if activity else None,
             "joined_at": member.joined_at.isoformat() if member.joined_at else None,
         }
+
+    @staticmethod
+    def message_payload(message: discord.Message) -> dict[str, object | None]:
+        return {
+            "channel_id": str(message.channel.id),
+            "channel_name": getattr(message.channel, "name", str(message.channel.id)),
+            "message_id": str(message.id),
+            "user_id": str(message.author.id),
+            "content": message.content or "",
+            "attachment_count": len(message.attachments),
+            "jump_url": message.jump_url,
+            "created_at": message.created_at.isoformat() if message.created_at else None,
+            "edited_at": message.edited_at.isoformat() if message.edited_at else None,
+            "deleted_at": None,
+        }
+
+    async def _store_message(self, message: discord.Message) -> None:
+        if not message.guild or message.author.bot:
+            return
+        try:
+            if isinstance(message.author, discord.Member):
+                await self._upsert_member(message.author, status="active")
+            await asyncio.to_thread(
+                upsert_guild_message,
+                str(message.guild.id),
+                self.message_payload(message),
+            )
+        except Exception:
+            logger.exception("Message-Upsert fuer %s fehlgeschlagen", message.id)
 
     async def _fetch_all_member_payloads(self, guild: discord.Guild) -> list[dict[str, object | None]]:
         payloads: list[dict[str, object | None]] = []
@@ -352,6 +389,34 @@ class PumpeBot(commands.Bot):
             member = guild.get_member(after.id)
             if member:
                 await self._upsert_member(member, status="active")
+
+    async def on_presence_update(
+        self, before: discord.Member, after: discord.Member
+    ) -> None:
+        if before.status != after.status or before.activities != after.activities:
+            await self._upsert_member(after, status="active")
+
+    async def on_message(self, message: discord.Message) -> None:
+        await self._store_message(message)
+        await self.process_commands(message)
+
+    async def on_message_edit(
+        self, before: discord.Message, after: discord.Message
+    ) -> None:
+        await self._store_message(after)
+
+    async def on_message_delete(self, message: discord.Message) -> None:
+        if not message.guild:
+            return
+        try:
+            await asyncio.to_thread(
+                mark_guild_message_deleted,
+                str(message.guild.id),
+                str(message.channel.id),
+                str(message.id),
+            )
+        except Exception:
+            logger.exception("Message-Delete-Markierung fuer %s fehlgeschlagen", message.id)
 
 
 bot = PumpeBot(

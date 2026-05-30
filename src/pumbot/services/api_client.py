@@ -82,6 +82,17 @@ class ApiClient:
     async def mark_guild_member_left(self, guild_id: str, user_id: str) -> None:
         await self.post(f"/api/guild/{guild_id}/members/{user_id}/left")
 
+    async def upsert_guild_message(self, guild_id: str, data: dict) -> dict | None:
+        return await self.post(f"/api/guild/{guild_id}/messages", data)
+
+    async def upsert_guild_messages(self, guild_id: str, messages: list[dict]) -> dict | None:
+        return await self.post(f"/api/guild/{guild_id}/messages/bulk", {"messages": messages})
+
+    async def mark_guild_message_deleted(
+        self, guild_id: str, channel_id: str, message_id: str
+    ) -> None:
+        await self.post(f"/api/guild/{guild_id}/messages/{channel_id}/{message_id}/delete")
+
     # ── Birthdays ──
 
     async def get_birthdays(self, guild_id: str) -> list:

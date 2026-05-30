@@ -51,7 +51,7 @@
       const body = `<span class="flex items-center gap-3">${avatarHtml}<span><span class="block font-medium text-slate-200">${escapeHtml(name)}</span>${sub ? `<span class="block text-xs text-slate-500">${escapeHtml(sub)}</span>` : ""}</span></span>`;
       return url ? `<a href="${escapeHtml(url)}" class="hover:text-white">${body}</a>` : body;
     }
-    if (column.type === "badge") return renderBadge(value, column.variants);
+    if (column.type === "badge") return renderBadge(value || column.fallback, column.variants);
     if (column.type === "date") return `<span class="whitespace-nowrap text-slate-500">${formatDate(value)}</span>`;
     if (column.type === "link") {
       const url = getValue(row, column.urlKey);

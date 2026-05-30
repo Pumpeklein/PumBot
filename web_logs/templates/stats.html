@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header, stat, empty_state %}
+
+{% block content %}
+{{ page_header("Statistiken", "Server-Übersicht", "Allgemeine Aktivitäts- und Nachrichtenstatistiken aus der lokalen Datenbank.") }}
+
+<div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  {{ stat("Nachrichten", overview.totals.message_count or 0) }}
+  {{ stat("Schreibende User", overview.totals.active_writers or 0) }}
+  {{ stat("Aktive Channels", overview.totals.active_channels or 0) }}
+  {{ stat("Letzte Nachricht", overview.totals.last_message_at or "-") }}
+</div>
+<div class="mb-4 text-xs text-slate-500">Guild ID: {{ guild_id }}</div>
+
+<div class="grid gap-6 lg:grid-cols-2">
+  <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+    <h2 class="mb-4 text-sm font-semibold text-white">Top User</h2>
+    {% if overview.top_users %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead>
+          <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+            <th class="px-3 py-2.5">User</th>
+            <th class="px-3 py-2.5">Nachrichten</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in overview.top_users %}
+          <tr class="border-b border-white/[0.04]">
+            <td class="px-3 py-2.5">
+              <a href="{{ url_for('user_detail_page', user_id=row.user_id, guild_id=guild_id) }}" class="flex items-center gap-3 hover:text-white">
+                {% if row.avatar_url %}
+                <img src="{{ row.avatar_url }}" alt="" class="h-8 w-8 rounded-full">
+                {% else %}
+                <span class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-xs font-semibold text-white">{{ (row.display_name or row.username or row.user_id)[:2]|upper }}</span>
+                {% endif %}
+                <span>
+                  <span class="block font-medium text-slate-200">{{ row.display_name or row.username or row.user_id }}</span>
+                  <span class="block text-xs text-slate-500">{{ row.user_id }}</span>
+                </span>
+              </a>
+            </td>
+            <td class="px-3 py-2.5 text-slate-300">{{ row.message_count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    {{ empty_state("Keine Nachrichten", "Führe zuerst /messagesync in Discord aus.") }}
+    {% endif %}
+  </div>
+
+  <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+    <h2 class="mb-4 text-sm font-semibold text-white">Top Channels</h2>
+    {% if overview.top_channels %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead>
+          <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+            <th class="px-3 py-2.5">Channel</th>
+            <th class="px-3 py-2.5">Nachrichten</th>
+            <th class="px-3 py-2.5">Letzte Nachricht</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in overview.top_channels %}
+          <tr class="border-b border-white/[0.04]">
+            <td class="px-3 py-2.5 text-white">#{{ row.channel_name }}</td>
+            <td class="px-3 py-2.5 text-slate-300">{{ row.message_count }}</td>
+            <td class="px-3 py-2.5 text-slate-500">{{ row.last_message_at or "-" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    {{ empty_state("Keine Channel-Daten", "Nach dem ersten Message-Sync werden hier Channel-Statistiken angezeigt.") }}
+    {% endif %}
+  </div>
+</div>
+
+<div data-paginated-table data-endpoint="{{ url_for('panel_api_messages') }}" data-form="#all-messages-filter" data-page-size="10" class="mt-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <script type="application/json">
+    [
+      {"type":"user","nameKey":"display_name","subKey":"username","avatarKey":"avatar_url","urlKey":"user_detail_url","class":"px-3 py-2.5"},
+      {"key":"channel_name","class":"px-3 py-2.5 text-white"},
+      {"key":"content","fallback":"-","class":"px-3 py-2.5 text-slate-300 max-w-xl truncate"},
+      {"key":"created_at","type":"date","class":"px-3 py-2.5 text-slate-500 whitespace-nowrap"}
+    ]
+  </script>
+  <form id="all-messages-filter" class="mb-4 grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
+    <input type="hidden" name="guild_id" value="{{ guild_id }}">
+    <div>
+      <label for="q" class="mb-1.5 block text-sm font-medium text-slate-400">Suche</label>
+      <input id="q" name="q" type="text" placeholder="Inhalt, Channel oder User"
+        class="w-full rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-white placeholder-slate-500 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
+    </div>
+    <button type="submit" class="rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-cyan-500">Filtern</button>
+  </form>
+  <h2 class="mb-4 text-sm font-semibold text-white">Letzte Nachrichten</h2>
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead>
+        <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+          <th class="px-3 py-2.5">User</th>
+          <th class="px-3 py-2.5">Channel</th>
+          <th class="px-3 py-2.5">Inhalt</th>
+          <th class="px-3 py-2.5">Zeitpunkt</th>
+        </tr>
+      </thead>
+      <tbody data-table-body></tbody>
+    </table>
+  </div>
+  <div data-table-empty class="hidden">{{ empty_state("Keine Nachrichten", "Der Message-Sync hat noch keine Nachrichten gespeichert.") }}</div>
+  <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400">
+    <span data-table-status></span>
+    <div class="flex items-center gap-2">
+      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+      <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button>
+      <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
+{% endblock %}

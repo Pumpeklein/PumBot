@@ -35,6 +35,7 @@ try:
         count_birthdays,
         count_counting_leaderboard,
         count_guild_members,
+        count_guild_messages,
         count_tickets,
         count_warnings,
         clear_warnings,
@@ -61,6 +62,7 @@ try:
         get_guild_member,
         get_guild_member_name_history,
         get_guild_members_panel_guild_id,
+        get_guild_message_overview,
         get_log_channel,
         get_selfrole_panel,
         get_server_stats,
@@ -69,11 +71,14 @@ try:
         get_twitch_config,
         get_user_by_discord_id,
         get_warnings,
+        get_user_channel_message_stats,
+        get_user_message_stats,
         init_db,
         insert_ticket_log,
         list_all_warnings,
         list_close_reasons,
         list_guild_members,
+        list_guild_messages,
         list_logs_for_ticket,
         list_roles,
         list_tickets,
@@ -92,8 +97,11 @@ try:
         set_server_stats,
         set_twitch_config,
         sync_guild_members,
+        mark_guild_message_deleted,
         upsert_guild_member,
         upsert_bot_message,
+        upsert_guild_message,
+        upsert_guild_messages,
         update_close_reason,
         update_role,
         upsert_ticket,
@@ -120,6 +128,7 @@ except ImportError:
         count_birthdays,
         count_counting_leaderboard,
         count_guild_members,
+        count_guild_messages,
         count_tickets,
         count_warnings,
         clear_warnings,
@@ -146,6 +155,7 @@ except ImportError:
         get_guild_member,
         get_guild_member_name_history,
         get_guild_members_panel_guild_id,
+        get_guild_message_overview,
         get_log_channel,
         get_selfrole_panel,
         get_server_stats,
@@ -154,11 +164,14 @@ except ImportError:
         get_twitch_config,
         get_user_by_discord_id,
         get_warnings,
+        get_user_channel_message_stats,
+        get_user_message_stats,
         init_db,
         insert_ticket_log,
         list_all_warnings,
         list_close_reasons,
         list_guild_members,
+        list_guild_messages,
         list_logs_for_ticket,
         list_roles,
         list_tickets,
@@ -177,8 +190,11 @@ except ImportError:
         set_server_stats,
         set_twitch_config,
         sync_guild_members,
+        mark_guild_message_deleted,
         upsert_guild_member,
         upsert_bot_message,
+        upsert_guild_message,
+        upsert_guild_messages,
         update_close_reason,
         update_role,
         upsert_ticket,
@@ -858,15 +874,49 @@ def user_detail_page(user_id: str):
             "first_seen_at": None,
             "last_seen_at": None,
             "updated_at": None,
+            "presence_status": None,
+            "activity_name": None,
+            "activity_type": None,
+            "status_updated_at": None,
         }
     history = get_guild_member_name_history(guild_id, user_id)
+    message_stats = get_user_message_stats(guild_id, user_id)
+    channel_stats = get_user_channel_message_stats(guild_id, user_id)
     return render_template(
         "user_detail.html",
         member=_format_date_fields(
-            [member], "joined_at", "left_at", "first_seen_at", "last_seen_at", "updated_at"
+            [member],
+            "joined_at",
+            "left_at",
+            "first_seen_at",
+            "last_seen_at",
+            "updated_at",
+            "status_updated_at",
         )[0],
         history=_format_date_fields(history, "changed_at"),
+        message_stats=_format_date_fields([message_stats], "last_message_at")[0],
+        channel_stats=_format_date_fields(channel_stats, "last_message_at"),
+        guild_id=guild_id,
         active_page="users",
+        **ctx,
+    )
+
+
+@app.get("/stats")
+@permission_required("users.view")
+def stats_page():
+    ctx = _ctx()
+    guild_id = _active_panel_guild_id()
+    overview = get_guild_message_overview(guild_id)
+    return render_template(
+        "stats.html",
+        guild_id=guild_id,
+        overview={
+            **overview,
+            "totals": _format_date_fields([overview.get("totals") or {}], "last_message_at")[0],
+            "top_channels": _format_date_fields(overview.get("top_channels") or [], "last_message_at"),
+        },
+        active_page="stats",
         **ctx,
     )
 
@@ -1166,8 +1216,46 @@ def panel_api_users():
             "user_detail_page", user_id=row["user_id"], guild_id=guild_id
         )
     return _paginated_response(
-        _format_date_fields(rows, "joined_at", "left_at", "first_seen_at", "last_seen_at", "updated_at"),
+        _format_date_fields(rows, "joined_at", "left_at", "first_seen_at", "last_seen_at", "updated_at", "last_message_at", "status_updated_at"),
         count_guild_members(guild_id, q=q, status=status),
+        page,
+        page_size,
+    )
+
+
+@app.get("/panel-api/messages")
+@permission_required("users.view")
+def panel_api_messages():
+    guild_id = request.args.get("guild_id") or _active_panel_guild_id()
+    user_id = request.args.get("user_id", "").strip() or None
+    channel_id = request.args.get("channel_id", "").strip() or None
+    q = request.args.get("q", "").strip()
+    include_deleted = request.args.get("include_deleted") == "1"
+    page, page_size, offset = _pagination_args()
+    rows = []
+    for message in list_guild_messages(
+        guild_id,
+        user_id=user_id,
+        channel_id=channel_id,
+        q=q,
+        include_deleted=include_deleted,
+        limit=page_size,
+        offset=offset,
+    ):
+        item = dict(message)
+        item["user_detail_url"] = url_for(
+            "user_detail_page", user_id=item["user_id"], guild_id=guild_id
+        )
+        rows.append(item)
+    return _paginated_response(
+        _format_date_fields(rows, "created_at", "edited_at", "deleted_at", "synced_at"),
+        count_guild_messages(
+            guild_id,
+            user_id=user_id,
+            channel_id=channel_id,
+            q=q,
+            include_deleted=include_deleted,
+        ),
         page,
         page_size,
     )
@@ -1320,6 +1408,32 @@ def api_mark_guild_member_left(guild_id: str, user_id: str):
 @api_key_required
 def api_get_guild_member_name_history(guild_id: str, user_id: str):
     return jsonify(get_guild_member_name_history(guild_id, user_id))
+
+
+@app.post("/api/guild/<guild_id>/messages")
+@api_key_required
+def api_upsert_guild_message(guild_id: str):
+    data = request.get_json(silent=True) or {}
+    row = upsert_guild_message(guild_id, data)
+    return jsonify(row)
+
+
+@app.post("/api/guild/<guild_id>/messages/bulk")
+@api_key_required
+def api_upsert_guild_messages(guild_id: str):
+    data = request.get_json(silent=True) or {}
+    messages = data.get("messages") or []
+    if not isinstance(messages, list):
+        return jsonify({"ok": False, "error": "messages_must_be_list"}), 400
+    result = upsert_guild_messages(guild_id, messages)
+    return jsonify({"ok": True, **result})
+
+
+@app.post("/api/guild/<guild_id>/messages/<channel_id>/<message_id>/delete")
+@api_key_required
+def api_mark_guild_message_deleted(guild_id: str, channel_id: str, message_id: str):
+    mark_guild_message_deleted(guild_id, channel_id, message_id)
+    return jsonify({"ok": True})
 
 
 @app.get("/api/guild/<guild_id>/birthdays/today")

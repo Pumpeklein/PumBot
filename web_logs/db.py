@@ -27,9 +27,22 @@ def init_db() -> None:
     sql = schema_path.read_text(encoding="utf-8")
     with _connect() as conn:
         conn.executescript(sql)
+        _ensure_columns(conn, "guild_members", {
+            "presence_status": "TEXT",
+            "activity_name": "TEXT",
+            "activity_type": "TEXT",
+            "status_updated_at": "TEXT",
+        })
         conn.commit()
     _seed_default_roles()
     _seed_default_bot_messages()
+
+
+def _ensure_columns(conn: sqlite3.Connection, table: str, columns: dict[str, str]) -> None:
+    existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    for name, definition in columns.items():
+        if name not in existing:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
 
 
 def _migrate_stale_tables() -> None:
@@ -222,6 +235,9 @@ def upsert_guild_member(guild_id: str, member: dict[str, Any]) -> dict:
     avatar_url = member.get("avatar_url")
     is_bot = 1 if member.get("is_bot") else 0
     status = member.get("status") or "active"
+    presence_status = member.get("presence_status")
+    activity_name = member.get("activity_name")
+    activity_type = member.get("activity_type")
     joined_at = member.get("joined_at")
     left_at = member.get("left_at")
 
@@ -258,9 +274,10 @@ def upsert_guild_member(guild_id: str, member: dict[str, Any]) -> dict:
         conn.execute(
             """INSERT INTO guild_members (
                  guild_id, user_id, username, global_name, display_name, discriminator,
-                 avatar_url, is_bot, status, joined_at, left_at, first_seen_at,
+                 avatar_url, is_bot, status, presence_status, activity_name, activity_type,
+                 status_updated_at, joined_at, left_at, first_seen_at,
                  last_seen_at, updated_at
-               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), datetime('now'))
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, datetime('now'), datetime('now'), datetime('now'))
                ON CONFLICT(guild_id, user_id) DO UPDATE SET
                  username = excluded.username,
                  global_name = excluded.global_name,
@@ -269,6 +286,13 @@ def upsert_guild_member(guild_id: str, member: dict[str, Any]) -> dict:
                  avatar_url = excluded.avatar_url,
                  is_bot = excluded.is_bot,
                  status = excluded.status,
+                 presence_status = COALESCE(excluded.presence_status, guild_members.presence_status),
+                 activity_name = COALESCE(excluded.activity_name, guild_members.activity_name),
+                 activity_type = COALESCE(excluded.activity_type, guild_members.activity_type),
+                 status_updated_at = CASE
+                   WHEN excluded.presence_status IS NOT NULL THEN datetime('now')
+                   ELSE guild_members.status_updated_at
+                 END,
                  joined_at = COALESCE(excluded.joined_at, guild_members.joined_at),
                  left_at = excluded.left_at,
                  last_seen_at = datetime('now'),
@@ -283,6 +307,9 @@ def upsert_guild_member(guild_id: str, member: dict[str, Any]) -> dict:
                 avatar_url,
                 is_bot,
                 status,
+                presence_status,
+                activity_name,
+                activity_type,
                 joined_at,
                 left_at,
             ),
@@ -336,9 +363,10 @@ def sync_guild_members(
             conn.execute(
                 """INSERT INTO guild_members (
                      guild_id, user_id, username, global_name, display_name, discriminator,
-                     avatar_url, is_bot, status, joined_at, left_at, first_seen_at,
+                     avatar_url, is_bot, status, presence_status, activity_name, activity_type,
+                     status_updated_at, joined_at, left_at, first_seen_at,
                      last_seen_at, updated_at
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, NULL, datetime('now'), datetime('now'), datetime('now'))
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, datetime('now'), ?, NULL, datetime('now'), datetime('now'), datetime('now'))
                    ON CONFLICT(guild_id, user_id) DO UPDATE SET
                      username = excluded.username,
                      global_name = excluded.global_name,
@@ -347,6 +375,13 @@ def sync_guild_members(
                      avatar_url = excluded.avatar_url,
                      is_bot = excluded.is_bot,
                      status = 'active',
+                     presence_status = COALESCE(excluded.presence_status, guild_members.presence_status),
+                     activity_name = COALESCE(excluded.activity_name, guild_members.activity_name),
+                     activity_type = COALESCE(excluded.activity_type, guild_members.activity_type),
+                     status_updated_at = CASE
+                       WHEN excluded.presence_status IS NOT NULL THEN datetime('now')
+                       ELSE guild_members.status_updated_at
+                     END,
                      joined_at = COALESCE(excluded.joined_at, guild_members.joined_at),
                      left_at = NULL,
                      last_seen_at = datetime('now'),
@@ -360,6 +395,9 @@ def sync_guild_members(
                     member.get("discriminator"),
                     member.get("avatar_url"),
                     1 if member.get("is_bot") else 0,
+                    member.get("presence_status"),
+                    member.get("activity_name"),
+                    member.get("activity_type"),
                     member.get("joined_at"),
                 ),
             )
@@ -432,12 +470,31 @@ def list_guild_members(
     clauses, params = _guild_members_where(guild_id, q, status)
     params.append(limit)
     params.append(offset)
+    joined_clauses = []
+    for clause in clauses:
+        if clause == "guild_id = ?":
+            joined_clauses.append("gm.guild_id = ?")
+        elif clause == "status = ?":
+            joined_clauses.append("gm.status = ?")
+        elif clause.startswith("(user_id LIKE"):
+            joined_clauses.append(
+                "(gm.user_id LIKE ? OR gm.username LIKE ? OR gm.global_name LIKE ? OR gm.display_name LIKE ?)"
+            )
+        else:
+            joined_clauses.append(clause)
     with _connect() as conn:
         rows = conn.execute(
-            f"""SELECT *
-                FROM guild_members
-                WHERE {' AND '.join(clauses)}
-                ORDER BY status ASC, display_name COLLATE NOCASE ASC
+            f"""SELECT gm.*,
+                       COUNT(msg.id) AS message_count,
+                       MAX(msg.created_at) AS last_message_at
+                FROM guild_members gm
+                LEFT JOIN guild_messages msg
+                  ON msg.guild_id = gm.guild_id
+                 AND msg.user_id = gm.user_id
+                 AND msg.deleted_at IS NULL
+                WHERE {' AND '.join(joined_clauses)}
+                GROUP BY gm.id
+                ORDER BY gm.status ASC, gm.display_name COLLATE NOCASE ASC
                 LIMIT ? OFFSET ?""",
             params,
         ).fetchall()
@@ -464,6 +521,244 @@ def get_guild_member_name_history(guild_id: str, user_id: str) -> list[dict]:
             (guild_id, user_id),
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def upsert_guild_message(guild_id: str, message: dict[str, Any]) -> dict:
+    channel_id = str(message["channel_id"])
+    message_id = str(message["message_id"])
+    user_id = str(message["user_id"])
+    with _connect() as conn:
+        conn.execute(
+            """INSERT INTO guild_messages (
+                 guild_id, channel_id, channel_name, message_id, user_id, content,
+                 attachment_count, jump_url, created_at, edited_at, deleted_at, synced_at
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+               ON CONFLICT(guild_id, channel_id, message_id) DO UPDATE SET
+                 channel_name = excluded.channel_name,
+                 user_id = excluded.user_id,
+                 content = excluded.content,
+                 attachment_count = excluded.attachment_count,
+                 jump_url = excluded.jump_url,
+                 created_at = excluded.created_at,
+                 edited_at = excluded.edited_at,
+                 deleted_at = COALESCE(excluded.deleted_at, guild_messages.deleted_at),
+                 synced_at = datetime('now')""",
+            (
+                guild_id,
+                channel_id,
+                message.get("channel_name"),
+                message_id,
+                user_id,
+                message.get("content"),
+                int(message.get("attachment_count") or 0),
+                message.get("jump_url"),
+                message.get("created_at"),
+                message.get("edited_at"),
+                message.get("deleted_at"),
+            ),
+        )
+        conn.commit()
+        row = conn.execute(
+            """SELECT * FROM guild_messages
+               WHERE guild_id = ? AND channel_id = ? AND message_id = ?""",
+            (guild_id, channel_id, message_id),
+        ).fetchone()
+        return dict(row)
+
+
+def upsert_guild_messages(guild_id: str, messages: list[dict[str, Any]]) -> dict:
+    synced = 0
+    with _connect() as conn:
+        for message in messages:
+            if not message.get("channel_id") or not message.get("message_id") or not message.get("user_id"):
+                continue
+            conn.execute(
+                """INSERT INTO guild_messages (
+                     guild_id, channel_id, channel_name, message_id, user_id, content,
+                     attachment_count, jump_url, created_at, edited_at, deleted_at, synced_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                   ON CONFLICT(guild_id, channel_id, message_id) DO UPDATE SET
+                     channel_name = excluded.channel_name,
+                     user_id = excluded.user_id,
+                     content = excluded.content,
+                     attachment_count = excluded.attachment_count,
+                     jump_url = excluded.jump_url,
+                     created_at = excluded.created_at,
+                     edited_at = excluded.edited_at,
+                     deleted_at = COALESCE(excluded.deleted_at, guild_messages.deleted_at),
+                     synced_at = datetime('now')""",
+                (
+                    guild_id,
+                    str(message["channel_id"]),
+                    message.get("channel_name"),
+                    str(message["message_id"]),
+                    str(message["user_id"]),
+                    message.get("content"),
+                    int(message.get("attachment_count") or 0),
+                    message.get("jump_url"),
+                    message.get("created_at"),
+                    message.get("edited_at"),
+                    message.get("deleted_at"),
+                ),
+            )
+            synced += 1
+        conn.commit()
+    return {"synced": synced}
+
+
+def mark_guild_message_deleted(guild_id: str, channel_id: str, message_id: str) -> None:
+    with _connect() as conn:
+        conn.execute(
+            """UPDATE guild_messages
+               SET deleted_at = datetime('now'), synced_at = datetime('now')
+               WHERE guild_id = ? AND channel_id = ? AND message_id = ?""",
+            (guild_id, channel_id, message_id),
+        )
+        conn.commit()
+
+
+def _guild_messages_where(
+    guild_id: str,
+    user_id: str | None = None,
+    channel_id: str | None = None,
+    q: str = "",
+    include_deleted: bool = False,
+) -> tuple[list[str], list[Any]]:
+    clauses = ["gm.guild_id = ?"]
+    params: list[Any] = [guild_id]
+    if user_id:
+        clauses.append("gm.user_id = ?")
+        params.append(user_id)
+    if channel_id:
+        clauses.append("gm.channel_id = ?")
+        params.append(channel_id)
+    if q:
+        clauses.append("(gm.content LIKE ? OR gm.channel_name LIKE ? OR m.display_name LIKE ?)")
+        q_like = f"%{q}%"
+        params.extend([q_like, q_like, q_like])
+    if not include_deleted:
+        clauses.append("gm.deleted_at IS NULL")
+    return clauses, params
+
+
+def list_guild_messages(
+    guild_id: str,
+    user_id: str | None = None,
+    channel_id: str | None = None,
+    q: str = "",
+    include_deleted: bool = False,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[dict]:
+    clauses, params = _guild_messages_where(guild_id, user_id, channel_id, q, include_deleted)
+    params.extend([limit, offset])
+    with _connect() as conn:
+        rows = conn.execute(
+            f"""SELECT gm.*, m.display_name, m.username, m.avatar_url, m.presence_status
+                FROM guild_messages gm
+                LEFT JOIN guild_members m
+                  ON m.guild_id = gm.guild_id AND m.user_id = gm.user_id
+                WHERE {' AND '.join(clauses)}
+                ORDER BY gm.created_at DESC
+                LIMIT ? OFFSET ?""",
+            params,
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def count_guild_messages(
+    guild_id: str,
+    user_id: str | None = None,
+    channel_id: str | None = None,
+    q: str = "",
+    include_deleted: bool = False,
+) -> int:
+    clauses, params = _guild_messages_where(guild_id, user_id, channel_id, q, include_deleted)
+    with _connect() as conn:
+        row = conn.execute(
+            f"""SELECT COUNT(*) AS total
+                FROM guild_messages gm
+                LEFT JOIN guild_members m
+                  ON m.guild_id = gm.guild_id AND m.user_id = gm.user_id
+                WHERE {' AND '.join(clauses)}""",
+            params,
+        ).fetchone()
+        return int(row["total"] if row else 0)
+
+
+def get_user_message_stats(guild_id: str, user_id: str) -> dict:
+    with _connect() as conn:
+        row = conn.execute(
+            """SELECT COUNT(*) AS message_count,
+                      COUNT(DISTINCT channel_id) AS channel_count,
+                      MAX(created_at) AS last_message_at,
+                      SUM(attachment_count) AS attachment_count
+               FROM guild_messages
+               WHERE guild_id = ? AND user_id = ? AND deleted_at IS NULL""",
+            (guild_id, user_id),
+        ).fetchone()
+        return dict(row) if row else {
+            "message_count": 0,
+            "channel_count": 0,
+            "last_message_at": None,
+            "attachment_count": 0,
+        }
+
+
+def get_user_channel_message_stats(guild_id: str, user_id: str) -> list[dict]:
+    with _connect() as conn:
+        rows = conn.execute(
+            """SELECT channel_id, COALESCE(channel_name, channel_id) AS channel_name,
+                      COUNT(*) AS message_count,
+                      MAX(created_at) AS last_message_at
+               FROM guild_messages
+               WHERE guild_id = ? AND user_id = ? AND deleted_at IS NULL
+               GROUP BY channel_id
+               ORDER BY message_count DESC, channel_name COLLATE NOCASE ASC""",
+            (guild_id, user_id),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_guild_message_overview(guild_id: str) -> dict:
+    with _connect() as conn:
+        totals = conn.execute(
+            """SELECT COUNT(*) AS message_count,
+                      COUNT(DISTINCT user_id) AS active_writers,
+                      COUNT(DISTINCT channel_id) AS active_channels,
+                      MAX(created_at) AS last_message_at
+               FROM guild_messages
+               WHERE guild_id = ? AND deleted_at IS NULL""",
+            (guild_id,),
+        ).fetchone()
+        top_users = conn.execute(
+            """SELECT gm.user_id, COUNT(*) AS message_count,
+                      m.display_name, m.username, m.avatar_url
+               FROM guild_messages gm
+               LEFT JOIN guild_members m
+                 ON m.guild_id = gm.guild_id AND m.user_id = gm.user_id
+               WHERE gm.guild_id = ? AND gm.deleted_at IS NULL
+               GROUP BY gm.user_id
+               ORDER BY message_count DESC
+               LIMIT 10""",
+            (guild_id,),
+        ).fetchall()
+        top_channels = conn.execute(
+            """SELECT channel_id, COALESCE(channel_name, channel_id) AS channel_name,
+                      COUNT(*) AS message_count,
+                      MAX(created_at) AS last_message_at
+               FROM guild_messages
+               WHERE guild_id = ? AND deleted_at IS NULL
+               GROUP BY channel_id
+               ORDER BY message_count DESC
+               LIMIT 10""",
+            (guild_id,),
+        ).fetchall()
+        return {
+            "totals": dict(totals) if totals else {},
+            "top_users": [dict(r) for r in top_users],
+            "top_channels": [dict(r) for r in top_channels],
+        }
 
 
 # ══════════ Roles & Permissions ══════════

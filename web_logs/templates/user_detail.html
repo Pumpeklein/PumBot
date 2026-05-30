@@ -2,13 +2,13 @@
 {% from "_macros.html" import page_header, stat, badge, empty_state %}
 
 {% block content %}
-{{ page_header("User", member.display_name or member.username, "Profil und Namenshistorie aus der lokalen Datenbank.") }}
+{{ page_header("User", member.display_name or member.username, "Profil, Aktivität, Nachrichten und Namenshistorie aus der lokalen Datenbank.") }}
 
 <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
   {{ stat("User ID", member.user_id) }}
-  {{ stat("Username", member.username) }}
-  {{ stat("Global Name", member.global_name or "-") }}
-  {{ stat("Bot", "Ja" if member.is_bot else "Nein") }}
+  {{ stat("Nachrichten", message_stats.message_count or 0) }}
+  {{ stat("Aktive Channels", message_stats.channel_count or 0) }}
+  {{ stat("Anhänge", message_stats.attachment_count or 0) }}
 </div>
 
 <div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
@@ -19,11 +19,24 @@
     <div>
       <div class="text-lg font-semibold text-white">{{ member.display_name or member.username }}</div>
       <div class="mt-1 font-mono text-xs text-slate-500">{{ member.user_id }}</div>
-      <div class="mt-3">
+      <div class="mt-3 flex flex-wrap gap-2">
         {% if member.status == "active" %}
         {{ badge("Aktiv", "success") }}
-        {% else %}
+        {% elif member.status == "left" %}
         {{ badge("Verlassen", "default") }}
+        {% else %}
+        {{ badge("Unbekannt", "default") }}
+        {% endif %}
+        {% if member.presence_status == "online" %}
+        {{ badge("Online", "success") }}
+        {% elif member.presence_status == "idle" %}
+        {{ badge("Abwesend", "warning") }}
+        {% elif member.presence_status == "dnd" %}
+        {{ badge("Nicht stören", "danger") }}
+        {% elif member.presence_status %}
+        {{ badge(member.presence_status, "default") }}
+        {% else %}
+        {{ badge("Online unbekannt", "default") }}
         {% endif %}
       </div>
     </div>
@@ -38,14 +51,78 @@
       <dd class="mt-1 text-slate-200">{{ member.left_at or "-" }}</dd>
     </div>
     <div>
-      <dt class="text-slate-500">Erst gesehen</dt>
-      <dd class="mt-1 text-slate-200">{{ member.first_seen_at or "-" }}</dd>
+      <dt class="text-slate-500">Letzte Nachricht</dt>
+      <dd class="mt-1 text-slate-200">{{ message_stats.last_message_at or "-" }}</dd>
     </div>
     <div>
-      <dt class="text-slate-500">Aktualisiert</dt>
-      <dd class="mt-1 text-slate-200">{{ member.updated_at or "-" }}</dd>
+      <dt class="text-slate-500">Aktivität</dt>
+      <dd class="mt-1 text-slate-200">{{ member.activity_name or "-" }}</dd>
     </div>
   </dl>
+</div>
+
+<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <h2 class="mb-4 text-sm font-semibold text-white">Nachrichten pro Channel</h2>
+  {% if channel_stats %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead>
+        <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+          <th class="px-3 py-2.5">Channel</th>
+          <th class="px-3 py-2.5">Nachrichten</th>
+          <th class="px-3 py-2.5">Letzte Nachricht</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in channel_stats %}
+        <tr class="border-b border-white/[0.04]">
+          <td class="px-3 py-2.5 text-white">#{{ row.channel_name }}</td>
+          <td class="px-3 py-2.5 text-slate-300">{{ row.message_count }}</td>
+          <td class="px-3 py-2.5 text-slate-500">{{ row.last_message_at or "-" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  {{ empty_state("Keine Nachrichten", "Für diesen User wurden noch keine Nachrichten synchronisiert.") }}
+  {% endif %}
+</div>
+
+<div data-paginated-table data-endpoint="{{ url_for('panel_api_messages') }}" data-form="#messages-filter" data-page-size="10" class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <script type="application/json">
+    [
+      {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},
+      {"key":"content","fallback":"-","class":"px-3 py-2.5 text-slate-300 max-w-xl truncate"},
+      {"key":"created_at","type":"date","class":"px-3 py-2.5 text-slate-500 whitespace-nowrap"}
+    ]
+  </script>
+  <form id="messages-filter">
+    <input type="hidden" name="guild_id" value="{{ guild_id }}">
+    <input type="hidden" name="user_id" value="{{ member.user_id }}">
+  </form>
+  <h2 class="mb-4 text-sm font-semibold text-white">Letzte Nachrichten</h2>
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead>
+        <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+          <th class="px-3 py-2.5">Channel</th>
+          <th class="px-3 py-2.5">Inhalt</th>
+          <th class="px-3 py-2.5">Zeitpunkt</th>
+        </tr>
+      </thead>
+      <tbody data-table-body></tbody>
+    </table>
+  </div>
+  <div data-table-empty class="hidden">{{ empty_state("Keine Nachrichten", "Der Message-Sync hat für diesen User noch nichts gespeichert.") }}</div>
+  <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400">
+    <span data-table-status></span>
+    <div class="flex items-center gap-2">
+      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+      <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button>
+      <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
+    </div>
+  </div>
 </div>
 
 <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
@@ -79,4 +156,8 @@
   {{ empty_state("Keine Namensänderungen", "Für diesen User wurde noch keine Namensänderung gespeichert.") }}
   {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
 {% endblock %}

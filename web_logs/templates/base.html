@@ -105,6 +105,16 @@
           </svg>
           User
         </a>
+
+        <a href="{{ url_for('stats_page') }}"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
+              {{ 'bg-white/[0.08] text-white' if active_page == 'stats' else 'text-slate-400 hover:bg-white/[0.04] hover:text-white' }}">
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M4 19h16M7 16V8m5 8V5m5 11v-6" />
+          </svg>
+          Statistiken
+        </a>
         {% endif %}
 
         {% if "users.warn" in permissions or "admin" in permissions %}

@@ -28,6 +28,8 @@ try:
     from .config import Config, DEFAULT_GUILD_ID, ensure_dirs
     from .db import (
         ALL_PERMISSIONS,
+        COMMAND_PERMISSION_GROUPS,
+        PERMISSION_GROUPS,
         add_auto_publisher_channel,
         add_close_reason,
         add_selfrole_mapping,
@@ -137,6 +139,8 @@ except ImportError:
     from config import Config, DEFAULT_GUILD_ID, ensure_dirs
     from db import (
         ALL_PERMISSIONS,
+        COMMAND_PERMISSION_GROUPS,
+        PERMISSION_GROUPS,
         add_auto_publisher_channel,
         add_close_reason,
         add_selfrole_mapping,
@@ -286,6 +290,67 @@ def _ctx() -> dict:
         "avatar": u.get("avatar"),
         "permissions": u["permissions"],
     }
+
+
+TICKET_CATEGORY_PERMISSIONS = {
+    "discord": "tickets.discord.view",
+    "twitch": "tickets.twitch.view",
+    "general": "tickets.general.view",
+    "admin": "tickets.admin.view",
+}
+
+
+def _current_discord_role_names() -> set[str]:
+    user = current_user()
+    if not user or not user.get("discord_id"):
+        return set()
+    member = get_guild_member(DEFAULT_GUILD_ID, str(user["discord_id"]))
+    return {
+        str(role.get("name"))
+        for role in parse_member_roles(member)
+        if isinstance(role, dict) and role.get("name")
+    }
+
+
+def _allowed_ticket_categories(permissions: set[str]) -> set[str] | None:
+    if "admin" in permissions or "tickets.view" in permissions:
+        return None
+    allowed = {
+        category
+        for category, permission in TICKET_CATEGORY_PERMISSIONS.items()
+        if permission in permissions
+    }
+    role_names = _current_discord_role_names()
+    if {"Admin", "Team"} & role_names:
+        return None
+    if "Discord Moderator" in role_names:
+        allowed.update({"discord", "general"})
+    if "Twitch Moderator" in role_names:
+        allowed.update({"twitch", "general"})
+    if "Admin Ticket" in role_names:
+        allowed.add("admin")
+    return allowed
+
+
+def _ticket_category_key(ticket: dict | None) -> str:
+    value = str((ticket or {}).get("category") or "general").strip().lower()
+    if "twitch" in value:
+        return "twitch"
+    if "discord" in value:
+        return "discord"
+    if "admin" in value:
+        return "admin"
+    return value or "general"
+
+
+def _can_access_ticket(ticket: dict | None, permissions: set[str] | None = None) -> bool:
+    if not ticket:
+        return False
+    perms = permissions if permissions is not None else (current_user() or {}).get("permissions", set())
+    allowed = _allowed_ticket_categories(set(perms))
+    if allowed is None:
+        return True
+    return _ticket_category_key(ticket) in allowed
 
 
 def _resolve_transcript_path(transcript_path: str) -> Path:
@@ -732,10 +797,11 @@ def home():
 def tickets_page():
     ctx = _ctx()
     q = request.args.get("q", "")
+    categories = _allowed_ticket_categories(set(ctx["permissions"]))
     return render_template(
         "tickets.html",
         q=q,
-        total=count_tickets(q=q),
+        total=count_tickets(q=q, categories=categories),
         active_page="tickets",
         **ctx,
     )
@@ -746,7 +812,7 @@ def tickets_page():
 def ticket_detail(ticket_id: str):
     ctx = _ctx()
     t = get_ticket(ticket_id)
-    if not t:
+    if not t or not _can_access_ticket(t, set(ctx["permissions"])):
         abort(404)
     t = {
         **t,
@@ -772,7 +838,7 @@ def ticket_detail(ticket_id: str):
 @login_required
 def ticket_transcript(ticket_id: str):
     t = get_ticket(ticket_id)
-    if not t or not t.get("transcript_path"):
+    if not t or not _can_access_ticket(t) or not t.get("transcript_path"):
         abort(404)
     path = _resolve_transcript_path(t["transcript_path"])
     if not path.exists():
@@ -834,6 +900,8 @@ def roles_page():
         roles=roles,
         server_roles=server_roles,
         all_permissions=ALL_PERMISSIONS,
+        permission_groups=PERMISSION_GROUPS,
+        command_permission_groups=COMMAND_PERMISSION_GROUPS,
         active_page="roles",
         **ctx,
     )
@@ -844,7 +912,7 @@ def roles_page():
 def roles_create():
     discord_role_id = (request.form.get("discord_role_id") or "").strip()
     role_name = (request.form.get("role_name") or "").strip()
-    perms = request.form.getlist("permissions")
+    perms = [perm for perm in request.form.getlist("permissions") if perm in ALL_PERMISSIONS]
     if not discord_role_id or not role_name:
         return redirect(url_for("roles_page"))
     guild, actor_member, bot_member = _live_role_context(DEFAULT_GUILD_ID)
@@ -864,7 +932,7 @@ def roles_create():
 @permission_required("roles.manage")
 def roles_update(role_id: int):
     role_name = (request.form.get("role_name") or "").strip()
-    perms = request.form.getlist("permissions")
+    perms = [perm for perm in request.form.getlist("permissions") if perm in ALL_PERMISSIONS]
     update_role(role_id, role_name=role_name or None, permissions=perms)
     return redirect(url_for("roles_page"))
 
@@ -913,6 +981,8 @@ def roles_discord_assign():
 @app.get("/tickets/<ticket_id>/messages.json")
 @login_required
 def ticket_messages_json(ticket_id: str):
+    if not _can_access_ticket(get_ticket(ticket_id)):
+        abort(404)
     messages = get_ticket_messages(ticket_id)
     return jsonify(_format_date_fields(messages, "created_at"))
 
@@ -925,6 +995,8 @@ def ticket_messages_json(ticket_id: str):
 def ticket_reply_web(ticket_id: str):
     if not has_permission("tickets.reply"):
         abort(403)
+    if not _can_access_ticket(get_ticket(ticket_id)):
+        abort(404)
     content = (request.form.get("content") or "").strip()
     if not content:
         return redirect(url_for("ticket_detail", ticket_id=ticket_id))
@@ -974,7 +1046,7 @@ def ticket_close_web(ticket_id: str):
     if not has_permission("tickets.close"):
         abort(403)
     t = get_ticket(ticket_id)
-    if not t or t.get("status") == "closed":
+    if not t or not _can_access_ticket(t) or t.get("status") == "closed":
         return redirect(url_for("ticket_detail", ticket_id=ticket_id))
 
     reason = (request.form.get("reason") or "").strip() or "Über Web Panel geschlossen."
@@ -1677,13 +1749,14 @@ def server_stats_save():
 def panel_api_tickets():
     q = request.args.get("q", "").strip()
     page, page_size, offset = _pagination_args()
+    categories = _allowed_ticket_categories(set((current_user() or {}).get("permissions", set())))
     rows = []
-    for ticket in list_tickets(q=q, limit=page_size, offset=offset):
+    for ticket in list_tickets(q=q, limit=page_size, offset=offset, categories=categories):
         guild_id = ticket.get("guild_id") or DEFAULT_GUILD_ID
         item = _attach_member_profile(ticket, guild_id, "creator_user_id", "creator")
         item["detail_url"] = url_for("ticket_detail", ticket_id=item["ticket_id"])
         rows.append(item)
-    return _paginated_response(rows, count_tickets(q=q), page, page_size)
+    return _paginated_response(rows, count_tickets(q=q, categories=categories), page, page_size)
 
 
 @app.get("/panel-api/users/<user_id>/tickets")
@@ -1691,15 +1764,16 @@ def panel_api_tickets():
 def panel_api_user_tickets(user_id: str):
     guild_id = _active_panel_guild_id()
     page, page_size, offset = _pagination_args()
+    categories = _allowed_ticket_categories(set((current_user() or {}).get("permissions", set())))
     rows = []
     for ticket in list_tickets_for_user(
-        guild_id, user_id, limit=page_size, offset=offset
+        guild_id, user_id, limit=page_size, offset=offset, categories=categories
     ):
         item = dict(ticket)
         item["detail_url"] = url_for("ticket_detail", ticket_id=item["ticket_id"])
         rows.append(item)
     return _paginated_response(
-        rows, count_tickets_for_user(guild_id, user_id), page, page_size
+        rows, count_tickets_for_user(guild_id, user_id, categories=categories), page, page_size
     )
 
 

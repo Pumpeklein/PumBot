@@ -20,6 +20,7 @@ from web_logs.app import create_app
 from web_logs.config import Config as WebConfig
 from web_logs.db import (
     get_all_log_channels,
+    get_permissions_for_discord_roles,
     mark_guild_member_left,
     mark_guild_message_deleted,
     sync_guild_members,
@@ -141,6 +142,32 @@ class PumpeBot(commands.Bot):
         self._member_sync_done = False
         self._member_resync_task: asyncio.Task | None = None
         self._log_sync_running: set[str] = set()
+        self.tree.interaction_check = self._web_command_interaction_check
+
+    async def _web_command_interaction_check(self, interaction: discord.Interaction) -> bool:
+        command = interaction.command
+        if command is None:
+            return True
+        qualified_name = getattr(command, "qualified_name", command.name)
+        permission = f"commands.{qualified_name.replace(' ', '.')}.use"
+        if permission == "commands.admin.ticket.use":
+            return True
+        user = interaction.user
+        if not isinstance(user, discord.Member):
+            return True
+        role_ids = [str(role.id) for role in user.roles if role.name != "@everyone"]
+        guild_id = str(interaction.guild_id or "")
+        permissions = await asyncio.to_thread(get_permissions_for_discord_roles, guild_id, role_ids)
+        command_permissions = {perm for perm in permissions if perm.startswith("commands.")}
+        if not command_permissions:
+            return True
+        if "admin" in permissions or "commands.all.use" in permissions or permission in permissions:
+            return True
+        await interaction.response.send_message(
+            "Du hast keine Berechtigung, diesen Command zu nutzen.",
+            ephemeral=True,
+        )
+        return False
 
     @staticmethod
     def _avatar_url(member: discord.Member) -> str | None:

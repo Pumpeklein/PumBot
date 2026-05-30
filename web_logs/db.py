@@ -1227,10 +1227,106 @@ def list_message_filter_channels(guild_id: str, limit: int = 500) -> list[dict]:
 ALL_PERMISSIONS = [
     "admin",
     "tickets.view", "tickets.reply", "tickets.close",
+    "tickets.discord.view", "tickets.twitch.view", "tickets.general.view", "tickets.admin.view",
     "users.view", "users.warn", "users.ban", "users.timeout",
+    "counting.view", "counting.manage",
+    "birthdays.view", "birthdays.manage",
+    "stats.view", "stats.manage",
+    "warnings.view", "warnings.manage",
     "roles.manage",
     "config.manage",
     "logs.view", "logs.manage",
+    "commands.all.use",
+    "commands.ticket.panel.use",
+    "commands.ticket.close.use",
+    "commands.ticket.useradd.use",
+    "commands.ticket.userremove.use",
+    "commands.admin.ticket.use",
+    "commands.counting.set.use",
+    "commands.counting.reset.use",
+    "commands.counting.info.use",
+    "commands.counting.leaderboard.use",
+    "commands.logs.use",
+    "commands.messagesync.use",
+]
+
+
+PERMISSION_GROUPS = [
+    {
+        "key": "tickets",
+        "label": "Tickets",
+        "permissions": [
+            ("tickets.view", "Alle Tickets ansehen"),
+            ("tickets.discord.view", "Discord Tickets ansehen"),
+            ("tickets.twitch.view", "Twitch Tickets ansehen"),
+            ("tickets.general.view", "Allgemeine Tickets ansehen"),
+            ("tickets.admin.view", "Admin Tickets ansehen"),
+            ("tickets.reply", "Antworten"),
+            ("tickets.close", "Schliessen"),
+        ],
+    },
+    {
+        "key": "users",
+        "label": "Users",
+        "permissions": [
+            ("users.view", "Ansehen"),
+            ("users.warn", "Verwarnen"),
+            ("users.ban", "Bannen"),
+            ("users.timeout", "Timeout"),
+        ],
+    },
+    {
+        "key": "counting",
+        "label": "Counting",
+        "permissions": [
+            ("counting.view", "Ansehen"),
+            ("counting.manage", "Verwalten"),
+        ],
+    },
+    {
+        "key": "features",
+        "label": "Features",
+        "permissions": [
+            ("birthdays.view", "Geburtstage ansehen"),
+            ("birthdays.manage", "Geburtstage verwalten"),
+            ("stats.view", "Statistiken ansehen"),
+            ("stats.manage", "Statistiken verwalten"),
+            ("warnings.view", "Verwarnungen ansehen"),
+            ("warnings.manage", "Verwarnungen verwalten"),
+        ],
+    },
+    {
+        "key": "system",
+        "label": "System",
+        "permissions": [
+            ("roles.manage", "Web Rollen verwalten"),
+            ("config.manage", "Konfiguration verwalten"),
+            ("logs.view", "Logs ansehen"),
+            ("logs.manage", "Logs verwalten"),
+            ("admin", "Vollzugriff"),
+        ],
+    },
+]
+
+COMMAND_PERMISSION_GROUPS = [
+    {
+        "key": "commands",
+        "label": "Commands",
+        "permissions": [
+            ("commands.all.use", "Alle Commands"),
+            ("commands.ticket.panel.use", "/ticket panel"),
+            ("commands.ticket.close.use", "/ticket close"),
+            ("commands.ticket.useradd.use", "/ticket useradd"),
+            ("commands.ticket.userremove.use", "/ticket userremove"),
+            ("commands.admin.ticket.use", "/admin ticket"),
+            ("commands.counting.set.use", "/counting set"),
+            ("commands.counting.reset.use", "/counting reset"),
+            ("commands.counting.info.use", "/counting info"),
+            ("commands.counting.leaderboard.use", "/counting leaderboard"),
+            ("commands.logs.use", "/logs"),
+            ("commands.messagesync.use", "/message-sync"),
+        ],
+    },
 ]
 
 
@@ -2134,48 +2230,111 @@ def get_ticket(ticket_id: str) -> dict[str, Any] | None:
         return dict(row) if row else None
 
 
-def list_tickets(q: str = "", limit: int = 200, offset: int = 0) -> list[dict[str, Any]]:
+def _ticket_filter_sql(q: str = "", categories: set[str] | None = None) -> tuple[str, list[Any]]:
     q_like = f"%{q}%"
+    clauses = [
+        "(ticket_id LIKE ? OR subject LIKE ? OR creator_user_id LIKE ? OR creator_username LIKE ?)"
+    ]
+    params: list[Any] = [q_like, q_like, q_like, q_like]
+    if categories is not None:
+        if not categories:
+            clauses.append("1 = 0")
+        else:
+            category_values = set(categories)
+            if "discord" in categories:
+                category_values.add("Discord Support")
+            if "twitch" in categories:
+                category_values.add("Twitch Support")
+            if "general" in categories:
+                category_values.add("Allgemeiner Support")
+            if "admin" in categories:
+                category_values.add("Admin Ticket")
+            placeholders = ",".join("?" * len(category_values))
+            clauses.append(f"COALESCE(category, 'general') IN ({placeholders})")
+            params.extend(sorted(category_values))
+    return " AND ".join(clauses), params
+
+
+def list_tickets(
+    q: str = "",
+    limit: int = 200,
+    offset: int = 0,
+    categories: set[str] | None = None,
+) -> list[dict[str, Any]]:
+    where_sql, params = _ticket_filter_sql(q, categories)
     with _connect() as conn:
         rows = conn.execute(
-            """SELECT * FROM tickets
-               WHERE ticket_id LIKE ? OR subject LIKE ? OR creator_user_id LIKE ? OR creator_username LIKE ?
-               ORDER BY updated_at DESC LIMIT ? OFFSET ?""",
-            (q_like, q_like, q_like, q_like, limit, offset),
+            f"""SELECT * FROM tickets
+                WHERE {where_sql}
+                ORDER BY updated_at DESC LIMIT ? OFFSET ?""",
+            (*params, limit, offset),
         ).fetchall()
         return [dict(r) for r in rows]
 
 
-def count_tickets(q: str = "") -> int:
-    q_like = f"%{q}%"
+def count_tickets(q: str = "", categories: set[str] | None = None) -> int:
+    where_sql, params = _ticket_filter_sql(q, categories)
     with _connect() as conn:
         row = conn.execute(
-            """SELECT COUNT(*) AS total FROM tickets
-               WHERE ticket_id LIKE ? OR subject LIKE ? OR creator_user_id LIKE ? OR creator_username LIKE ?""",
-            (q_like, q_like, q_like, q_like),
+            f"SELECT COUNT(*) AS total FROM tickets WHERE {where_sql}",
+            params,
         ).fetchone()
         return int(row["total"] if row else 0)
 
 
 def list_tickets_for_user(
-    guild_id: str, user_id: str, limit: int = 100, offset: int = 0
+    guild_id: str,
+    user_id: str,
+    limit: int = 100,
+    offset: int = 0,
+    categories: set[str] | None = None,
 ) -> list[dict[str, Any]]:
+    clauses = ["creator_user_id = ?"]
+    params: list[Any] = [str(user_id)]
+    if categories is not None:
+        if not categories:
+            clauses.append("1 = 0")
+        else:
+            category_values = set(categories)
+            if "discord" in categories:
+                category_values.add("Discord Support")
+            if "twitch" in categories:
+                category_values.add("Twitch Support")
+            if "general" in categories:
+                category_values.add("Allgemeiner Support")
+            if "admin" in categories:
+                category_values.add("Admin Ticket")
+            placeholders = ",".join("?" * len(category_values))
+            clauses.append(f"COALESCE(category, 'general') IN ({placeholders})")
+            params.extend(sorted(category_values))
     with _connect() as conn:
         rows = conn.execute(
-            """SELECT * FROM tickets
-               WHERE creator_user_id = ?
-               ORDER BY updated_at DESC LIMIT ? OFFSET ?""",
-            (str(user_id), limit, offset),
+            f"""SELECT * FROM tickets
+                WHERE {' AND '.join(clauses)}
+                ORDER BY updated_at DESC LIMIT ? OFFSET ?""",
+            (*params, limit, offset),
         ).fetchall()
         return [dict(r) for r in rows]
 
 
-def count_tickets_for_user(guild_id: str, user_id: str) -> int:
+def count_tickets_for_user(
+    guild_id: str,
+    user_id: str,
+    categories: set[str] | None = None,
+) -> int:
+    clauses = ["creator_user_id = ?"]
+    params: list[Any] = [str(user_id)]
+    if categories is not None:
+        if not categories:
+            clauses.append("1 = 0")
+        else:
+            placeholders = ",".join("?" * len(categories))
+            clauses.append(f"COALESCE(category, 'general') IN ({placeholders})")
+            params.extend(sorted(categories))
     with _connect() as conn:
         row = conn.execute(
-            """SELECT COUNT(*) AS total FROM tickets
-               WHERE creator_user_id = ?""",
-            (str(user_id),),
+            f"SELECT COUNT(*) AS total FROM tickets WHERE {' AND '.join(clauses)}",
+            params,
         ).fetchone()
         return int(row["total"] if row else 0)
 

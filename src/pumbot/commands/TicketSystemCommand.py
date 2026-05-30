@@ -16,8 +16,15 @@ from src.pumbot.utils.datetime_format import format_berlin_datetime
 
 TICKET_CATEGORY_NAME = "🎫 Tickets"
 TICKET_LOG_CHANNEL_ID = 1441186559486595142
+ADMIN_TICKET_ROLE_ID = 1510385400173039629
 
-TICKET_STAFF_ROLES = {"Admin", "Team", "Twitch Moderator", "Discord Moderator"}
+TICKET_STAFF_ROLES = {"Admin", "Team", "Twitch Moderator", "Discord Moderator", "Admin Ticket"}
+TICKET_CATEGORY_STAFF_ROLES = {
+    "discord": {"Admin", "Team", "Discord Moderator"},
+    "twitch": {"Admin", "Team", "Twitch Moderator"},
+    "general": {"Admin", "Team", "Discord Moderator", "Twitch Moderator"},
+    "admin": {"Admin Ticket"},
+}
 
 
 def is_ticket_staff(member: discord.Member) -> bool:
@@ -218,19 +225,28 @@ class TicketSystemCog(commands.Cog):
                 guild.me: discord.PermissionOverwrite(view_channel=True, send_messages=True),
             }
 
+            allowed_role_names = TICKET_CATEGORY_STAFF_ROLES.get(
+                category_key,
+                TICKET_CATEGORY_STAFF_ROLES["general"],
+            )
             for role in guild.roles:
-                if role.name in TICKET_STAFF_ROLES:
-                    overwrites[role] = discord.PermissionOverwrite(
-                        view_channel=True,
-                        send_messages=True,
-                        read_message_history=True,
-                    )
+                if category_key == "admin":
+                    if role.id != ADMIN_TICKET_ROLE_ID:
+                        continue
+                elif role.name not in allowed_role_names:
+                    continue
+                overwrites[role] = discord.PermissionOverwrite(
+                    view_channel=True,
+                    send_messages=True,
+                    read_message_history=True,
+                )
 
             topic_parts = [
                 "TICKET",
                 f"creator_id:{user.id}",
                 f"creator_name:{user}",
-                f"category:{category_label}",
+                f"category:{category_key}",
+                f"category_label:{category_label}",
                 f"created_at:{discord.utils.utcnow().isoformat()}",
             ]
             if twitch_name:
@@ -326,6 +342,8 @@ class TicketSystemCog(commands.Cog):
             creator_id = topic_data.get("creator_id")
             creator_name = topic_data.get("creator_name")
             category_label = topic_data.get("category")
+            category_key = topic_data.get("category_key") or self._normalize_ticket_category(category_label)
+            category_label = topic_data.get("category_label") or category_label
             created_at_iso = topic_data.get("created_at")
             twitch_name = topic_data.get("twitch_name")
             twitch_verified_flag = topic_data.get("twitch_verified")
@@ -359,6 +377,7 @@ class TicketSystemCog(commands.Cog):
                     ticket_id=str(channel.id),
                     channel_name=channel.name,
                     category_label=category_label or "Unbekannt",
+                    category=category_key or "general",
                     creator_id=str(creator_id) if creator_id else None,
                     creator_name=creator_name,
                     guild_id=str(guild.id),
@@ -464,9 +483,25 @@ class TicketSystemCog(commands.Cog):
             logger.exception("_parse_ticket_topic error")
             return {}
 
+    @staticmethod
+    def _normalize_ticket_category(category: Optional[str]) -> str:
+        value = (category or "").strip().lower()
+        if "twitch" in value:
+            return "twitch"
+        if "discord" in value:
+            return "discord"
+        if "admin" in value:
+            return "admin"
+        return "general"
+
     ticket_group = app_commands.Group(
         name="ticket",
         description="Ticket-System Verwaltung.",
+    )
+
+    admin_group = app_commands.Group(
+        name="admin",
+        description="Admin-Funktionen.",
     )
 
     @ticket_group.command(name="panel", description="Erstellt ein Ticket-Panel für Benutzer-Anfragen.")
@@ -518,7 +553,25 @@ class TicketSystemCog(commands.Cog):
         await interaction.response.send_message("Ticket wird geschlossen …", ephemeral=True)
         await self.close_ticket(member, channel, reason=grund or "Per Slash Command geschlossen.")
 
-    @ticket_group.command(name="useradd", description="Fügt einen User zu diesem Ticket hinzu (Staff).")
+    @admin_group.command(name="ticket", description="Erstellt ein Admin Ticket.")
+    @app_commands.describe(grund="Grund / Anliegen")
+    async def admin_ticket(self, interaction: discord.Interaction, grund: str):
+        if interaction.guild is None:
+            await interaction.response.send_message("Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True)
+            return
+        reason = (grund or "").strip()
+        if not reason:
+            await interaction.response.send_message("Bitte gib einen Grund an.", ephemeral=True)
+            return
+        await self.create_ticket_channel(
+            interaction,
+            category_key="admin",
+            category_label="Admin Ticket",
+            reason=reason,
+            twitch_name=None,
+        )
+
+    @ticket_group.command(name="useradd", description="Fuegt einen User zu diesem Ticket hinzu (Staff).")
     @app_commands.describe(user="User")
     async def useradd(self, interaction: discord.Interaction, user: discord.Member):
         channel = interaction.channel

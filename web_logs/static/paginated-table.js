@@ -40,30 +40,37 @@
 
   const renderCell = (row, column) => {
     const value = getValue(row, column.key);
+
     if (column.type === "message") {
       const original = getValue(row, column.originalKey);
       const editedAt = getValue(row, column.editedAtKey);
       const deletedAt = getValue(row, column.deletedAtKey);
       const changed = original && original !== value;
       const status = deletedAt ? "Gelöscht" : editedAt && changed ? "Bearbeitet" : "";
+
       const statusClass = deletedAt
         ? "border-red-500/25 bg-red-500/10 text-red-300"
         : "border-amber-500/25 bg-amber-500/10 text-amber-300";
+
       return `<div class="max-w-xl">
         <div class="whitespace-pre-wrap break-words text-slate-200">${escapeHtml(value || column.fallback || "-")}</div>
         ${status ? `<div class="mt-1 inline-flex rounded border px-2 py-0.5 text-[11px] ${statusClass}">${status}</div>` : ""}
         ${changed ? `<details class="mt-1 text-xs text-slate-500"><summary class="cursor-pointer text-slate-400 hover:text-white">Original anzeigen</summary><div class="mt-1 whitespace-pre-wrap break-words rounded border border-white/10 bg-black/20 p-2">${escapeHtml(original)}</div></details>` : ""}
       </div>`;
     }
+
     if (column.type === "user") {
       const name = getValue(row, column.nameKey) || value || "-";
       const sub = getValue(row, column.subKey);
       const avatar = getValue(row, column.avatarKey);
       const url = getValue(row, column.urlKey);
+
       const avatarHtml = avatar
         ? `<img src="${escapeHtml(avatar)}" alt="" class="h-8 w-8 rounded-full">`
         : `<span class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-xs font-semibold text-white">${initials(name)}</span>`;
+
       const body = `<span class="flex items-center gap-3">${avatarHtml}<span><span class="block font-medium text-slate-200">${escapeHtml(name)}</span>${sub ? `<span class="block text-xs text-slate-500">${escapeHtml(sub)}</span>` : ""}</span></span>`;
+
       return url ? `<a href="${escapeHtml(url)}" class="hover:text-white">${body}</a>` : body;
     }
     if (column.type === "badge") return renderBadge(value || column.fallback, column.variants);

@@ -12,9 +12,23 @@ CREATE TABLE IF NOT EXISTS users (
   discord_banner TEXT,
   accent_color INTEGER,
   locale TEXT,
-  discord_bio TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   last_login TEXT
+);
+
+CREATE TABLE IF NOT EXISTS user_connections (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  discord_id TEXT NOT NULL,
+  connection_id TEXT NOT NULL,
+  connection_type TEXT NOT NULL,
+  name TEXT NOT NULL,
+  verified INTEGER NOT NULL DEFAULT 0,
+  visibility INTEGER,
+  show_activity INTEGER,
+  two_way_link INTEGER,
+  metadata_json TEXT,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(discord_id, connection_id, connection_type)
 );
 
 CREATE TABLE IF NOT EXISTS guild_members (
@@ -28,7 +42,6 @@ CREATE TABLE IF NOT EXISTS guild_members (
   avatar_url TEXT,
   banner_url TEXT,
   accent_color INTEGER,
-  bio TEXT,
   locale TEXT,
   roles_json TEXT,
   is_bot INTEGER NOT NULL DEFAULT 0,
@@ -283,6 +296,7 @@ CREATE INDEX IF NOT EXISTS idx_birthdays_guild ON birthdays(guild_id);
 CREATE INDEX IF NOT EXISTS idx_birthdays_month_day ON birthdays(month, day);
 CREATE INDEX IF NOT EXISTS idx_bot_messages_guild_type ON bot_messages(guild_id, message_type);
 CREATE INDEX IF NOT EXISTS idx_roles_guild ON roles(guild_id);
+CREATE INDEX IF NOT EXISTS idx_user_connections_discord_id ON user_connections(discord_id);
 CREATE INDEX IF NOT EXISTS idx_guild_members_guild_status ON guild_members(guild_id, status);
 CREATE INDEX IF NOT EXISTS idx_guild_members_user ON guild_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_guild_member_name_history_user ON guild_member_name_history(guild_id, user_id, changed_at);

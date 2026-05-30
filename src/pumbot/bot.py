@@ -143,7 +143,6 @@ class PumpeBot(commands.Bot):
             "avatar_url": self._avatar_url(member),
             "banner_url": str(member.banner.url) if getattr(member, "banner", None) else None,
             "accent_color": int(member.accent_color.value) if getattr(member, "accent_color", None) else None,
-            "bio": getattr(member, "bio", None),
             "locale": str(member.locale) if getattr(member, "locale", None) else None,
             "roles": [
                 {"id": str(role.id), "name": role.name}

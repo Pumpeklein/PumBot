@@ -11,10 +11,22 @@ from flask import abort, redirect, request, session, url_for
 
 try:
     from .config import Config, DEFAULT_GUILD_ID
-    from .db import get_guild_member, get_permissions_for_discord_roles, get_user_by_discord_id, upsert_user
+    from .db import (
+        get_guild_member,
+        get_permissions_for_discord_roles,
+        get_user_by_discord_id,
+        replace_user_connections,
+        upsert_user,
+    )
 except ImportError:
     from config import Config, DEFAULT_GUILD_ID
-    from db import get_guild_member, get_permissions_for_discord_roles, get_user_by_discord_id, upsert_user
+    from db import (
+        get_guild_member,
+        get_permissions_for_discord_roles,
+        get_user_by_discord_id,
+        replace_user_connections,
+        upsert_user,
+    )
 
 logger = logging.getLogger("web_logs.auth")
 
@@ -74,7 +86,7 @@ def discord_login_url() -> str:
         "client_id": Config.DISCORD_CLIENT_ID,
         "redirect_uri": Config.DISCORD_REDIRECT_URI,
         "response_type": "code",
-        "scope": "identify",
+        "scope": "identify connections",
     }
     return f"{DISCORD_OAUTH_AUTHORIZE}?{urlencode(params)}"
 
@@ -108,6 +120,19 @@ def fetch_discord_user(access_token: str) -> dict | None:
     if resp.status_code != 200:
         return None
     return resp.json()
+
+
+def fetch_discord_connections(access_token: str) -> list[dict]:
+    resp = requests.get(
+        f"{DISCORD_API}/users/@me/connections",
+        headers={"Authorization": f"Bearer {access_token}"},
+        timeout=10,
+    )
+    if resp.status_code != 200:
+        logger.warning("fetch_discord_connections failed: %d %s", resp.status_code, resp.text)
+        return []
+    data = resp.json()
+    return data if isinstance(data, list) else []
 
 
 def _discord_asset_url(user_id: str, asset_hash: str | None, asset_type: str) -> str | None:
@@ -198,7 +223,6 @@ def fetch_guild_member_display_name(discord_user_id: str) -> str | None:
             discord_banner=banner_url,
             accent_color=user.get("accent_color"),
             locale=user.get("locale"),
-            discord_bio=user.get("bio"),
         )
         _set_cached_display_name(discord_user_id, display_name)
 
@@ -234,8 +258,8 @@ def login_user_from_oauth(code: str) -> bool:
             discord_banner=banner_url,
             accent_color=discord_user.get("accent_color"),
             locale=discord_user.get("locale"),
-            discord_bio=discord_user.get("bio"),
         )
+        replace_user_connections(discord_id, fetch_discord_connections(access_token))
 
         guild_roles = fetch_guild_member_roles(discord_id)
         permissions = get_permissions_for_discord_roles(DEFAULT_GUILD_ID, guild_roles)

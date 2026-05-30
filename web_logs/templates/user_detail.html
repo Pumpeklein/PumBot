@@ -71,12 +71,7 @@
       <dd class="mt-1 text-slate-200">{{ member.activity_name or "-" }}</dd>
     </div>
   </dl>
-  {% if member.bio or member.banner_url or member.accent_color %}
   <div class="mt-5 grid gap-4 text-sm lg:grid-cols-3">
-    <div class="lg:col-span-2">
-      <div class="text-slate-500">Bio</div>
-      <div class="mt-1 whitespace-pre-wrap rounded-lg border border-white/[0.06] bg-black/10 p-3 text-slate-200">{{ member.bio or "-" }}</div>
-    </div>
     <div>
       <div class="text-slate-500">Profilfarbe</div>
       <div class="mt-1 text-slate-200">{{ member.accent_color or "-" }}</div>
@@ -85,6 +80,24 @@
       {% endif %}
     </div>
   </div>
+</div>
+
+<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <h2 class="mb-4 text-sm font-semibold text-white">Verknüpfungen</h2>
+  {% if connections %}
+  <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    {% for connection in connections %}
+    <div class="rounded-lg border border-white/[0.06] bg-black/10 px-3 py-2">
+      <div class="text-xs uppercase text-slate-500">{{ connection.connection_type }}</div>
+      <div class="mt-1 font-medium text-slate-200">{{ connection.name }}</div>
+      <div class="mt-1 text-xs text-slate-500">
+        {% if connection.verified %}verifiziert{% else %}nicht verifiziert{% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  {{ empty_state("Keine Verknüpfungen", "Für diesen User wurden keine OAuth-Verknüpfungen gespeichert.") }}
   {% endif %}
 </div>
 
@@ -125,14 +138,14 @@
     {% endif %}
     <form method="post" action="{{ url_for('user_discord_role_add', user_id=member.user_id, guild_id=guild_id) }}" class="mb-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
       <div>
-        <label for="role_id" class="mb-1.5 block text-sm font-medium text-slate-400">Rolle hinzufÃ¼gen</label>
+        <label for="role_id" class="mb-1.5 block text-sm font-medium text-slate-400">Rolle hinzufügen</label>
         <select id="role_id" name="role_id" class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
           {% for role in assignable_discord_roles %}
           <option value="{{ role.id }}">{{ role.name }}</option>
           {% endfor %}
         </select>
       </div>
-      {{ btn("HinzufÃ¼gen") }}
+      {{ btn("Hinzufügen") }}
     </form>
     <form method="post" action="{{ url_for('user_discord_role_create', user_id=member.user_id, guild_id=guild_id) }}" class="grid gap-3 sm:grid-cols-[1fr_120px_auto_auto] sm:items-end">
       {{ field("role_name", "Neue Discord Rolle", placeholder="Rollenname", required=false) }}
@@ -246,12 +259,12 @@
         <tbody data-table-body></tbody>
       </table>
     </div>
-    <div data-table-empty class="hidden">{{ empty_state("Keine Edits", "FÃ¼r diesen User wurden keine bearbeiteten Nachrichten gespeichert.") }}</div>
+    <div data-table-empty class="hidden">{{ empty_state("Keine Edits", "Für diesen User wurden keine bearbeiteten Nachrichten gespeichert.") }}</div>
     <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400">
       <span data-table-status></span>
       <div class="flex items-center gap-2">
         <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option></select>
-        <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">ZurÃ¼ck</button>
+        <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button>
         <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
       </div>
     </div>
@@ -270,25 +283,25 @@
       <input type="hidden" name="user_id" value="{{ member.user_id }}">
       <input type="hidden" name="event_type" value="delete">
     </form>
-    <h2 class="mb-4 text-sm font-semibold text-white">GelÃ¶schte Nachrichten</h2>
+    <h2 class="mb-4 text-sm font-semibold text-white">Gelöschte Nachrichten</h2>
     <div class="overflow-x-auto">
       <table class="w-full text-left text-sm">
         <thead>
           <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
             <th class="px-3 py-2.5">Channel</th>
-            <th class="px-3 py-2.5">GelÃ¶schter Inhalt</th>
+            <th class="px-3 py-2.5">Gelöschter Inhalt</th>
             <th class="px-3 py-2.5">Zeitpunkt</th>
           </tr>
         </thead>
         <tbody data-table-body></tbody>
       </table>
     </div>
-    <div data-table-empty class="hidden">{{ empty_state("Keine gelÃ¶schten Nachrichten", "FÃ¼r diesen User wurden keine LÃ¶schungen gespeichert.") }}</div>
+    <div data-table-empty class="hidden">{{ empty_state("Keine gelöschten Nachrichten", "Für diesen User wurden keine Löschungen gespeichert.") }}</div>
     <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400">
       <span data-table-status></span>
       <div class="flex items-center gap-2">
         <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option></select>
-        <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">ZurÃ¼ck</button>
+        <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button>
         <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
       </div>
     </div>

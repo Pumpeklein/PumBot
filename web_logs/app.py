@@ -64,6 +64,7 @@ try:
         get_guild_member_name_history,
         get_guild_members_panel_guild_id,
         get_guild_message_overview,
+        list_user_connections,
         get_log_channel,
         get_selfrole_panel,
         get_server_stats,
@@ -167,6 +168,7 @@ except ImportError:
         get_guild_member_name_history,
         get_guild_members_panel_guild_id,
         get_guild_message_overview,
+        list_user_connections,
         get_log_channel,
         get_selfrole_panel,
         get_server_stats,
@@ -513,7 +515,6 @@ async def _discord_fetch_user_profile(user_id: str) -> dict:
     return {
         "banner_url": str(banner.url) if banner else None,
         "accent_color": int(accent_color.value) if accent_color else None,
-        "bio": getattr(user, "bio", None),
         "locale": str(getattr(user, "locale", "")) if getattr(user, "locale", None) else None,
     }
 
@@ -990,7 +991,6 @@ def user_detail_page(user_id: str):
             "avatar_url": None,
             "banner_url": None,
             "accent_color": None,
-            "bio": None,
             "locale": None,
             "is_bot": 0,
             "status": "unknown",
@@ -1009,18 +1009,16 @@ def user_detail_page(user_id: str):
     if oauth_user:
         member["banner_url"] = member.get("banner_url") or oauth_user.get("discord_banner")
         member["accent_color"] = member.get("accent_color") or oauth_user.get("accent_color")
-        member["bio"] = member.get("bio") or oauth_user.get("discord_bio")
         member["locale"] = member.get("locale") or oauth_user.get("locale")
     if not any(
         member.get(field)
-        for field in ("banner_url", "accent_color", "bio", "locale")
+        for field in ("banner_url", "accent_color", "locale")
     ):
         profile, error = _run_bot_coro(_discord_fetch_user_profile(user_id))
         if profile:
             update_guild_member_profile_fields(guild_id, user_id, **profile)
             member["banner_url"] = member.get("banner_url") or profile.get("banner_url")
             member["accent_color"] = member.get("accent_color") or profile.get("accent_color")
-            member["bio"] = member.get("bio") or profile.get("bio")
             member["locale"] = member.get("locale") or profile.get("locale")
         elif error and error != "Bot ist nicht verbunden.":
             app.logger.warning("Discord profile fetch failed: %s", error)
@@ -1054,6 +1052,7 @@ def user_detail_page(user_id: str):
         assignable_discord_roles=[
             role for role in discord_roles if role["id"] not in current_role_ids
         ],
+        connections=list_user_connections(user_id),
         message_stats=_format_date_fields([message_stats], "last_message_at")[0],
         channel_stats=_format_date_fields(channel_stats, "last_message_at"),
         ticket_stats=_format_date_fields([ticket_stats], "last_ticket_at")[0],
@@ -1444,6 +1443,10 @@ def panel_api_users():
     rows = list_guild_members(
         guild_id, q=q, status=status, limit=page_size, offset=offset
     )
+    web_roles_by_discord_id = {
+        str(role["discord_role_id"]): role["role_name"]
+        for role in list_roles(guild_id)
+    }
     for row in rows:
         row["detail_url"] = url_for(
             "user_detail_page", user_id=row["user_id"], guild_id=guild_id
@@ -1457,9 +1460,18 @@ def panel_api_users():
             for role in roles
             if isinstance(role, dict) and (role.get("name") or role.get("id"))
         ]
-        row["roles_label"] = ", ".join(role_names[:3]) if role_names else "-"
-        if len(role_names) > 3:
-            row["roles_label"] += f" +{len(role_names) - 3}"
+        web_role_names = [
+            web_roles_by_discord_id[str(role.get("id"))]
+            for role in roles
+            if isinstance(role, dict) and str(role.get("id")) in web_roles_by_discord_id
+        ]
+        row["web_roles_label"] = ", ".join(web_role_names[:3]) if web_role_names else "-"
+        if len(web_role_names) > 3:
+            row["web_roles_label"] += f" +{len(web_role_names) - 3}"
+        row["discord_roles_label"] = ", ".join(role_names[:4]) if role_names else "-"
+        if len(role_names) > 4:
+            row["discord_roles_label"] += f" +{len(role_names) - 4}"
+        row["roles_label"] = row["discord_roles_label"]
     return _paginated_response(
         _format_date_fields(rows, "joined_at", "left_at", "first_seen_at", "last_seen_at", "updated_at", "last_message_at", "status_updated_at"),
         count_guild_members(guild_id, q=q, status=status),

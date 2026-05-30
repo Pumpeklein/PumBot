@@ -6,9 +6,23 @@ CREATE TABLE IF NOT EXISTS users (
   discord_banner TEXT,
   accent_color INT,
   locale VARCHAR(32),
-  discord_bio TEXT,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   last_login DATETIME NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS user_connections (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  discord_id VARCHAR(32) NOT NULL,
+  connection_id VARCHAR(255) NOT NULL,
+  connection_type VARCHAR(64) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  verified TINYINT(1) NOT NULL DEFAULT 0,
+  visibility INT,
+  show_activity TINYINT(1),
+  two_way_link TINYINT(1),
+  metadata_json LONGTEXT,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_user_connections_connection (discord_id, connection_id, connection_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS guild_members (
@@ -22,7 +36,6 @@ CREATE TABLE IF NOT EXISTS guild_members (
   avatar_url TEXT,
   banner_url TEXT,
   accent_color INT,
-  bio TEXT,
   locale VARCHAR(32),
   roles_json LONGTEXT,
   is_bot TINYINT(1) NOT NULL DEFAULT 0,
@@ -262,6 +275,7 @@ CREATE INDEX idx_birthdays_guild ON birthdays(guild_id);
 CREATE INDEX idx_birthdays_month_day ON birthdays(month, day);
 CREATE INDEX idx_bot_messages_guild_type ON bot_messages(guild_id, message_type);
 CREATE INDEX idx_roles_guild ON roles(guild_id);
+CREATE INDEX idx_user_connections_discord_id ON user_connections(discord_id);
 CREATE INDEX idx_guild_members_guild_status ON guild_members(guild_id, status);
 CREATE INDEX idx_guild_members_user ON guild_members(user_id);
 CREATE INDEX idx_guild_member_name_history_user ON guild_member_name_history(guild_id, user_id, changed_at);

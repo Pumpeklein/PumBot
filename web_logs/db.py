@@ -111,7 +111,6 @@ def init_db() -> None:
             "roles_json": "TEXT",
             "banner_url": "TEXT",
             "accent_color": "INT",
-            "bio": "TEXT",
             "locale": "VARCHAR(32)",
             "presence_status": "TEXT",
             "activity_name": "TEXT",
@@ -122,7 +121,6 @@ def init_db() -> None:
             "discord_banner": "TEXT",
             "accent_color": "INT",
             "locale": "VARCHAR(32)",
-            "discord_bio": "TEXT",
         })
         _ensure_columns(conn, "guild_messages", {
             "original_content": "TEXT",
@@ -287,21 +285,19 @@ def upsert_user(
     discord_banner: str | None = None,
     accent_color: int | None = None,
     locale: str | None = None,
-    discord_bio: str | None = None,
 ) -> dict:
     with _connect() as conn:
         conn.execute(
             """INSERT INTO users (
                  discord_id, discord_username, discord_avatar, discord_banner,
-                 accent_color, locale, discord_bio, last_login
-               ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                 accent_color, locale, last_login
+               ) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
                ON DUPLICATE KEY UPDATE
                  discord_username = VALUES(discord_username),
                  discord_avatar = VALUES(discord_avatar),
                  discord_banner = COALESCE(VALUES(discord_banner), discord_banner),
                  accent_color = COALESCE(VALUES(accent_color), accent_color),
                  locale = COALESCE(VALUES(locale), locale),
-                 discord_bio = COALESCE(VALUES(discord_bio), discord_bio),
                  last_login = CURRENT_TIMESTAMP""",
             (
                 discord_id,
@@ -310,7 +306,6 @@ def upsert_user(
                 discord_banner,
                 accent_color,
                 locale,
-                discord_bio,
             ),
         )
         conn.commit()
@@ -330,6 +325,47 @@ def list_users() -> list[dict]:
         return [dict(r) for r in rows]
 
 
+def replace_user_connections(discord_id: str, connections: list[dict[str, Any]]) -> None:
+    with _connect() as conn:
+        conn.execute("DELETE FROM user_connections WHERE discord_id = ?", (discord_id,))
+        for item in connections:
+            connection_id = str(item.get("id") or "").strip()
+            connection_type = str(item.get("type") or "").strip()
+            name = str(item.get("name") or "").strip()
+            if not connection_id or not connection_type or not name:
+                continue
+            conn.execute(
+                """INSERT INTO user_connections (
+                     discord_id, connection_id, connection_type, name, verified,
+                     visibility, show_activity, two_way_link, metadata_json, updated_at
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
+                (
+                    discord_id,
+                    connection_id,
+                    connection_type,
+                    name,
+                    1 if item.get("verified") else 0,
+                    item.get("visibility"),
+                    1 if item.get("show_activity") else 0 if item.get("show_activity") is not None else None,
+                    1 if item.get("two_way_link") else 0 if item.get("two_way_link") is not None else None,
+                    json.dumps(item.get("metadata") or {}, ensure_ascii=False),
+                ),
+            )
+        conn.commit()
+
+
+def list_user_connections(discord_id: str) -> list[dict]:
+    with _connect() as conn:
+        rows = conn.execute(
+            """SELECT *
+               FROM user_connections
+               WHERE discord_id = ?
+               ORDER BY connection_type ASC, name ASC""",
+            (discord_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
 def _member_name_changed(existing: dict[str, Any], member: dict[str, Any]) -> bool:
     return any(
         (existing[key] or "") != (member.get(key) or "")
@@ -346,7 +382,6 @@ def upsert_guild_member(guild_id: str, member: dict[str, Any]) -> dict:
     avatar_url = member.get("avatar_url")
     banner_url = member.get("banner_url")
     accent_color = member.get("accent_color")
-    bio = member.get("bio")
     locale = member.get("locale")
     roles_json = json.dumps(member.get("roles") or [], ensure_ascii=False)
     is_bot = 1 if member.get("is_bot") else 0
@@ -390,11 +425,11 @@ def upsert_guild_member(guild_id: str, member: dict[str, Any]) -> dict:
         conn.execute(
             """INSERT INTO guild_members (
                  guild_id, user_id, username, global_name, display_name, discriminator,
-                 avatar_url, banner_url, accent_color, bio, locale, roles_json,
+                 avatar_url, banner_url, accent_color, locale, roles_json,
                  is_bot, status, presence_status, activity_name, activity_type,
                  status_updated_at, joined_at, left_at, first_seen_at,
                  last_seen_at, updated_at
-               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, datetime('now'), datetime('now'), datetime('now'))
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, datetime('now'), datetime('now'), datetime('now'))
                ON DUPLICATE KEY UPDATE
                  username = VALUES(username),
                  global_name = VALUES(global_name),
@@ -403,7 +438,6 @@ def upsert_guild_member(guild_id: str, member: dict[str, Any]) -> dict:
                  avatar_url = VALUES(avatar_url),
                  banner_url = COALESCE(VALUES(banner_url), banner_url),
                  accent_color = COALESCE(VALUES(accent_color), accent_color),
-                 bio = COALESCE(VALUES(bio), bio),
                  locale = COALESCE(VALUES(locale), locale),
                  roles_json = VALUES(roles_json),
                  is_bot = VALUES(is_bot),
@@ -429,7 +463,6 @@ def upsert_guild_member(guild_id: str, member: dict[str, Any]) -> dict:
                 avatar_url,
                 banner_url,
                 accent_color,
-                bio,
                 locale,
                 roles_json,
                 is_bot,
@@ -490,11 +523,11 @@ def sync_guild_members(
             conn.execute(
                 """INSERT INTO guild_members (
                      guild_id, user_id, username, global_name, display_name, discriminator,
-                     avatar_url, banner_url, accent_color, bio, locale, roles_json,
+                     avatar_url, banner_url, accent_color, locale, roles_json,
                      is_bot, status, presence_status, activity_name, activity_type,
                      status_updated_at, joined_at, left_at, first_seen_at,
                      last_seen_at, updated_at
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, datetime('now'), ?, NULL, datetime('now'), datetime('now'), datetime('now'))
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, datetime('now'), ?, NULL, datetime('now'), datetime('now'), datetime('now'))
                    ON DUPLICATE KEY UPDATE
                      username = VALUES(username),
                      global_name = VALUES(global_name),
@@ -503,7 +536,6 @@ def sync_guild_members(
                      avatar_url = VALUES(avatar_url),
                      banner_url = COALESCE(VALUES(banner_url), banner_url),
                      accent_color = COALESCE(VALUES(accent_color), accent_color),
-                     bio = COALESCE(VALUES(bio), bio),
                      locale = COALESCE(VALUES(locale), locale),
                      roles_json = VALUES(roles_json),
                      is_bot = VALUES(is_bot),
@@ -529,7 +561,6 @@ def sync_guild_members(
                     member.get("avatar_url"),
                     member.get("banner_url"),
                     member.get("accent_color"),
-                    member.get("bio"),
                     member.get("locale"),
                     json.dumps(member.get("roles") or [], ensure_ascii=False),
                     1 if member.get("is_bot") else 0,
@@ -1154,7 +1185,6 @@ def update_guild_member_profile_fields(
     *,
     banner_url: str | None = None,
     accent_color: int | None = None,
-    bio: str | None = None,
     locale: str | None = None,
 ) -> None:
     with _connect() as conn:
@@ -1162,11 +1192,10 @@ def update_guild_member_profile_fields(
             """UPDATE guild_members
                SET banner_url = COALESCE(?, banner_url),
                    accent_color = COALESCE(?, accent_color),
-                   bio = COALESCE(?, bio),
                    locale = COALESCE(?, locale),
                    updated_at = datetime('now')
                WHERE guild_id = ? AND user_id = ?""",
-            (banner_url, accent_color, bio, locale, guild_id, user_id),
+            (banner_url, accent_color, locale, guild_id, user_id),
         )
         conn.commit()
 

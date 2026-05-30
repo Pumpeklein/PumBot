@@ -155,12 +155,15 @@ class PumpeBot(commands.Bot):
         }
 
     @staticmethod
-    def message_payload(message: discord.Message) -> dict[str, object | None]:
+    def message_payload(
+        message: discord.Message, original_content: str | None = None
+    ) -> dict[str, object | None]:
         return {
             "channel_id": str(message.channel.id),
             "channel_name": getattr(message.channel, "name", str(message.channel.id)),
             "message_id": str(message.id),
             "user_id": str(message.author.id),
+            "original_content": original_content,
             "content": message.content or "",
             "attachment_count": len(message.attachments),
             "jump_url": message.jump_url,
@@ -414,7 +417,16 @@ class PumpeBot(commands.Bot):
     async def on_message_edit(
         self, before: discord.Message, after: discord.Message
     ) -> None:
-        await self._store_message(after)
+        if not after.guild or after.author.bot:
+            return
+        try:
+            await asyncio.to_thread(
+                upsert_guild_message,
+                str(after.guild.id),
+                self.message_payload(after, original_content=before.content or ""),
+            )
+        except Exception:
+            logger.exception("Message-Edit-Upsert fuer %s fehlgeschlagen", after.id)
 
     async def on_message_delete(self, message: discord.Message) -> None:
         if not message.guild:

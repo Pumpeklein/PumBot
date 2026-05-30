@@ -40,6 +40,21 @@
 
   const renderCell = (row, column) => {
     const value = getValue(row, column.key);
+    if (column.type === "message") {
+      const original = getValue(row, column.originalKey);
+      const editedAt = getValue(row, column.editedAtKey);
+      const deletedAt = getValue(row, column.deletedAtKey);
+      const changed = original && original !== value;
+      const status = deletedAt ? "Gelöscht" : editedAt && changed ? "Bearbeitet" : "";
+      const statusClass = deletedAt
+        ? "border-red-500/25 bg-red-500/10 text-red-300"
+        : "border-amber-500/25 bg-amber-500/10 text-amber-300";
+      return `<div class="max-w-xl">
+        <div class="whitespace-pre-wrap break-words text-slate-200">${escapeHtml(value || column.fallback || "-")}</div>
+        ${status ? `<div class="mt-1 inline-flex rounded border px-2 py-0.5 text-[11px] ${statusClass}">${status}</div>` : ""}
+        ${changed ? `<details class="mt-1 text-xs text-slate-500"><summary class="cursor-pointer text-slate-400 hover:text-white">Original anzeigen</summary><div class="mt-1 whitespace-pre-wrap break-words rounded border border-white/10 bg-black/20 p-2">${escapeHtml(original)}</div></details>` : ""}
+      </div>`;
+    }
     if (column.type === "user") {
       const name = getValue(row, column.nameKey) || value || "-";
       const sub = getValue(row, column.subKey);
@@ -110,7 +125,7 @@
         const items = data.items || [];
         const pagination = data.pagination || { page: 1, pages: 1, total: 0 };
         body.innerHTML = items
-          .map((row) => `<tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]">${columns.map((column) => `<td class="${column.class || "px-3 py-2.5"}">${renderCell(row, column)}</td>`).join("")}</tr>`)
+          .map((row) => `<tr class="border-b border-white/[0.04] transition ${escapeHtml(row._row_class || "hover:bg-white/[0.02]")}">${columns.map((column) => `<td class="${column.class || "px-3 py-2.5"}">${renderCell(row, column)}</td>`).join("")}</tr>`)
           .join("");
         empty.classList.toggle("hidden", items.length > 0);
         status.textContent = `${pagination.total} Einträge - Seite ${pagination.page} von ${pagination.pages}`;

@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS guild_messages (
   channel_name TEXT,
   message_id TEXT NOT NULL,
   user_id TEXT NOT NULL,
+  original_content TEXT,
   content TEXT,
   attachment_count INTEGER NOT NULL DEFAULT 0,
   jump_url TEXT,

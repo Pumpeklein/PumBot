@@ -34,6 +34,9 @@ def init_db() -> None:
             "activity_type": "TEXT",
             "status_updated_at": "TEXT",
         })
+        _ensure_columns(conn, "guild_messages", {
+            "original_content": "TEXT",
+        })
         conn.commit()
     _seed_default_roles()
     _seed_default_bot_messages()
@@ -43,7 +46,11 @@ def _ensure_columns(conn: sqlite3.Connection, table: str, columns: dict[str, str
     existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
     for name, definition in columns.items():
         if name not in existing:
-            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
+            try:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
+            except sqlite3.OperationalError as exc:
+                if "duplicate column name" not in str(exc).lower():
+                    raise
 
 
 def _migrate_stale_tables() -> None:
@@ -536,12 +543,13 @@ def upsert_guild_message(guild_id: str, message: dict[str, Any]) -> dict:
     with _connect() as conn:
         conn.execute(
             """INSERT INTO guild_messages (
-                 guild_id, channel_id, channel_name, message_id, user_id, content,
+                 guild_id, channel_id, channel_name, message_id, user_id, original_content, content,
                  attachment_count, jump_url, created_at, edited_at, deleted_at, synced_at
-               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
                ON CONFLICT(guild_id, channel_id, message_id) DO UPDATE SET
                  channel_name = excluded.channel_name,
                  user_id = excluded.user_id,
+                 original_content = COALESCE(guild_messages.original_content, excluded.original_content, guild_messages.content),
                  content = excluded.content,
                  attachment_count = excluded.attachment_count,
                  jump_url = excluded.jump_url,
@@ -555,6 +563,7 @@ def upsert_guild_message(guild_id: str, message: dict[str, Any]) -> dict:
                 message.get("channel_name"),
                 message_id,
                 user_id,
+                message.get("original_content") or message.get("content"),
                 message.get("content"),
                 int(message.get("attachment_count") or 0),
                 message.get("jump_url"),
@@ -579,13 +588,14 @@ def upsert_guild_messages(guild_id: str, messages: list[dict[str, Any]]) -> dict
             if not message.get("channel_id") or not message.get("message_id") or not message.get("user_id"):
                 continue
             conn.execute(
-                """INSERT INTO guild_messages (
-                     guild_id, channel_id, channel_name, message_id, user_id, content,
+            """INSERT INTO guild_messages (
+                     guild_id, channel_id, channel_name, message_id, user_id, original_content, content,
                      attachment_count, jump_url, created_at, edited_at, deleted_at, synced_at
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
                    ON CONFLICT(guild_id, channel_id, message_id) DO UPDATE SET
                      channel_name = excluded.channel_name,
                      user_id = excluded.user_id,
+                     original_content = COALESCE(guild_messages.original_content, excluded.original_content, guild_messages.content),
                      content = excluded.content,
                      attachment_count = excluded.attachment_count,
                      jump_url = excluded.jump_url,
@@ -599,6 +609,7 @@ def upsert_guild_messages(guild_id: str, messages: list[dict[str, Any]]) -> dict
                     message.get("channel_name"),
                     str(message["message_id"]),
                     str(message["user_id"]),
+                    message.get("original_content") or message.get("content"),
                     message.get("content"),
                     int(message.get("attachment_count") or 0),
                     message.get("jump_url"),
@@ -639,9 +650,9 @@ def _guild_messages_where(
         clauses.append("gm.channel_id = ?")
         params.append(channel_id)
     if q:
-        clauses.append("(gm.content LIKE ? OR gm.channel_name LIKE ? OR m.display_name LIKE ?)")
+        clauses.append("(gm.content LIKE ? OR gm.original_content LIKE ? OR gm.channel_name LIKE ? OR m.display_name LIKE ?)")
         q_like = f"%{q}%"
-        params.extend([q_like, q_like, q_like])
+        params.extend([q_like, q_like, q_like, q_like])
     if not include_deleted:
         clauses.append("gm.deleted_at IS NULL")
     return clauses, params

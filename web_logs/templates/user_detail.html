@@ -19,6 +19,10 @@
     <div>
       <div class="text-lg font-semibold text-white">{{ member.display_name or member.username }}</div>
       <div class="mt-1 text-xs text-slate-500">@{{ member.username or member.display_name }}</div>
+      <button type="button" data-copy-user-id="{{ member.user_id }}"
+        class="mt-2 inline-flex items-center rounded border border-white/10 bg-white/5 px-2 py-1 font-mono text-[11px] text-slate-400 transition hover:bg-white/10 hover:text-white">
+        ID: {{ member.user_id }}
+      </button>
       <div class="mt-3 flex flex-wrap gap-2">
         {% if member.status == "active" %}
         {{ badge("Aktiv", "success") }}
@@ -97,7 +101,8 @@
   <script type="application/json">
     [
       {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},
-      {"key":"content","fallback":"-","class":"px-3 py-2.5 text-slate-300 max-w-xl truncate"},
+      {"key":"content","type":"message","originalKey":"original_content","editedAtKey":"edited_at","deletedAtKey":"deleted_at","fallback":"-","class":"px-3 py-2.5"},
+      {"key":"message_status","type":"badge","variants":{"Gelöscht":"danger","Bearbeitet":"warning","Original":"default"},"class":"px-3 py-2.5"},
       {"key":"created_at","type":"date","class":"px-3 py-2.5 text-slate-500 whitespace-nowrap"}
     ]
   </script>
@@ -116,6 +121,7 @@
         <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
           <th class="px-3 py-2.5">Channel</th>
           <th class="px-3 py-2.5">Inhalt</th>
+          <th class="px-3 py-2.5">Status</th>
           <th class="px-3 py-2.5">Zeitpunkt</th>
         </tr>
       </thead>
@@ -231,6 +237,26 @@
       if (!channelInput) return;
       channelInput.value = "";
       submitFilter();
+    });
+
+    document.querySelectorAll("[data-copy-user-id]").forEach((button) => {
+      const originalText = button.textContent.trim();
+      button.addEventListener("click", async () => {
+        const userId = button.dataset.copyUserId || "";
+        if (!userId) return;
+        try {
+          await navigator.clipboard.writeText(userId);
+          button.textContent = "ID kopiert";
+          window.setTimeout(() => {
+            button.textContent = originalText;
+          }, 1400);
+        } catch {
+          button.textContent = "Kopieren fehlgeschlagen";
+          window.setTimeout(() => {
+            button.textContent = originalText;
+          }, 1600);
+        }
+      });
     });
   });
 </script>

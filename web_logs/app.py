@@ -1279,7 +1279,7 @@ def panel_api_messages():
     user_id = request.args.get("user_id", "").strip() or None
     channel_id = request.args.get("channel_id", "").strip() or None
     q = request.args.get("q", "").strip()
-    include_deleted = request.args.get("include_deleted") == "1"
+    include_deleted = request.args.get("include_deleted", "1") != "0"
     page, page_size, offset = _pagination_args()
     rows = []
     for message in list_guild_messages(
@@ -1292,6 +1292,20 @@ def panel_api_messages():
         offset=offset,
     ):
         item = dict(message)
+        is_deleted = bool(item.get("deleted_at"))
+        is_edited = bool(item.get("edited_at")) and (
+            (item.get("original_content") or "") != (item.get("content") or "")
+        )
+        if is_deleted:
+            item["message_status"] = "Gelöscht"
+            item["_row_class"] = "bg-red-500/10 hover:bg-red-500/15"
+        elif is_edited:
+            item["message_status"] = "Bearbeitet"
+            item["_row_class"] = "bg-amber-500/10 hover:bg-amber-500/15"
+        else:
+            item["message_status"] = "Original"
+            item["_row_class"] = ""
+        item["message_status_variant"] = "danger" if is_deleted else "warning" if is_edited else "default"
         item["user_detail_url"] = url_for(
             "user_detail_page", user_id=item["user_id"], guild_id=guild_id
         )

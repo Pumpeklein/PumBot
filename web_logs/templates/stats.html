@@ -91,7 +91,8 @@
     [
       {"type":"user","nameKey":"display_name","subKey":"username","avatarKey":"avatar_url","urlKey":"user_detail_url","class":"px-3 py-2.5"},
       {"key":"channel_name","class":"px-3 py-2.5 text-white"},
-      {"key":"content","fallback":"-","class":"px-3 py-2.5 text-slate-300 max-w-xl truncate"},
+      {"key":"content","type":"message","originalKey":"original_content","editedAtKey":"edited_at","deletedAtKey":"deleted_at","fallback":"-","class":"px-3 py-2.5"},
+      {"key":"message_status","type":"badge","variants":{"Gelöscht":"danger","Bearbeitet":"warning","Original":"default"},"class":"px-3 py-2.5"},
       {"key":"created_at","type":"date","class":"px-3 py-2.5 text-slate-500 whitespace-nowrap"}
     ]
   </script>
@@ -133,6 +134,7 @@
           <th class="px-3 py-2.5">User</th>
           <th class="px-3 py-2.5">Channel</th>
           <th class="px-3 py-2.5">Inhalt</th>
+          <th class="px-3 py-2.5">Status</th>
           <th class="px-3 py-2.5">Zeitpunkt</th>
         </tr>
       </thead>

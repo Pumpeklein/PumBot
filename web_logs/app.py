@@ -844,7 +844,21 @@ def user_detail_page(user_id: str):
     guild_id = _active_panel_guild_id()
     member = get_guild_member(guild_id, user_id)
     if not member:
-        abort(404)
+        member = {
+            "guild_id": guild_id,
+            "user_id": user_id,
+            "username": user_id,
+            "global_name": None,
+            "display_name": user_id,
+            "avatar_url": None,
+            "is_bot": 0,
+            "status": "unknown",
+            "joined_at": None,
+            "left_at": None,
+            "first_seen_at": None,
+            "last_seen_at": None,
+            "updated_at": None,
+        }
     history = get_guild_member_name_history(guild_id, user_id)
     return render_template(
         "user_detail.html",
@@ -1165,7 +1179,7 @@ def panel_api_birthdays():
     guild_id = request.args.get("guild_id") or get_birthdays_panel_guild_id(DEFAULT_GUILD_ID)
     page, page_size, offset = _pagination_args()
     month_names = {
-        1: "Januar", 2: "Februar", 3: "Maerz", 4: "April",
+        1: "Januar", 2: "Februar", 3: "März", 4: "April",
         5: "Mai", 6: "Juni", 7: "Juli", 8: "August",
         9: "September", 10: "Oktober", 11: "November", 12: "Dezember",
     }

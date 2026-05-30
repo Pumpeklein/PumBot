@@ -2,7 +2,7 @@
 {% from "_macros.html" import page_header, field, btn, stat, empty_state %}
 
 {% block content %}
-{{ page_header("Counting", "Uebersicht und Einstellungen fuer das Counting-Spiel.", "Aktueller Stand, Highscore und Leaderboard.") }}
+{{ page_header("Counting", "Übersicht und Einstellungen für das Counting-Spiel.", "Aktueller Stand, Highscore und Leaderboard.") }}
 
 <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
   {{ stat("Aktueller Stand", state.last_number|default(0)) }}
@@ -21,8 +21,8 @@
       {{ btn("Speichern") }}
     </form>
     <form method="post" action="{{ url_for('counting_reset') }}" class="flex items-end"
-      onsubmit="return confirm('Counting wirklich zuruecksetzen? Stand und Highscore werden auf 0 gesetzt.')">
-      {{ btn("Zuruecksetzen", variant="danger") }}
+      onsubmit="return confirm('Counting wirklich zurücksetzen? Stand und Highscore werden auf 0 gesetzt.')">
+      {{ btn("Zurücksetzen", variant="danger") }}
     </form>
   </div>
 </div>
@@ -59,7 +59,7 @@
     <span data-table-status></span>
     <div class="flex items-center gap-2">
       <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
-      <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurueck</button>
+      <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button>
       <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
     </div>
   </div>

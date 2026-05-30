@@ -2,7 +2,7 @@
 {% from "_macros.html" import page_header, field, btn, stat, empty_state %}
 
 {% block content %}
-{{ page_header("Verwarnungen", "Uebersicht aller Verwarnungen auf dem Server.", "Suche nach User ID oder zeige alle Verwarnungen an.") }}
+{{ page_header("Verwarnungen", "Übersicht aller Verwarnungen auf dem Server.", "Suche nach User ID oder zeige alle Verwarnungen an.") }}
 
 <div class="mb-6 grid gap-4 sm:grid-cols-2">
   {{ stat("Verwarnungen", warning_count) }}
@@ -34,11 +34,11 @@
       {"type":"user","nameKey":"moderator_display_name","subKey":"moderator_id","avatarKey":"moderator_avatar_url","urlKey":"moderator_detail_url","class":"px-3 py-2.5"},
       {"key":"reason","fallback":"Kein Grund","class":"px-3 py-2.5 text-white max-w-xs truncate"},
       {"key":"created_at","type":"date","class":"px-3 py-2.5 text-slate-500 text-xs whitespace-nowrap"},
-      {"type":"delete","urlKey":"delete_url","label":"Loeschen","confirm":"Verwarnung wirklich loeschen?","class":"px-3 py-2.5 text-right"}
+      {"type":"delete","urlKey":"delete_url","label":"Löschen","confirm":"Verwarnung wirklich löschen?","class":"px-3 py-2.5 text-right"}
     ]
   </script>
   <h2 class="mb-4 text-sm font-semibold text-white">
-    {% if q_user %}Verwarnungen fuer {{ q_user_display_name or q_user }}{% else %}Alle Verwarnungen{% endif %}
+    {% if q_user %}Verwarnungen für {{ q_user_display_name or q_user }}{% else %}Alle Verwarnungen{% endif %}
   </h2>
   <div class="overflow-x-auto">
     <table class="w-full text-left text-sm">
@@ -60,7 +60,7 @@
     <span data-table-status></span>
     <div class="flex items-center gap-2">
       <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
-      <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurueck</button>
+      <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button>
       <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
     </div>
   </div>

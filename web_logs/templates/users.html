@@ -2,7 +2,7 @@
 {% from "_macros.html" import page_header, field, btn, stat, empty_state %}
 
 {% block content %}
-{{ page_header("User", "Useruebersicht", "Aktive und ehemalige Discord-Servermitglieder aus der lokalen Datenbank.") }}
+{{ page_header("User", "Userübersicht", "Aktive und ehemalige Discord-Servermitglieder aus der lokalen Datenbank.") }}
 
 <div class="mb-6 grid gap-4 sm:grid-cols-3">
   {{ stat("Aktiv", active_count) }}
@@ -58,7 +58,7 @@
     <span data-table-status></span>
     <div class="flex items-center gap-2">
       <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
-      <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurueck</button>
+      <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button>
       <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
     </div>
   </div>

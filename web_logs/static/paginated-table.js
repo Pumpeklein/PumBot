@@ -60,7 +60,7 @@
     if (column.type === "delete") {
       const url = getValue(row, column.urlKey);
       if (!url) return "";
-      return `<form method="post" action="${escapeHtml(url)}" class="text-right" onsubmit="return confirm('${escapeHtml(column.confirm || "Wirklich loeschen?")}')"><button type="submit" class="rounded border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-400 transition hover:bg-red-500/20">${escapeHtml(column.label || "Loeschen")}</button></form>`;
+      return `<form method="post" action="${escapeHtml(url)}" class="text-right" onsubmit="return confirm('${escapeHtml(column.confirm || "Wirklich löschen?")}')"><button type="submit" class="rounded border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-400 transition hover:bg-red-500/20">${escapeHtml(column.label || "Löschen")}</button></form>`;
     }
     if (column.type === "rank") {
       if (value === 1) return '<span class="font-bold text-yellow-400">#1</span>';
@@ -97,7 +97,7 @@
       const params = collectParams(form);
       params.set("page", page);
       params.set("page_size", pageSize ? pageSize.value : root.dataset.pageSize || "10");
-      body.innerHTML = `<tr><td colspan="${columns.length}" class="px-3 py-8 text-center text-slate-500">Laedt...</td></tr>`;
+      body.innerHTML = `<tr><td colspan="${columns.length}" class="px-3 py-8 text-center text-slate-500">Lädt...</td></tr>`;
       const response = await fetch(`${endpoint}?${params.toString()}`, { headers: { Accept: "application/json" } });
       const data = await response.json();
       const items = data.items || [];
@@ -106,7 +106,7 @@
         .map((row) => `<tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]">${columns.map((column) => `<td class="${column.class || "px-3 py-2.5"}">${renderCell(row, column)}</td>`).join("")}</tr>`)
         .join("");
       empty.classList.toggle("hidden", items.length > 0);
-      status.textContent = `${pagination.total} Eintraege - Seite ${pagination.page} von ${pagination.pages}`;
+      status.textContent = `${pagination.total} Einträge - Seite ${pagination.page} von ${pagination.pages}`;
       prev.disabled = pagination.page <= 1;
       next.disabled = pagination.page >= pagination.pages;
     };

@@ -2,7 +2,7 @@
 {% from "_macros.html" import page_header, field, btn, stat, empty_state %}
 
 {% block content %}
-{{ page_header("Geburtstage", "Uebersicht aller gespeicherten Geburtstage.", "Verwalte Geburtstage und den Gratulations-Channel.") }}
+{{ page_header("Geburtstage", "Übersicht aller gespeicherten Geburtstage.", "Verwalte Geburtstage und den Gratulations-Channel.") }}
 
 <div class="mb-6 grid gap-4 sm:grid-cols-2">
   {{ stat("Gespeicherte Geburtstage", birthday_count) }}
@@ -25,7 +25,7 @@
   <form method="post" action="{{ url_for('birthdays_add_message') }}" class="mb-5 flex flex-wrap items-end gap-3">
     <div class="w-64">{{ field("message_id", "Nachrichten-ID", placeholder="z.B. 1362697161598304439", required=true) }}</div>
     <div class="w-64">{{ field("channel_id", "Channel-ID", placeholder="optional, sonst Fallback aus Config") }}</div>
-    {{ btn("Nachricht hinzufuegen") }}
+    {{ btn("Nachricht hinzufügen") }}
   </form>
 
   {% if birthday_messages %}
@@ -49,7 +49,7 @@
           <td class="px-3 py-2.5 text-slate-500">{{ msg.meta_key or "-" }}</td>
           <td class="px-3 py-2.5 text-right">
             <form method="post" action="{{ url_for('birthdays_delete_message', message_id=msg.message_id) }}" class="inline"
-              onsubmit="return confirm('Nachrichten-Verknuepfung wirklich entfernen?')">
+              onsubmit="return confirm('Nachrichten-Verknüpfung wirklich entfernen?')">
               <button type="submit" class="rounded border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-400 transition hover:bg-red-500/20">Entfernen</button>
             </form>
           </td>
@@ -59,18 +59,18 @@
     </table>
   </div>
   {% else %}
-  {{ empty_state("Keine Listen-Nachrichten hinterlegt", "Fuege oben eine Bot-Nachricht hinzu, die aktualisiert werden soll.") }}
+  {{ empty_state("Keine Listen-Nachrichten hinterlegt", "Füge oben eine Bot-Nachricht hinzu, die aktualisiert werden soll.") }}
   {% endif %}
 </div>
 
 <div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-  <h2 class="mb-4 text-sm font-semibold text-white">Geburtstag hinzufuegen</h2>
+  <h2 class="mb-4 text-sm font-semibold text-white">Geburtstag hinzufügen</h2>
   <form method="post" action="{{ url_for('birthdays_add') }}" class="flex flex-wrap items-end gap-3">
     <div class="w-52">{{ field("user_id", "User ID", placeholder="z.B. 123456789012345678", required=true) }}</div>
     <div class="w-20">{{ field("day", "Tag", type="number", min=1, max=31, required=true) }}</div>
     <div class="w-20">{{ field("month", "Monat", type="number", min=1, max=12, required=true) }}</div>
     <div class="w-24">{{ field("year", "Jahr", type="number", required=false, placeholder="optional") }}</div>
-    {{ btn("Hinzufuegen") }}
+    {{ btn("Hinzufügen") }}
   </form>
 </div>
 
@@ -81,7 +81,7 @@
       {"key":"date_label","class":"px-3 py-2.5 text-white font-medium"},
       {"key":"month_name","class":"px-3 py-2.5 text-slate-400"},
       {"key":"last_congrats","type":"date","class":"px-3 py-2.5 text-slate-500 text-xs"},
-      {"type":"delete","urlKey":"delete_url","label":"Loeschen","confirm":"Geburtstag wirklich loeschen?","class":"px-3 py-2.5 text-right"}
+      {"type":"delete","urlKey":"delete_url","label":"Löschen","confirm":"Geburtstag wirklich löschen?","class":"px-3 py-2.5 text-right"}
     ]
   </script>
   <form id="birthdays-filter"><input type="hidden" name="guild_id" value="{{ birthdays_guild_id }}"></form>
@@ -100,12 +100,12 @@
       <tbody data-table-body></tbody>
     </table>
   </div>
-  <div data-table-empty class="hidden">{{ empty_state("Keine Geburtstage gespeichert", "Fuege oben einen neuen Geburtstag hinzu.") }}</div>
+  <div data-table-empty class="hidden">{{ empty_state("Keine Geburtstage gespeichert", "Füge oben einen neuen Geburtstag hinzu.") }}</div>
   <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400">
     <span data-table-status></span>
     <div class="flex items-center gap-2">
       <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
-      <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurueck</button>
+      <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button>
       <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
     </div>
   </div>

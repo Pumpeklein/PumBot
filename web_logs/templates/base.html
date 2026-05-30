@@ -176,6 +176,18 @@
           </svg>
           Schließungsgründe
         </a>
+
+        {% if "admin" in permissions %}
+        <a href="{{ url_for('database_page') }}"
+          class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition
+              {{ 'bg-white/[0.08] text-white' if active_page == 'database' else 'text-slate-400 hover:bg-white/[0.04] hover:text-white' }}">
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M4 7c0-1.657 3.582-3 8-3s8 1.343 8 3-3.582 3-8 3-8-1.343-8-3zm0 0v5c0 1.657 3.582 3 8 3s8-1.343 8-3V7M4 12v5c0 1.657 3.582 3 8 3s8-1.343 8-3v-5" />
+          </svg>
+          Datenbank
+        </a>
+        {% endif %}
         {% endif %}
 
         {% else %}

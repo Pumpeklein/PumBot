@@ -2,7 +2,7 @@
 {% from "_macros.html" import page_header, stat, badge, empty_state %}
 
 {% block content %}
-{{ page_header("User", member.display_name or member.username, "Profil, Aktivität, Nachrichten, Tickets und Namenshistorie aus der lokalen Datenbank.") }}
+{{ page_header("User", member.display_name or member.username, "Profil, Aktivität, Nachrichten, Tickets und Namenshistorie aus der Datenbank.") }}
 
 <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
   {{ stat("Nachrichten", message_stats.message_count or 0) }}

@@ -2,7 +2,7 @@
 {% from "_macros.html" import page_header, stat, empty_state %}
 
 {% block content %}
-{{ page_header("Statistiken", "Server-Übersicht", "Allgemeine Aktivitäts- und Nachrichtenstatistiken aus der lokalen Datenbank.") }}
+{{ page_header("Statistiken", "Server-Übersicht", "Allgemeine Aktivitäts- und Nachrichtenstatistiken aus der Datenbank.") }}
 
 <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
   {{ stat("Nachrichten", overview.totals.message_count or 0) }}

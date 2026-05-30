@@ -6,7 +6,7 @@ Der aktuelle Stand des Projekts ist kein reiner Chat-Bot, sondern ein kleines Ge
 
 - Der Bot führt Slash-Commands, Event-Handler und Hintergrundjobs aus.
 - Das Web-Panel verwaltet Konfigurationen, Tickets, Feature-Daten und Rollen-/Rechtezuordnung.
-- Beide Komponenten teilen sich dieselbe SQLite-Datenbank und kommunizieren zusätzlich über eine interne HTTP-API.
+- Beide Komponenten teilen sich dieselbe MySQL/MariaDB-Datenbank und kommunizieren zusätzlich über eine interne HTTP-API.
 
 ## Gesamtkonzept
 
@@ -28,11 +28,11 @@ Die Architektur besteht aus drei Schichten:
 
 3. Datenhaltung
 
-- SQLite-Datenbank unter `web_logs/data/pumbot.db`
-- Schema in [web_logs/models.sql](./web_logs/models.sql)
+- MySQL/MariaDB-Datenbank, konfiguriert über `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
+- Schema in [web_logs/models_mysql.sql](./web_logs/models_mysql.sql)
 - Zugriff über [web_logs/db.py](./web_logs/db.py)
 
-Der Bot arbeitet fachlich gegen die interne API in [src/pumbot/services/api_client.py](./src/pumbot/services/api_client.py), statt direkt auf SQLite zu schreiben. Dadurch bleibt die Datenlogik an einer Stelle gebündelt.
+Der Bot arbeitet fachlich gegen die interne API in [src/pumbot/services/api_client.py](./src/pumbot/services/api_client.py), statt direkt in die Datenbank zu schreiben. Dadurch bleibt die Datenlogik an einer Stelle gebündelt.
 
 ## Laufzeitmodell
 
@@ -261,7 +261,7 @@ Typischer Ablauf am Beispiel Tickets:
 - Ein User erstellt in Discord ein Ticket.
 - Der Bot erstellt Channel, Metadaten und erste Logeinträge.
 - Der Bot sendet Ticketdaten per HTTP an die Flask-API.
-- Die API schreibt in SQLite.
+- Die API schreibt in MySQL/MariaDB.
 - Das Web-Panel liest dieselben Daten aus und stellt sie dar.
 - Antworten aus dem Web-Panel können wieder an Discord zurückgesendet werden.
 
@@ -285,7 +285,7 @@ PumBot/
    ├─ auth.py
    ├─ config.py
    ├─ db.py
-   ├─ models.sql
+   ├─ models_mysql.sql
    ├─ templates/
    ├─ static/
    └─ data/
@@ -402,7 +402,7 @@ PumBot ist aktuell ein kombiniertes Moderations-, Support- und Verwaltungswerkze
 
 - Discord-Bot
 - internem API-Layer
-- SQLite-Datenmodell
+- MySQL/MariaDB-Datenmodell
 - Web-Panel für Betrieb, Einsicht und Konfiguration
 
 Wenn du das Projekt weiterentwickelst, ist diese Trennung der wichtigste Architekturgedanke: Discord erledigt Interaktion, die Flask-App bündelt Daten und Administration.

@@ -1,8 +1,11 @@
 ﻿from __future__ import annotations
 
 import json
-import sqlite3
+from datetime import datetime
 from typing import Any
+
+import pymysql
+from pymysql.cursors import DictCursor
 
 try:
     from .config import BASE_DIR, Config, ensure_dirs, DEFAULT_GUILD_ID, DEFAULT_ADMIN_ROLE_ID
@@ -12,18 +15,95 @@ except ImportError:
     from datetime_format import berlin_today
 
 
-def _connect() -> sqlite3.Connection:
+class DatabaseConnection:
+    def __init__(self) -> None:
+        missing = [
+            name
+            for name, value in {
+                "DB_NAME": Config.DB_NAME,
+                "DB_USER": Config.DB_USER,
+            }.items()
+            if not value
+        ]
+        if missing:
+            raise RuntimeError(
+                "Datenbank-Konfiguration fehlt: "
+                + ", ".join(missing)
+                + ". Setze DB_HOST, DB_PORT, DB_NAME, DB_USER und DB_PASSWORD in der .env."
+            )
+        self.conn = pymysql.connect(
+            host=Config.DB_HOST,
+            port=Config.DB_PORT,
+            user=Config.DB_USER,
+            password=Config.DB_PASSWORD,
+            database=Config.DB_NAME,
+            charset=Config.DB_CHARSET,
+            cursorclass=DictCursor,
+            autocommit=False,
+        )
+
+    def __enter__(self) -> "DatabaseConnection":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        if exc_type:
+            self.conn.rollback()
+        self.conn.close()
+
+    def _sql(self, sql: str) -> str:
+        return (
+            sql.replace("datetime('now')", "CURRENT_TIMESTAMP")
+            .replace("COLLATE NOCASE", "")
+            .replace("?", "%s")
+        )
+
+    def _param(self, value: Any) -> Any:
+        if isinstance(value, str) and "T" in value and ":" in value:
+            try:
+                parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                return parsed.replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                return value
+        return value
+
+    def _params(self, params: Any) -> Any:
+        if params is None:
+            return None
+        if isinstance(params, dict):
+            return {key: self._param(value) for key, value in params.items()}
+        return tuple(self._param(value) for value in params)
+
+    def execute(self, sql: str, params: Any = None):
+        cursor = self.conn.cursor()
+        cursor.execute(self._sql(sql), self._params(params))
+        return cursor
+
+    def executescript(self, sql: str) -> None:
+        for statement in sql.split(";"):
+            statement = statement.strip()
+            if not statement:
+                continue
+            try:
+                self.execute(statement)
+            except pymysql.err.OperationalError as exc:
+                if exc.args and exc.args[0] in {1061}:  # duplicate key name
+                    continue
+                raise
+
+    def commit(self) -> None:
+        self.conn.commit()
+
+    def rollback(self) -> None:
+        self.conn.rollback()
+
+
+def _connect() -> DatabaseConnection:
     ensure_dirs()
-    conn = sqlite3.connect(Config.DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
-    return conn
+    return DatabaseConnection()
 
 
 def init_db() -> None:
-    _migrate_stale_tables()
-    schema_path = BASE_DIR / "models.sql"
+    schema_path = BASE_DIR / "models_mysql.sql"
     sql = schema_path.read_text(encoding="utf-8")
     with _connect() as conn:
         conn.executescript(sql)
@@ -42,34 +122,25 @@ def init_db() -> None:
     _seed_default_bot_messages()
 
 
-def _ensure_columns(conn: sqlite3.Connection, table: str, columns: dict[str, str]) -> None:
-    existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+def _table_columns(conn: DatabaseConnection, table: str) -> set[str]:
+    rows = conn.execute(
+        """SELECT COLUMN_NAME
+           FROM INFORMATION_SCHEMA.COLUMNS
+           WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s""",
+        (table,),
+    ).fetchall()
+    return {row["COLUMN_NAME"] for row in rows}
+
+
+def _ensure_columns(conn: DatabaseConnection, table: str, columns: dict[str, str]) -> None:
+    existing = _table_columns(conn, table)
     for name, definition in columns.items():
         if name not in existing:
             try:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
-            except sqlite3.OperationalError as exc:
-                if "duplicate column name" not in str(exc).lower():
+            except pymysql.err.OperationalError as exc:
+                if not exc.args or exc.args[0] != 1060:
                     raise
-
-
-def _migrate_stale_tables() -> None:
-    """Drop and let init_db recreate tables whose schema is outdated."""
-    expected_columns = {
-        "users": {"discord_id", "discord_username", "discord_avatar", "last_login"},
-        "tickets": {"creator_username", "category", "closed_by_id", "closed_by_name", "close_reason", "transcript_url", "twitch_name"},
-    }
-    with _connect() as conn:
-        for table, required_cols in expected_columns.items():
-            existing = {
-                row[1]
-                for row in conn.execute(f"PRAGMA table_info({table})").fetchall()
-            }
-            if not existing:
-                continue  # table doesn't exist yet, will be created
-            if not required_cols.issubset(existing):
-                conn.execute(f"DROP TABLE IF EXISTS {table}")
-                conn.commit()
 
 
 def _seed_default_roles() -> None:
@@ -108,9 +179,9 @@ def _seed_default_bot_messages() -> None:
             conn.execute(
                 """INSERT INTO bot_messages (guild_id, message_type, message_id, channel_id, meta_key)
                    VALUES (?, ?, ?, ?, ?)
-                   ON CONFLICT(guild_id, message_type, message_id) DO UPDATE SET
-                     channel_id = COALESCE(excluded.channel_id, bot_messages.channel_id),
-                     updated_at = datetime('now')""",
+                   ON DUPLICATE KEY UPDATE
+                     channel_id = COALESCE(VALUES(channel_id), channel_id),
+                     updated_at = CURRENT_TIMESTAMP""",
                 (guild_id, "birthday_list", message_id, channel_id, "birthdays"),
             )
         conn.commit()
@@ -204,10 +275,10 @@ def upsert_user(discord_id: str, discord_username: str, discord_avatar: str | No
         conn.execute(
             """INSERT INTO users (discord_id, discord_username, discord_avatar, last_login)
                VALUES (?, ?, ?, datetime('now'))
-               ON CONFLICT(discord_id) DO UPDATE SET
-                 discord_username = excluded.discord_username,
-                 discord_avatar = excluded.discord_avatar,
-                 last_login = datetime('now')""",
+               ON DUPLICATE KEY UPDATE
+                 discord_username = VALUES(discord_username),
+                 discord_avatar = VALUES(discord_avatar),
+                 last_login = CURRENT_TIMESTAMP""",
             (discord_id, discord_username, discord_avatar),
         )
         conn.commit()
@@ -227,7 +298,7 @@ def list_users() -> list[dict]:
         return [dict(r) for r in rows]
 
 
-def _member_name_changed(existing: sqlite3.Row, member: dict[str, Any]) -> bool:
+def _member_name_changed(existing: dict[str, Any], member: dict[str, Any]) -> bool:
     return any(
         (existing[key] or "") != (member.get(key) or "")
         for key in ("username", "global_name", "display_name")
@@ -287,26 +358,26 @@ def upsert_guild_member(guild_id: str, member: dict[str, Any]) -> dict:
                  status_updated_at, joined_at, left_at, first_seen_at,
                  last_seen_at, updated_at
                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, datetime('now'), datetime('now'), datetime('now'))
-               ON CONFLICT(guild_id, user_id) DO UPDATE SET
-                 username = excluded.username,
-                 global_name = excluded.global_name,
-                 display_name = excluded.display_name,
-                 discriminator = excluded.discriminator,
-                 avatar_url = excluded.avatar_url,
-                 roles_json = excluded.roles_json,
-                 is_bot = excluded.is_bot,
-                 status = excluded.status,
-                 presence_status = COALESCE(excluded.presence_status, guild_members.presence_status),
-                 activity_name = COALESCE(excluded.activity_name, guild_members.activity_name),
-                 activity_type = COALESCE(excluded.activity_type, guild_members.activity_type),
+               ON DUPLICATE KEY UPDATE
+                 username = VALUES(username),
+                 global_name = VALUES(global_name),
+                 display_name = VALUES(display_name),
+                 discriminator = VALUES(discriminator),
+                 avatar_url = VALUES(avatar_url),
+                 roles_json = VALUES(roles_json),
+                 is_bot = VALUES(is_bot),
+                 status = VALUES(status),
+                 presence_status = COALESCE(VALUES(presence_status), presence_status),
+                 activity_name = COALESCE(VALUES(activity_name), activity_name),
+                 activity_type = COALESCE(VALUES(activity_type), activity_type),
                  status_updated_at = CASE
-                   WHEN excluded.presence_status IS NOT NULL THEN datetime('now')
-                   ELSE guild_members.status_updated_at
+                   WHEN VALUES(presence_status) IS NOT NULL THEN CURRENT_TIMESTAMP
+                   ELSE status_updated_at
                  END,
-                 joined_at = COALESCE(excluded.joined_at, guild_members.joined_at),
-                 left_at = excluded.left_at,
-                 last_seen_at = datetime('now'),
-                 updated_at = datetime('now')""",
+                 joined_at = COALESCE(VALUES(joined_at), joined_at),
+                 left_at = VALUES(left_at),
+                 last_seen_at = CURRENT_TIMESTAMP,
+                 updated_at = CURRENT_TIMESTAMP""",
             (
                 guild_id,
                 user_id,
@@ -378,26 +449,26 @@ def sync_guild_members(
                      status_updated_at, joined_at, left_at, first_seen_at,
                      last_seen_at, updated_at
                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, datetime('now'), ?, NULL, datetime('now'), datetime('now'), datetime('now'))
-                   ON CONFLICT(guild_id, user_id) DO UPDATE SET
-                     username = excluded.username,
-                     global_name = excluded.global_name,
-                     display_name = excluded.display_name,
-                     discriminator = excluded.discriminator,
-                     avatar_url = excluded.avatar_url,
-                     roles_json = excluded.roles_json,
-                     is_bot = excluded.is_bot,
+                   ON DUPLICATE KEY UPDATE
+                     username = VALUES(username),
+                     global_name = VALUES(global_name),
+                     display_name = VALUES(display_name),
+                     discriminator = VALUES(discriminator),
+                     avatar_url = VALUES(avatar_url),
+                     roles_json = VALUES(roles_json),
+                     is_bot = VALUES(is_bot),
                      status = 'active',
-                     presence_status = COALESCE(excluded.presence_status, guild_members.presence_status),
-                     activity_name = COALESCE(excluded.activity_name, guild_members.activity_name),
-                     activity_type = COALESCE(excluded.activity_type, guild_members.activity_type),
+                     presence_status = COALESCE(VALUES(presence_status), presence_status),
+                     activity_name = COALESCE(VALUES(activity_name), activity_name),
+                     activity_type = COALESCE(VALUES(activity_type), activity_type),
                      status_updated_at = CASE
-                       WHEN excluded.presence_status IS NOT NULL THEN datetime('now')
-                       ELSE guild_members.status_updated_at
+                       WHEN VALUES(presence_status) IS NOT NULL THEN CURRENT_TIMESTAMP
+                       ELSE status_updated_at
                      END,
-                     joined_at = COALESCE(excluded.joined_at, guild_members.joined_at),
+                     joined_at = COALESCE(VALUES(joined_at), joined_at),
                      left_at = NULL,
-                     last_seen_at = datetime('now'),
-                     updated_at = datetime('now')""",
+                     last_seen_at = CURRENT_TIMESTAMP,
+                     updated_at = CURRENT_TIMESTAMP""",
                 (
                     guild_id,
                     user_id,
@@ -546,17 +617,17 @@ def upsert_guild_message(guild_id: str, message: dict[str, Any]) -> dict:
                  guild_id, channel_id, channel_name, message_id, user_id, original_content, content,
                  attachment_count, jump_url, created_at, edited_at, deleted_at, synced_at
                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-               ON CONFLICT(guild_id, channel_id, message_id) DO UPDATE SET
-                 channel_name = excluded.channel_name,
-                 user_id = excluded.user_id,
-                 original_content = COALESCE(guild_messages.original_content, excluded.original_content, guild_messages.content),
-                 content = excluded.content,
-                 attachment_count = excluded.attachment_count,
-                 jump_url = excluded.jump_url,
-                 created_at = excluded.created_at,
-                 edited_at = excluded.edited_at,
-                 deleted_at = COALESCE(excluded.deleted_at, guild_messages.deleted_at),
-                 synced_at = datetime('now')""",
+               ON DUPLICATE KEY UPDATE
+                 channel_name = VALUES(channel_name),
+                 user_id = VALUES(user_id),
+                 original_content = COALESCE(original_content, VALUES(original_content), content),
+                 content = VALUES(content),
+                 attachment_count = VALUES(attachment_count),
+                 jump_url = VALUES(jump_url),
+                 created_at = VALUES(created_at),
+                 edited_at = VALUES(edited_at),
+                 deleted_at = COALESCE(VALUES(deleted_at), deleted_at),
+                 synced_at = CURRENT_TIMESTAMP""",
             (
                 guild_id,
                 channel_id,
@@ -592,17 +663,17 @@ def upsert_guild_messages(guild_id: str, messages: list[dict[str, Any]]) -> dict
                      guild_id, channel_id, channel_name, message_id, user_id, original_content, content,
                      attachment_count, jump_url, created_at, edited_at, deleted_at, synced_at
                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-                   ON CONFLICT(guild_id, channel_id, message_id) DO UPDATE SET
-                     channel_name = excluded.channel_name,
-                     user_id = excluded.user_id,
-                     original_content = COALESCE(guild_messages.original_content, excluded.original_content, guild_messages.content),
-                     content = excluded.content,
-                     attachment_count = excluded.attachment_count,
-                     jump_url = excluded.jump_url,
-                     created_at = excluded.created_at,
-                     edited_at = excluded.edited_at,
-                     deleted_at = COALESCE(excluded.deleted_at, guild_messages.deleted_at),
-                     synced_at = datetime('now')""",
+                   ON DUPLICATE KEY UPDATE
+                     channel_name = VALUES(channel_name),
+                     user_id = VALUES(user_id),
+                     original_content = COALESCE(original_content, VALUES(original_content), content),
+                     content = VALUES(content),
+                     attachment_count = VALUES(attachment_count),
+                     jump_url = VALUES(jump_url),
+                     created_at = VALUES(created_at),
+                     edited_at = VALUES(edited_at),
+                     deleted_at = COALESCE(VALUES(deleted_at), deleted_at),
+                     synced_at = CURRENT_TIMESTAMP""",
                 (
                     guild_id,
                     str(message["channel_id"]),
@@ -725,7 +796,7 @@ def get_user_message_stats(guild_id: str, user_id: str) -> dict:
 def get_user_channel_message_stats(guild_id: str, user_id: str) -> list[dict]:
     with _connect() as conn:
         rows = conn.execute(
-            """SELECT channel_id, COALESCE(channel_name, channel_id) AS channel_name,
+            """SELECT channel_id, COALESCE(MAX(channel_name), channel_id) AS channel_name,
                       COUNT(*) AS message_count,
                       MAX(created_at) AS last_message_at
                FROM guild_messages
@@ -750,7 +821,9 @@ def get_guild_message_overview(guild_id: str) -> dict:
         ).fetchone()
         top_users = conn.execute(
             """SELECT gm.user_id, COUNT(*) AS message_count,
-                      m.display_name, m.username, m.avatar_url
+                      MAX(m.display_name) AS display_name,
+                      MAX(m.username) AS username,
+                      MAX(m.avatar_url) AS avatar_url
                FROM guild_messages gm
                LEFT JOIN guild_members m
                  ON m.guild_id = gm.guild_id AND m.user_id = gm.user_id
@@ -761,7 +834,7 @@ def get_guild_message_overview(guild_id: str) -> dict:
             (guild_id,),
         ).fetchall()
         top_channels = conn.execute(
-            """SELECT channel_id, COALESCE(channel_name, channel_id) AS channel_name,
+            """SELECT channel_id, COALESCE(MAX(channel_name), channel_id) AS channel_name,
                       COUNT(*) AS message_count,
                       MAX(created_at) AS last_message_at
                FROM guild_messages
@@ -783,14 +856,14 @@ def list_message_filter_users(guild_id: str, limit: int = 500) -> list[dict]:
         rows = conn.execute(
             """SELECT gm.user_id,
                       COUNT(*) AS message_count,
-                      m.display_name,
-                      m.username
+                      MAX(m.display_name) AS display_name,
+                      MAX(m.username) AS username
                FROM guild_messages gm
                LEFT JOIN guild_members m
                  ON m.guild_id = gm.guild_id AND m.user_id = gm.user_id
                WHERE gm.guild_id = ? AND gm.deleted_at IS NULL
                GROUP BY gm.user_id
-               ORDER BY COALESCE(m.display_name, m.username, gm.user_id) COLLATE NOCASE ASC
+               ORDER BY COALESCE(MAX(m.display_name), MAX(m.username), gm.user_id) COLLATE NOCASE ASC
                LIMIT ?""",
             (guild_id, limit),
         ).fetchall()
@@ -801,7 +874,7 @@ def list_message_filter_channels(guild_id: str, limit: int = 500) -> list[dict]:
     with _connect() as conn:
         rows = conn.execute(
             """SELECT channel_id,
-                      COALESCE(channel_name, channel_id) AS channel_name,
+                      COALESCE(MAX(channel_name), channel_id) AS channel_name,
                       COUNT(*) AS message_count
                FROM guild_messages
                WHERE guild_id = ? AND deleted_at IS NULL
@@ -920,7 +993,7 @@ def set_config(guild_id: str, key: str, value: str) -> None:
         conn.execute(
             """INSERT INTO guild_config (guild_id, config_key, config_value)
                VALUES (?, ?, ?)
-               ON CONFLICT(guild_id, config_key) DO UPDATE SET config_value = excluded.config_value""",
+               ON DUPLICATE KEY UPDATE config_value = VALUES(config_value)""",
             (guild_id, key, value),
         )
         conn.commit()
@@ -976,8 +1049,8 @@ def set_birthday(guild_id: str, user_id: str, day: int, month: int, year: int | 
         conn.execute(
             """INSERT INTO birthdays (guild_id, user_id, day, month, year)
                VALUES (?, ?, ?, ?, ?)
-               ON CONFLICT(guild_id, user_id) DO UPDATE SET
-                 day = excluded.day, month = excluded.month, year = excluded.year""",
+               ON DUPLICATE KEY UPDATE
+                 day = VALUES(day), month = VALUES(month), year = VALUES(year)""",
             (guild_id, user_id, day, month, year),
         )
         conn.commit()
@@ -1039,10 +1112,10 @@ def upsert_bot_message(
         conn.execute(
             """INSERT INTO bot_messages (guild_id, message_type, message_id, channel_id, meta_key)
                VALUES (?, ?, ?, ?, ?)
-               ON CONFLICT(guild_id, message_type, message_id) DO UPDATE SET
-                 channel_id = excluded.channel_id,
-                 meta_key = COALESCE(excluded.meta_key, bot_messages.meta_key),
-                 updated_at = datetime('now')""",
+               ON DUPLICATE KEY UPDATE
+                 channel_id = VALUES(channel_id),
+                 meta_key = COALESCE(VALUES(meta_key), meta_key),
+                 updated_at = CURRENT_TIMESTAMP""",
             (guild_id, message_type, message_id, channel_id, meta_key),
         )
         conn.commit()
@@ -1091,8 +1164,9 @@ def add_warning(guild_id: str, user_id: str, moderator_id: str, reason: str) -> 
             "INSERT INTO warnings (guild_id, user_id, moderator_id, reason) VALUES (?, ?, ?, ?)",
             (guild_id, user_id, moderator_id, reason),
         )
+        warning_id = conn.conn.insert_id()
         conn.commit()
-        row = conn.execute("SELECT * FROM warnings WHERE rowid = last_insert_rowid()").fetchone()
+        row = conn.execute("SELECT * FROM warnings WHERE id = ?", (warning_id,)).fetchone()
         return dict(row)
 
 
@@ -1258,7 +1332,7 @@ def get_auto_publisher_channels(guild_id: str) -> list[str]:
 def add_auto_publisher_channel(guild_id: str, channel_id: str) -> None:
     with _connect() as conn:
         conn.execute(
-            "INSERT OR IGNORE INTO auto_publisher_channels (guild_id, channel_id) VALUES (?, ?)",
+            "INSERT IGNORE INTO auto_publisher_channels (guild_id, channel_id) VALUES (?, ?)",
             (guild_id, channel_id),
         )
         conn.commit()
@@ -1317,7 +1391,7 @@ def create_selfrole_panel(
                VALUES (?, ?, ?, ?, ?)""",
             (guild_id, message_id, channel_id, title, max_roles),
         )
-        panel_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        panel_id = conn.conn.insert_id()
         for emoji, role_id in roles.items():
             conn.execute(
                 "INSERT INTO selfrole_mappings (panel_id, emoji, role_id) VALUES (?, ?, ?)",
@@ -1333,7 +1407,9 @@ def add_selfrole_mapping(message_id: str, emoji: str, role_id: str) -> None:
         return
     with _connect() as conn:
         conn.execute(
-            "INSERT OR REPLACE INTO selfrole_mappings (panel_id, emoji, role_id) VALUES (?, ?, ?)",
+            """INSERT INTO selfrole_mappings (panel_id, emoji, role_id)
+               VALUES (?, ?, ?)
+               ON DUPLICATE KEY UPDATE role_id = VALUES(role_id)""",
             (panel["id"], emoji, role_id),
         )
         conn.commit()
@@ -1402,7 +1478,7 @@ def set_log_channel(guild_id: str, log_type: str, channel_id: str) -> None:
         conn.execute(
             """INSERT INTO log_channels (guild_id, log_type, channel_id)
                VALUES (?, ?, ?)
-               ON CONFLICT(guild_id, log_type) DO UPDATE SET channel_id = excluded.channel_id""",
+               ON DUPLICATE KEY UPDATE channel_id = VALUES(channel_id)""",
             (guild_id, log_type, channel_id),
         )
         conn.commit()
@@ -1440,9 +1516,9 @@ def set_twitch_config(guild_id: str, channel_id: str | None = None, last_stream_
         conn.execute(
             """INSERT INTO twitch_config (guild_id, channel_id, last_stream_id)
                VALUES (?, ?, ?)
-               ON CONFLICT(guild_id) DO UPDATE SET
-                 channel_id = COALESCE(excluded.channel_id, twitch_config.channel_id),
-                 last_stream_id = COALESCE(excluded.last_stream_id, twitch_config.last_stream_id)""",
+               ON DUPLICATE KEY UPDATE
+                 channel_id = COALESCE(VALUES(channel_id), channel_id),
+                 last_stream_id = COALESCE(VALUES(last_stream_id), last_stream_id)""",
             (guild_id, channel_id, last_stream_id),
         )
         conn.commit()
@@ -1464,22 +1540,22 @@ def upsert_ticket(ticket: dict[str, Any]) -> None:
                  status, subject, category, twitch_name, closed_at, closed_by_id, closed_by_name,
                  close_reason, transcript_path, transcript_url, created_at, updated_at
                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-               ON CONFLICT(ticket_id) DO UPDATE SET
-                 guild_id = COALESCE(excluded.guild_id, tickets.guild_id),
-                 channel_id = COALESCE(excluded.channel_id, tickets.channel_id),
-                 creator_user_id = COALESCE(excluded.creator_user_id, tickets.creator_user_id),
-                 creator_username = COALESCE(excluded.creator_username, tickets.creator_username),
-                 status = COALESCE(excluded.status, tickets.status),
-                 subject = COALESCE(excluded.subject, tickets.subject),
-                 category = COALESCE(excluded.category, tickets.category),
-                 twitch_name = COALESCE(excluded.twitch_name, tickets.twitch_name),
-                 closed_at = COALESCE(excluded.closed_at, tickets.closed_at),
-                 closed_by_id = COALESCE(excluded.closed_by_id, tickets.closed_by_id),
-                 closed_by_name = COALESCE(excluded.closed_by_name, tickets.closed_by_name),
-                 close_reason = COALESCE(excluded.close_reason, tickets.close_reason),
-                 transcript_path = COALESCE(excluded.transcript_path, tickets.transcript_path),
-                 transcript_url = COALESCE(excluded.transcript_url, tickets.transcript_url),
-                 updated_at = datetime('now')""",
+               ON DUPLICATE KEY UPDATE
+                 guild_id = COALESCE(VALUES(guild_id), guild_id),
+                 channel_id = COALESCE(VALUES(channel_id), channel_id),
+                 creator_user_id = COALESCE(VALUES(creator_user_id), creator_user_id),
+                 creator_username = COALESCE(VALUES(creator_username), creator_username),
+                 status = COALESCE(VALUES(status), status),
+                 subject = COALESCE(VALUES(subject), subject),
+                 category = COALESCE(VALUES(category), category),
+                 twitch_name = COALESCE(VALUES(twitch_name), twitch_name),
+                 closed_at = COALESCE(VALUES(closed_at), closed_at),
+                 closed_by_id = COALESCE(VALUES(closed_by_id), closed_by_id),
+                 closed_by_name = COALESCE(VALUES(closed_by_name), closed_by_name),
+                 close_reason = COALESCE(VALUES(close_reason), close_reason),
+                 transcript_path = COALESCE(VALUES(transcript_path), transcript_path),
+                 transcript_url = COALESCE(VALUES(transcript_url), transcript_url),
+                 updated_at = CURRENT_TIMESTAMP""",
             (
                 ticket.get("ticket_id"),
                 ticket.get("guild_id"),
@@ -1587,9 +1663,11 @@ def add_ticket_message(
                VALUES (?, ?, ?, ?, ?, ?)""",
             (ticket_id, author_id, author_name, content, source, discord_message_id),
         )
+        message_row_id = conn.conn.insert_id()
         conn.commit()
         row = conn.execute(
-            "SELECT * FROM ticket_messages WHERE rowid = last_insert_rowid()"
+            "SELECT * FROM ticket_messages WHERE id = ?",
+            (message_row_id,),
         ).fetchone()
         return dict(row)
 
@@ -1652,9 +1730,11 @@ def add_close_reason(guild_id: str, label: str, sort_order: int = 0) -> dict:
             "INSERT INTO close_reasons (guild_id, label, sort_order) VALUES (?, ?, ?)",
             (guild_id, label, sort_order),
         )
+        reason_id = conn.conn.insert_id()
         conn.commit()
         row = conn.execute(
-            "SELECT * FROM close_reasons WHERE rowid = last_insert_rowid()"
+            "SELECT * FROM close_reasons WHERE id = ?",
+            (reason_id,),
         ).fetchone()
         return dict(row)
 

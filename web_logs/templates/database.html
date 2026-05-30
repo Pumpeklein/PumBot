@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header, field, btn, badge %}
+
+{% block content %}
+{{ page_header("Datenbank", "SQLite nach MySQL/MariaDB migrieren", "Einmalige Migration aus der alten lokalen Datei in die konfigurierte Datenbank.") }}
+
+{% if error %}
+<div class="mb-5 rounded-xl border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-200">
+  <div class="font-semibold text-red-100">Migration fehlgeschlagen</div>
+  <div class="mt-1 break-words">{{ error }}</div>
+</div>
+{% endif %}
+
+{% if result %}
+<div class="mb-5 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-4">
+  <div class="flex flex-wrap items-center gap-3">
+    <div class="text-sm font-semibold text-emerald-100">Migration abgeschlossen</div>
+    {{ badge(result.total ~ " Zeilen", "success") }}
+    {% if result.truncate %}{{ badge("Ziel vorher geleert", "warning") }}{% endif %}
+  </div>
+  <div class="mt-2 text-xs text-emerald-200/80">{{ result.sqlite_path }}</div>
+</div>
+
+<div class="mb-6 overflow-hidden rounded-xl border border-white/[0.06]">
+  <table class="w-full text-left text-sm">
+    <thead>
+      <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+        <th class="px-4 py-3">Tabelle</th>
+        <th class="px-4 py-3">Status</th>
+        <th class="px-4 py-3 text-right">Zeilen</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-white/[0.04]">
+      {% for row in result.tables %}
+      <tr>
+        <td class="px-4 py-3 font-mono text-slate-300">{{ row.table }}</td>
+        <td class="px-4 py-3">
+          {% if row.skipped %}
+            {{ badge("Fehlt in SQLite", "default") }}
+          {% else %}
+            {{ badge("Migriert", "success") }}
+          {% endif %}
+        </td>
+        <td class="px-4 py-3 text-right text-slate-400">{{ row.copied }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <h2 class="mb-4 text-sm font-semibold text-white">Migration starten</h2>
+  <form method="post" action="{{ url_for('database_migrate') }}" class="space-y-5"
+    onsubmit="return confirm('Migration jetzt starten? Mit aktivierter Option werden die Zieltabellen vorher geleert.');">
+    {{ field("sqlite_path", "SQLite-Datei", value=default_sqlite_path, required=true) }}
+
+    <label class="flex items-start gap-3 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-100">
+      <input type="checkbox" name="truncate" value="1" checked class="mt-1 rounded border-amber-500/40 bg-black/20">
+      <span>
+        <span class="block font-semibold">Zieltabellen vor der Migration leeren</span>
+        <span class="mt-1 block text-xs text-amber-200/80">Für den einmaligen Umzug empfohlen. Dadurch wird die neue MySQL/MariaDB-Datenbank mit dem Stand der SQLite-Datei überschrieben.</span>
+      </span>
+    </label>
+
+    <div class="flex gap-3">
+      {{ btn("Migration starten", variant="danger") }}
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 TRANSCRIPTS_DIR = DATA_DIR / "transcripts"
-DB_PATH = DATA_DIR / "pumbot.db"
 
 load_dotenv()
 
@@ -29,7 +28,13 @@ class Config:
     )
     DISCORD_BOT_TOKEN: str = os.getenv("DISCORD_TOKEN", "")
 
-    DB_PATH = DB_PATH
+    DB_HOST: str = os.getenv("DB_HOST", "127.0.0.1")
+    DB_PORT: int = int(os.getenv("DB_PORT", "3306"))
+    DB_NAME: str = os.getenv("DB_NAME", "")
+    DB_USER: str = os.getenv("DB_USER", "")
+    DB_PASSWORD: str = os.getenv("DB_PASSWORD", "")
+    DB_CHARSET: str = os.getenv("DB_CHARSET", "utf8mb4")
+
     DATA_DIR = DATA_DIR
     TRANSCRIPTS_DIR = TRANSCRIPTS_DIR
 

@@ -684,7 +684,9 @@ def _guild_members_where(
         params.append(status)
     if q:
         q_like = f"%{q}%"
-        clauses.append("(username LIKE ? OR global_name LIKE ? OR display_name LIKE ? OR user_id LIKE ?)")
+        clauses.append(
+            "(username LIKE ? OR global_name LIKE ? OR display_name LIKE ? OR user_id LIKE ?)"
+        )
         params.extend([q_like, q_like, q_like, q_like])
     if role_id:
         clauses.append("(roles_json LIKE ? OR roles_json LIKE ?)")
@@ -692,7 +694,9 @@ def _guild_members_where(
     if presence:
         p = presence.lower()
         if p == "offline":
-            clauses.append("(LOWER(COALESCE(presence_status, '')) = 'offline' OR presence_status IS NULL OR presence_status = '')")
+            clauses.append(
+                "(LOWER(COALESCE(presence_status, '')) = 'offline' OR presence_status IS NULL OR presence_status = '')"
+            )
         elif p in {"online", "idle", "dnd"}:
             clauses.append("LOWER(COALESCE(presence_status, '')) = ?")
             params.append(p)
@@ -727,7 +731,9 @@ def list_guild_members(
         elif clause.startswith("LOWER(COALESCE(presence_status"):
             joined_clauses.append("LOWER(COALESCE(gm.presence_status, '')) = ?")
         elif clause.startswith("(LOWER(COALESCE(presence_status"):
-            joined_clauses.append("(LOWER(COALESCE(gm.presence_status, '')) = 'offline' OR gm.presence_status IS NULL OR gm.presence_status = '')")
+            joined_clauses.append(
+                "(LOWER(COALESCE(gm.presence_status, '')) = 'offline' OR gm.presence_status IS NULL OR gm.presence_status = '')"
+            )
         else:
             joined_clauses.append(clause)
     with _connect() as conn:

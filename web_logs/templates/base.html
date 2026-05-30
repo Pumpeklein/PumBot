@@ -205,13 +205,15 @@
         <span class="text-sm font-semibold text-white">PumBot</span>
       </header>
 
-      <main class="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">
+      <main class="flex-1 overflow-y-auto px-4 pb-6 sm:px-6 lg:px-8">
+        <div class="pt-6">
         {% if error %}
         <div class="mb-5 rounded-lg border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-300">
           {{ error }}
         </div>
         {% endif %}
         {% block content %}{% endblock %}
+        </div>
       </main>
     </div>
   </div>
@@ -291,12 +293,11 @@
           links.forEach((a) => {
             const isActive = a.getAttribute("href") === "#" + id;
             a.dataset.active = isActive ? "true" : "false";
+            const base = "inline-flex h-8 items-center gap-2 rounded-lg px-3 text-xs font-medium leading-none transition";
             if (isActive) {
-              a.className =
-                "inline-flex items-center gap-2 rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-3 py-1.5 text-xs font-semibold text-cyan-200 transition";
+              a.className = base + " border border-cyan-500/40 bg-cyan-500/15 text-cyan-200";
             } else {
-              a.className =
-                "inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-slate-400 transition hover:border-white/20 hover:bg-white/[0.06] hover:text-white";
+              a.className = base + " border border-white/10 bg-white/[0.03] text-slate-400 hover:border-white/20 hover:bg-white/[0.06] hover:text-white";
             }
           });
         };

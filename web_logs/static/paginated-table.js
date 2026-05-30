@@ -252,18 +252,51 @@
         )
         .join("");
 
+    const fillerRowsHtml = (count) => {
+      if (count <= 0) return "";
+      const cells = columns
+        .map(
+          (column) =>
+            `<td class="${column.class || "px-3 py-2.5"}">&nbsp;</td>`,
+        )
+        .join("");
+      let html = "";
+      for (let i = 0; i < count; i += 1) {
+        html += `<tr aria-hidden="true" class="pointer-events-none select-none border-b border-white/[0.02] opacity-0">${cells}</tr>`;
+      }
+      return html;
+    };
+
+    const skeletonRowsHtml = (count) => {
+      const cells = columns
+        .map(
+          (column) =>
+            `<td class="${column.class || "px-3 py-2.5"}"><div class="h-3 w-full max-w-[180px] animate-pulse rounded bg-white/[0.06]"></div></td>`,
+        )
+        .join("");
+      let html = "";
+      for (let i = 0; i < count; i += 1) {
+        html += `<tr aria-hidden="true" class="border-b border-white/[0.04]">${cells}</tr>`;
+      }
+      return html;
+    };
+
+    const currentPageSize = () =>
+      Math.max(
+        1,
+        Number(pageSize ? pageSize.value : root.dataset.pageSize || "10") || 10,
+      );
+
     const load = async (quiet = false) => {
       if (loading) return;
       loading = true;
       try {
         const params = collectParams(form);
         params.set("page", page);
-        params.set(
-          "page_size",
-          pageSize ? pageSize.value : root.dataset.pageSize || "10",
-        );
+        const size = currentPageSize();
+        params.set("page_size", String(size));
         if (!quiet) {
-          body.innerHTML = `<tr><td colspan="${columns.length}" class="px-3 py-8 text-center text-slate-500">Lädt...</td></tr>`;
+          body.innerHTML = skeletonRowsHtml(size);
         }
         const response = await fetch(`${endpoint}?${params.toString()}`, {
           headers: { Accept: "application/json" },
@@ -286,7 +319,8 @@
         }
         lastSignature = signature;
 
-        const html = rowsHtmlFor(items);
+        const filler = fillerRowsHtml(Math.max(0, size - items.length));
+        const html = rowsHtmlFor(items) + filler;
         if (body.innerHTML !== html) body.innerHTML = html;
         if (empty) empty.classList.toggle("hidden", items.length > 0);
         if (status)

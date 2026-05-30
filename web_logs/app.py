@@ -2118,7 +2118,9 @@ def panel_api_users():
             "last_message_at",
             "status_updated_at",
         ),
-        count_guild_members(guild_id, q=q, status=status, role_id=role_id, presence=presence),
+        count_guild_members(
+            guild_id, q=q, status=status, role_id=role_id, presence=presence
+        ),
         page,
         page_size,
     )
@@ -2134,13 +2136,17 @@ def panel_api_users_suggest():
     rows = list_guild_members(guild_id, q=q, status="all", limit=8, offset=0)
     suggestions = []
     for row in rows:
-        suggestions.append({
-            "user_id": row.get("user_id"),
-            "display_name": row.get("display_name") or row.get("global_name") or row.get("username"),
-            "username": row.get("username"),
-            "avatar_url": row.get("avatar_url"),
-            "status": row.get("status"),
-        })
+        suggestions.append(
+            {
+                "user_id": row.get("user_id"),
+                "display_name": row.get("display_name")
+                or row.get("global_name")
+                or row.get("username"),
+                "username": row.get("username"),
+                "avatar_url": row.get("avatar_url"),
+                "status": row.get("status"),
+            }
+        )
     return jsonify(suggestions)
 
 

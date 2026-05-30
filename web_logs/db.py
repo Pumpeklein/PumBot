@@ -109,10 +109,20 @@ def init_db() -> None:
         conn.executescript(sql)
         _ensure_columns(conn, "guild_members", {
             "roles_json": "TEXT",
+            "banner_url": "TEXT",
+            "accent_color": "INT",
+            "bio": "TEXT",
+            "locale": "VARCHAR(32)",
             "presence_status": "TEXT",
             "activity_name": "TEXT",
             "activity_type": "TEXT",
             "status_updated_at": "TEXT",
+        })
+        _ensure_columns(conn, "users", {
+            "discord_banner": "TEXT",
+            "accent_color": "INT",
+            "locale": "VARCHAR(32)",
+            "discord_bio": "TEXT",
         })
         _ensure_columns(conn, "guild_messages", {
             "original_content": "TEXT",
@@ -270,16 +280,38 @@ def get_guild_members_panel_guild_id(default_guild_id: str) -> str:
 
 # ══════════ Users (Discord OAuth2) ══════════
 
-def upsert_user(discord_id: str, discord_username: str, discord_avatar: str | None = None) -> dict:
+def upsert_user(
+    discord_id: str,
+    discord_username: str,
+    discord_avatar: str | None = None,
+    discord_banner: str | None = None,
+    accent_color: int | None = None,
+    locale: str | None = None,
+    discord_bio: str | None = None,
+) -> dict:
     with _connect() as conn:
         conn.execute(
-            """INSERT INTO users (discord_id, discord_username, discord_avatar, last_login)
-               VALUES (?, ?, ?, datetime('now'))
+            """INSERT INTO users (
+                 discord_id, discord_username, discord_avatar, discord_banner,
+                 accent_color, locale, discord_bio, last_login
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
                ON DUPLICATE KEY UPDATE
                  discord_username = VALUES(discord_username),
                  discord_avatar = VALUES(discord_avatar),
+                 discord_banner = COALESCE(VALUES(discord_banner), discord_banner),
+                 accent_color = COALESCE(VALUES(accent_color), accent_color),
+                 locale = COALESCE(VALUES(locale), locale),
+                 discord_bio = COALESCE(VALUES(discord_bio), discord_bio),
                  last_login = CURRENT_TIMESTAMP""",
-            (discord_id, discord_username, discord_avatar),
+            (
+                discord_id,
+                discord_username,
+                discord_avatar,
+                discord_banner,
+                accent_color,
+                locale,
+                discord_bio,
+            ),
         )
         conn.commit()
         row = conn.execute("SELECT * FROM users WHERE discord_id = ?", (discord_id,)).fetchone()
@@ -312,6 +344,10 @@ def upsert_guild_member(guild_id: str, member: dict[str, Any]) -> dict:
     global_name = member.get("global_name")
     discriminator = member.get("discriminator")
     avatar_url = member.get("avatar_url")
+    banner_url = member.get("banner_url")
+    accent_color = member.get("accent_color")
+    bio = member.get("bio")
+    locale = member.get("locale")
     roles_json = json.dumps(member.get("roles") or [], ensure_ascii=False)
     is_bot = 1 if member.get("is_bot") else 0
     status = member.get("status") or "active"
@@ -354,16 +390,21 @@ def upsert_guild_member(guild_id: str, member: dict[str, Any]) -> dict:
         conn.execute(
             """INSERT INTO guild_members (
                  guild_id, user_id, username, global_name, display_name, discriminator,
-                 avatar_url, roles_json, is_bot, status, presence_status, activity_name, activity_type,
+                 avatar_url, banner_url, accent_color, bio, locale, roles_json,
+                 is_bot, status, presence_status, activity_name, activity_type,
                  status_updated_at, joined_at, left_at, first_seen_at,
                  last_seen_at, updated_at
-               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, datetime('now'), datetime('now'), datetime('now'))
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, datetime('now'), datetime('now'), datetime('now'))
                ON DUPLICATE KEY UPDATE
                  username = VALUES(username),
                  global_name = VALUES(global_name),
                  display_name = VALUES(display_name),
                  discriminator = VALUES(discriminator),
                  avatar_url = VALUES(avatar_url),
+                 banner_url = COALESCE(VALUES(banner_url), banner_url),
+                 accent_color = COALESCE(VALUES(accent_color), accent_color),
+                 bio = COALESCE(VALUES(bio), bio),
+                 locale = COALESCE(VALUES(locale), locale),
                  roles_json = VALUES(roles_json),
                  is_bot = VALUES(is_bot),
                  status = VALUES(status),
@@ -386,6 +427,10 @@ def upsert_guild_member(guild_id: str, member: dict[str, Any]) -> dict:
                 display_name,
                 discriminator,
                 avatar_url,
+                banner_url,
+                accent_color,
+                bio,
+                locale,
                 roles_json,
                 is_bot,
                 status,
@@ -445,16 +490,21 @@ def sync_guild_members(
             conn.execute(
                 """INSERT INTO guild_members (
                      guild_id, user_id, username, global_name, display_name, discriminator,
-                     avatar_url, roles_json, is_bot, status, presence_status, activity_name, activity_type,
+                     avatar_url, banner_url, accent_color, bio, locale, roles_json,
+                     is_bot, status, presence_status, activity_name, activity_type,
                      status_updated_at, joined_at, left_at, first_seen_at,
                      last_seen_at, updated_at
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, datetime('now'), ?, NULL, datetime('now'), datetime('now'), datetime('now'))
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, datetime('now'), ?, NULL, datetime('now'), datetime('now'), datetime('now'))
                    ON DUPLICATE KEY UPDATE
                      username = VALUES(username),
                      global_name = VALUES(global_name),
                      display_name = VALUES(display_name),
                      discriminator = VALUES(discriminator),
                      avatar_url = VALUES(avatar_url),
+                     banner_url = COALESCE(VALUES(banner_url), banner_url),
+                     accent_color = COALESCE(VALUES(accent_color), accent_color),
+                     bio = COALESCE(VALUES(bio), bio),
+                     locale = COALESCE(VALUES(locale), locale),
                      roles_json = VALUES(roles_json),
                      is_bot = VALUES(is_bot),
                      status = 'active',
@@ -477,6 +527,10 @@ def sync_guild_members(
                     display_name,
                     member.get("discriminator"),
                     member.get("avatar_url"),
+                    member.get("banner_url"),
+                    member.get("accent_color"),
+                    member.get("bio"),
+                    member.get("locale"),
                     json.dumps(member.get("roles") or [], ensure_ascii=False),
                     1 if member.get("is_bot") else 0,
                     member.get("presence_status"),
@@ -538,9 +592,9 @@ def _guild_members_where(
     if q:
         q_like = f"%{q}%"
         clauses.append(
-            "(user_id LIKE ? OR username LIKE ? OR global_name LIKE ? OR display_name LIKE ?)"
+            "(username LIKE ? OR global_name LIKE ? OR display_name LIKE ?)"
         )
-        params.extend([q_like, q_like, q_like, q_like])
+        params.extend([q_like, q_like, q_like])
     return clauses, params
 
 
@@ -560,9 +614,9 @@ def list_guild_members(
             joined_clauses.append("gm.guild_id = ?")
         elif clause == "status = ?":
             joined_clauses.append("gm.status = ?")
-        elif clause.startswith("(user_id LIKE"):
+        elif clause.startswith("(username LIKE"):
             joined_clauses.append(
-                "(gm.user_id LIKE ? OR gm.username LIKE ? OR gm.global_name LIKE ? OR gm.display_name LIKE ?)"
+                "(gm.username LIKE ? OR gm.global_name LIKE ? OR gm.display_name LIKE ?)"
             )
         else:
             joined_clauses.append(clause)
@@ -607,11 +661,70 @@ def get_guild_member_name_history(guild_id: str, user_id: str) -> list[dict]:
         return [dict(r) for r in rows]
 
 
+def _insert_message_history(
+    conn: DatabaseConnection,
+    *,
+    guild_id: str,
+    channel_id: str,
+    channel_name: str | None,
+    message_id: str,
+    user_id: str | None,
+    event_type: str,
+    old_content: str | None,
+    new_content: str | None,
+    attachment_count: int = 0,
+    jump_url: str | None = None,
+    event_at: str | None = None,
+) -> None:
+    conn.execute(
+        """INSERT INTO guild_message_history (
+             guild_id, channel_id, channel_name, message_id, user_id, event_type,
+             old_content, new_content, attachment_count, jump_url, event_at, synced_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), datetime('now'))""",
+        (
+            guild_id,
+            channel_id,
+            channel_name,
+            message_id,
+            user_id,
+            event_type,
+            old_content,
+            new_content,
+            int(attachment_count or 0),
+            jump_url,
+            event_at,
+        ),
+    )
+
+
 def upsert_guild_message(guild_id: str, message: dict[str, Any]) -> dict:
     channel_id = str(message["channel_id"])
     message_id = str(message["message_id"])
     user_id = str(message["user_id"])
     with _connect() as conn:
+        existing = conn.execute(
+            """SELECT *
+               FROM guild_messages
+               WHERE guild_id = ? AND channel_id = ? AND message_id = ?""",
+            (guild_id, channel_id, message_id),
+        ).fetchone()
+        new_content = message.get("content")
+        old_content = existing.get("content") if existing else None
+        if existing and (old_content or "") != (new_content or ""):
+            _insert_message_history(
+                conn,
+                guild_id=guild_id,
+                channel_id=channel_id,
+                channel_name=message.get("channel_name") or existing.get("channel_name"),
+                message_id=message_id,
+                user_id=user_id,
+                event_type="edit",
+                old_content=old_content,
+                new_content=new_content,
+                attachment_count=int(message.get("attachment_count") or 0),
+                jump_url=message.get("jump_url") or existing.get("jump_url"),
+                event_at=message.get("edited_at"),
+            )
         conn.execute(
             """INSERT INTO guild_messages (
                  guild_id, channel_id, channel_name, message_id, user_id, original_content, content,
@@ -658,6 +771,32 @@ def upsert_guild_messages(guild_id: str, messages: list[dict[str, Any]]) -> dict
         for message in messages:
             if not message.get("channel_id") or not message.get("message_id") or not message.get("user_id"):
                 continue
+            channel_id = str(message["channel_id"])
+            message_id = str(message["message_id"])
+            user_id = str(message["user_id"])
+            existing = conn.execute(
+                """SELECT *
+                   FROM guild_messages
+                   WHERE guild_id = ? AND channel_id = ? AND message_id = ?""",
+                (guild_id, channel_id, message_id),
+            ).fetchone()
+            new_content = message.get("content")
+            old_content = existing.get("content") if existing else None
+            if existing and (old_content or "") != (new_content or ""):
+                _insert_message_history(
+                    conn,
+                    guild_id=guild_id,
+                    channel_id=channel_id,
+                    channel_name=message.get("channel_name") or existing.get("channel_name"),
+                    message_id=message_id,
+                    user_id=user_id,
+                    event_type="edit",
+                    old_content=old_content,
+                    new_content=new_content,
+                    attachment_count=int(message.get("attachment_count") or 0),
+                    jump_url=message.get("jump_url") or existing.get("jump_url"),
+                    event_at=message.get("edited_at"),
+                )
             conn.execute(
             """INSERT INTO guild_messages (
                      guild_id, channel_id, channel_name, message_id, user_id, original_content, content,
@@ -696,6 +835,26 @@ def upsert_guild_messages(guild_id: str, messages: list[dict[str, Any]]) -> dict
 
 def mark_guild_message_deleted(guild_id: str, channel_id: str, message_id: str) -> None:
     with _connect() as conn:
+        existing = conn.execute(
+            """SELECT *
+               FROM guild_messages
+               WHERE guild_id = ? AND channel_id = ? AND message_id = ?""",
+            (guild_id, channel_id, message_id),
+        ).fetchone()
+        if existing and not existing.get("deleted_at"):
+            _insert_message_history(
+                conn,
+                guild_id=guild_id,
+                channel_id=channel_id,
+                channel_name=existing.get("channel_name"),
+                message_id=message_id,
+                user_id=existing.get("user_id"),
+                event_type="delete",
+                old_content=existing.get("content"),
+                new_content=None,
+                attachment_count=int(existing.get("attachment_count") or 0),
+                jump_url=existing.get("jump_url"),
+            )
         conn.execute(
             """UPDATE guild_messages
                SET deleted_at = datetime('now'), synced_at = datetime('now')
@@ -769,6 +928,57 @@ def count_guild_messages(
                 LEFT JOIN guild_members m
                   ON m.guild_id = gm.guild_id AND m.user_id = gm.user_id
                 WHERE {' AND '.join(clauses)}""",
+            params,
+        ).fetchone()
+        return int(row["total"] if row else 0)
+
+
+def list_guild_message_history(
+    guild_id: str,
+    user_id: str | None = None,
+    event_type: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> list[dict]:
+    clauses = ["h.guild_id = ?"]
+    params: list[Any] = [guild_id]
+    if user_id:
+        clauses.append("h.user_id = ?")
+        params.append(user_id)
+    if event_type in {"edit", "delete"}:
+        clauses.append("h.event_type = ?")
+        params.append(event_type)
+    params.extend([limit, offset])
+    with _connect() as conn:
+        rows = conn.execute(
+            f"""SELECT h.*, m.display_name, m.username, m.avatar_url
+                FROM guild_message_history h
+                LEFT JOIN guild_members m
+                  ON m.guild_id = h.guild_id AND m.user_id = h.user_id
+                WHERE {' AND '.join(clauses)}
+                ORDER BY h.event_at DESC
+                LIMIT ? OFFSET ?""",
+            params,
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def count_guild_message_history(
+    guild_id: str,
+    user_id: str | None = None,
+    event_type: str | None = None,
+) -> int:
+    clauses = ["guild_id = ?"]
+    params: list[Any] = [guild_id]
+    if user_id:
+        clauses.append("user_id = ?")
+        params.append(user_id)
+    if event_type in {"edit", "delete"}:
+        clauses.append("event_type = ?")
+        params.append(event_type)
+    with _connect() as conn:
+        row = conn.execute(
+            f"SELECT COUNT(*) AS total FROM guild_message_history WHERE {' AND '.join(clauses)}",
             params,
         ).fetchone()
         return int(row["total"] if row else 0)
@@ -909,6 +1119,56 @@ def list_roles(guild_id: str) -> list[dict]:
             d["permissions"] = json.loads(d.get("permissions") or "[]")
             result.append(d)
         return result
+
+
+def parse_member_roles(member: dict | None) -> list[dict]:
+    if not member:
+        return []
+    try:
+        roles = json.loads(member.get("roles_json") or "[]")
+    except (TypeError, json.JSONDecodeError):
+        return []
+    return [
+        role
+        for role in roles
+        if isinstance(role, dict) and (role.get("id") or role.get("name"))
+    ]
+
+
+def update_guild_member_roles(
+    guild_id: str, user_id: str, roles: list[dict[str, Any]]
+) -> None:
+    with _connect() as conn:
+        conn.execute(
+            """UPDATE guild_members
+               SET roles_json = ?, updated_at = datetime('now')
+               WHERE guild_id = ? AND user_id = ?""",
+            (json.dumps(roles or [], ensure_ascii=False), guild_id, user_id),
+        )
+        conn.commit()
+
+
+def update_guild_member_profile_fields(
+    guild_id: str,
+    user_id: str,
+    *,
+    banner_url: str | None = None,
+    accent_color: int | None = None,
+    bio: str | None = None,
+    locale: str | None = None,
+) -> None:
+    with _connect() as conn:
+        conn.execute(
+            """UPDATE guild_members
+               SET banner_url = COALESCE(?, banner_url),
+                   accent_color = COALESCE(?, accent_color),
+                   bio = COALESCE(?, bio),
+                   locale = COALESCE(?, locale),
+                   updated_at = datetime('now')
+               WHERE guild_id = ? AND user_id = ?""",
+            (banner_url, accent_color, bio, locale, guild_id, user_id),
+        )
+        conn.commit()
 
 
 def get_role(role_id: int) -> dict | None:

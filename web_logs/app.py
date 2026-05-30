@@ -35,6 +35,7 @@ try:
         count_birthdays,
         count_counting_leaderboard,
         count_guild_members,
+        count_guild_message_history,
         count_guild_messages,
         count_tickets,
         count_warnings,
@@ -79,6 +80,7 @@ try:
         list_all_warnings,
         list_close_reasons,
         list_guild_members,
+        list_guild_message_history,
         list_guild_messages,
         list_message_filter_channels,
         list_message_filter_users,
@@ -94,6 +96,7 @@ try:
         remove_selfrole_mapping,
         remove_twitch_config,
         remove_warning,
+        parse_member_roles,
         set_birthday,
         set_config,
         set_counting,
@@ -103,6 +106,8 @@ try:
         set_twitch_config,
         sync_guild_members,
         mark_guild_message_deleted,
+        update_guild_member_profile_fields,
+        update_guild_member_roles,
         upsert_guild_member,
         upsert_bot_message,
         upsert_guild_message,
@@ -133,6 +138,7 @@ except ImportError:
         count_birthdays,
         count_counting_leaderboard,
         count_guild_members,
+        count_guild_message_history,
         count_guild_messages,
         count_tickets,
         count_warnings,
@@ -177,6 +183,7 @@ except ImportError:
         list_all_warnings,
         list_close_reasons,
         list_guild_members,
+        list_guild_message_history,
         list_guild_messages,
         list_message_filter_channels,
         list_message_filter_users,
@@ -192,6 +199,7 @@ except ImportError:
         remove_selfrole_mapping,
         remove_twitch_config,
         remove_warning,
+        parse_member_roles,
         set_birthday,
         set_config,
         set_counting,
@@ -201,6 +209,8 @@ except ImportError:
         set_twitch_config,
         sync_guild_members,
         mark_guild_message_deleted,
+        update_guild_member_profile_fields,
+        update_guild_member_roles,
         upsert_guild_member,
         upsert_bot_message,
         upsert_guild_message,
@@ -405,6 +415,107 @@ def _paginated_response(items: list[dict], total: int, page: int, page_size: int
             },
         }
     )
+
+
+def _run_bot_coro(coro):
+    bot = app.config.get("DISCORD_BOT")
+    if not bot or not bot.is_ready():
+        if hasattr(coro, "close"):
+            coro.close()
+        return None, "Bot ist nicht verbunden."
+    try:
+        future = asyncio.run_coroutine_threadsafe(coro, bot.loop)
+        return future.result(timeout=15), None
+    except Exception as exc:
+        return None, str(exc)
+
+
+def _live_discord_roles(guild_id: str) -> list[dict]:
+    bot = app.config.get("DISCORD_BOT")
+    if not bot or not bot.is_ready():
+        return []
+    guild = bot.get_guild(int(guild_id))
+    if not guild:
+        return []
+    roles = []
+    for role in sorted(guild.roles, key=lambda r: r.position, reverse=True):
+        if getattr(role, "is_default", lambda: False)():
+            continue
+        roles.append({
+            "id": str(role.id),
+            "name": role.name,
+            "position": role.position,
+            "managed": role.managed,
+            "color": str(role.color),
+        })
+    return roles
+
+
+async def _discord_add_member_role(guild_id: str, user_id: str, role_id: str) -> list[dict]:
+    bot = app.config.get("DISCORD_BOT")
+    guild = bot.get_guild(int(guild_id)) if bot else None
+    if guild is None:
+        raise RuntimeError("Guild nicht gefunden.")
+    member = guild.get_member(int(user_id)) or await guild.fetch_member(int(user_id))
+    role = guild.get_role(int(role_id))
+    if role is None:
+        raise RuntimeError("Rolle nicht gefunden.")
+    await member.add_roles(role, reason="Web Panel")
+    return [
+        {"id": str(role.id), "name": role.name}
+        for role in sorted(member.roles, key=lambda r: r.position, reverse=True)
+        if role.name != "@everyone"
+    ]
+
+
+async def _discord_remove_member_role(guild_id: str, user_id: str, role_id: str) -> list[dict]:
+    bot = app.config.get("DISCORD_BOT")
+    guild = bot.get_guild(int(guild_id)) if bot else None
+    if guild is None:
+        raise RuntimeError("Guild nicht gefunden.")
+    member = guild.get_member(int(user_id)) or await guild.fetch_member(int(user_id))
+    role = guild.get_role(int(role_id))
+    if role is None:
+        raise RuntimeError("Rolle nicht gefunden.")
+    await member.remove_roles(role, reason="Web Panel")
+    return [
+        {"id": str(role.id), "name": role.name}
+        for role in sorted(member.roles, key=lambda r: r.position, reverse=True)
+        if role.name != "@everyone"
+    ]
+
+
+async def _discord_create_role(guild_id: str, name: str, color_hex: str | None = None) -> dict:
+    import discord
+
+    bot = app.config.get("DISCORD_BOT")
+    guild = bot.get_guild(int(guild_id)) if bot else None
+    if guild is None:
+        raise RuntimeError("Guild nicht gefunden.")
+    color_value = 0
+    if color_hex:
+        color_value = int(color_hex.strip().lstrip("#"), 16)
+    role = await guild.create_role(
+        name=name,
+        colour=discord.Colour(color_value),
+        reason="Web Panel",
+    )
+    return {"id": str(role.id), "name": role.name}
+
+
+async def _discord_fetch_user_profile(user_id: str) -> dict:
+    bot = app.config.get("DISCORD_BOT")
+    if bot is None:
+        raise RuntimeError("Bot ist nicht verbunden.")
+    user = await bot.fetch_user(int(user_id))
+    banner = getattr(user, "banner", None)
+    accent_color = getattr(user, "accent_color", None)
+    return {
+        "banner_url": str(banner.url) if banner else None,
+        "accent_color": int(accent_color.value) if accent_color else None,
+        "bio": getattr(user, "bio", None),
+        "locale": str(getattr(user, "locale", "")) if getattr(user, "locale", None) else None,
+    }
 
 
 # ════════════════ API KEY SECURITY ════════════════
@@ -877,6 +988,10 @@ def user_detail_page(user_id: str):
             "global_name": None,
             "display_name": user_id,
             "avatar_url": None,
+            "banner_url": None,
+            "accent_color": None,
+            "bio": None,
+            "locale": None,
             "is_bot": 0,
             "status": "unknown",
             "joined_at": None,
@@ -890,6 +1005,30 @@ def user_detail_page(user_id: str):
             "status_updated_at": None,
         }
     history = get_guild_member_name_history(guild_id, user_id)
+    oauth_user = get_user_by_discord_id(user_id) or {}
+    if oauth_user:
+        member["banner_url"] = member.get("banner_url") or oauth_user.get("discord_banner")
+        member["accent_color"] = member.get("accent_color") or oauth_user.get("accent_color")
+        member["bio"] = member.get("bio") or oauth_user.get("discord_bio")
+        member["locale"] = member.get("locale") or oauth_user.get("locale")
+    if not any(
+        member.get(field)
+        for field in ("banner_url", "accent_color", "bio", "locale")
+    ):
+        profile, error = _run_bot_coro(_discord_fetch_user_profile(user_id))
+        if profile:
+            update_guild_member_profile_fields(guild_id, user_id, **profile)
+            member["banner_url"] = member.get("banner_url") or profile.get("banner_url")
+            member["accent_color"] = member.get("accent_color") or profile.get("accent_color")
+            member["bio"] = member.get("bio") or profile.get("bio")
+            member["locale"] = member.get("locale") or profile.get("locale")
+        elif error and error != "Bot ist nicht verbunden.":
+            app.logger.warning("Discord profile fetch failed: %s", error)
+    member_roles = parse_member_roles(member)
+    web_roles = list_roles(guild_id)
+    web_role_ids = {str(role["discord_role_id"]) for role in web_roles}
+    discord_roles = _live_discord_roles(guild_id)
+    current_role_ids = {str(role.get("id")) for role in member_roles}
     message_stats = get_user_message_stats(guild_id, user_id)
     channel_stats = get_user_channel_message_stats(guild_id, user_id)
     ticket_stats = get_ticket_stats_for_user(guild_id, user_id)
@@ -905,6 +1044,16 @@ def user_detail_page(user_id: str):
             "status_updated_at",
         )[0],
         history=_format_date_fields(history, "changed_at"),
+        member_roles=member_roles,
+        web_roles=web_roles,
+        discord_roles=discord_roles,
+        discord_member_roles=[
+            {**role, "is_web_role": str(role.get("id")) in web_role_ids}
+            for role in member_roles
+        ],
+        assignable_discord_roles=[
+            role for role in discord_roles if role["id"] not in current_role_ids
+        ],
         message_stats=_format_date_fields([message_stats], "last_message_at")[0],
         channel_stats=_format_date_fields(channel_stats, "last_message_at"),
         ticket_stats=_format_date_fields([ticket_stats], "last_ticket_at")[0],
@@ -912,6 +1061,53 @@ def user_detail_page(user_id: str):
         active_page="users",
         **ctx,
     )
+
+
+@app.post("/users/<user_id>/discord-roles/add")
+@permission_required("roles.manage")
+def user_discord_role_add(user_id: str):
+    guild_id = _active_panel_guild_id()
+    role_id = (request.form.get("role_id") or "").strip()
+    if role_id:
+        roles, error = _run_bot_coro(_discord_add_member_role(guild_id, user_id, role_id))
+        if roles is not None:
+            update_guild_member_roles(guild_id, user_id, roles)
+        elif error:
+            app.logger.warning("Discord role add failed: %s", error)
+    return redirect(url_for("user_detail_page", user_id=user_id, guild_id=guild_id))
+
+
+@app.post("/users/<user_id>/discord-roles/<role_id>/remove")
+@permission_required("roles.manage")
+def user_discord_role_remove(user_id: str, role_id: str):
+    guild_id = _active_panel_guild_id()
+    roles, error = _run_bot_coro(_discord_remove_member_role(guild_id, user_id, role_id))
+    if roles is not None:
+        update_guild_member_roles(guild_id, user_id, roles)
+    elif error:
+        app.logger.warning("Discord role remove failed: %s", error)
+    return redirect(url_for("user_detail_page", user_id=user_id, guild_id=guild_id))
+
+
+@app.post("/users/<user_id>/discord-roles/create")
+@permission_required("roles.manage")
+def user_discord_role_create(user_id: str):
+    guild_id = _active_panel_guild_id()
+    role_name = (request.form.get("role_name") or "").strip()
+    color_hex = (request.form.get("color") or "").strip() or None
+    if role_name:
+        role, error = _run_bot_coro(_discord_create_role(guild_id, role_name, color_hex))
+        if error:
+            app.logger.warning("Discord role create failed: %s", error)
+        elif role and request.form.get("assign_created") == "1":
+            roles, assign_error = _run_bot_coro(
+                _discord_add_member_role(guild_id, user_id, role["id"])
+            )
+            if roles is not None:
+                update_guild_member_roles(guild_id, user_id, roles)
+            elif assign_error:
+                app.logger.warning("Discord created role assign failed: %s", assign_error)
+    return redirect(url_for("user_detail_page", user_id=user_id, guild_id=guild_id))
 
 
 @app.get("/stats")
@@ -1319,6 +1515,40 @@ def panel_api_messages():
             q=q,
             include_deleted=include_deleted,
         ),
+        page,
+        page_size,
+    )
+
+
+@app.get("/panel-api/message-history")
+@permission_required("users.view")
+def panel_api_message_history():
+    guild_id = request.args.get("guild_id") or _active_panel_guild_id()
+    user_id = request.args.get("user_id", "").strip() or None
+    event_type = request.args.get("event_type", "").strip() or None
+    if event_type not in {"edit", "delete", None}:
+        event_type = None
+    page, page_size, offset = _pagination_args()
+    rows = []
+    for event in list_guild_message_history(
+        guild_id,
+        user_id=user_id,
+        event_type=event_type,
+        limit=page_size,
+        offset=offset,
+    ):
+        item = dict(event)
+        item["event_label"] = "Bearbeitet" if item.get("event_type") == "edit" else "Gelöscht"
+        item["message_status"] = item["event_label"]
+        item["user_detail_url"] = (
+            url_for("user_detail_page", user_id=item["user_id"], guild_id=guild_id)
+            if item.get("user_id")
+            else None
+        )
+        rows.append(item)
+    return _paginated_response(
+        _format_date_fields(rows, "event_at", "synced_at"),
+        count_guild_message_history(guild_id, user_id=user_id, event_type=event_type),
         page,
         page_size,
     )

@@ -3,6 +3,10 @@ CREATE TABLE IF NOT EXISTS users (
   discord_id VARCHAR(32) NOT NULL UNIQUE,
   discord_username VARCHAR(255) NOT NULL,
   discord_avatar TEXT,
+  discord_banner TEXT,
+  accent_color INT,
+  locale VARCHAR(32),
+  discord_bio TEXT,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   last_login DATETIME NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -16,6 +20,10 @@ CREATE TABLE IF NOT EXISTS guild_members (
   display_name VARCHAR(255) NOT NULL,
   discriminator VARCHAR(16),
   avatar_url TEXT,
+  banner_url TEXT,
+  accent_color INT,
+  bio TEXT,
+  locale VARCHAR(32),
   roles_json LONGTEXT,
   is_bot TINYINT(1) NOT NULL DEFAULT 0,
   status VARCHAR(32) NOT NULL DEFAULT 'active',
@@ -60,6 +68,22 @@ CREATE TABLE IF NOT EXISTS guild_messages (
   deleted_at DATETIME NULL,
   synced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_guild_messages_message (guild_id, channel_id, message_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS guild_message_history (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  guild_id VARCHAR(32) NOT NULL,
+  channel_id VARCHAR(32) NOT NULL,
+  channel_name VARCHAR(255),
+  message_id VARCHAR(32) NOT NULL,
+  user_id VARCHAR(32),
+  event_type VARCHAR(32) NOT NULL,
+  old_content LONGTEXT,
+  new_content LONGTEXT,
+  attachment_count INT NOT NULL DEFAULT 0,
+  jump_url TEXT,
+  event_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  synced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS roles (
@@ -244,3 +268,6 @@ CREATE INDEX idx_guild_member_name_history_user ON guild_member_name_history(gui
 CREATE INDEX idx_guild_messages_guild_created ON guild_messages(guild_id, created_at);
 CREATE INDEX idx_guild_messages_user ON guild_messages(guild_id, user_id, created_at);
 CREATE INDEX idx_guild_messages_channel ON guild_messages(guild_id, channel_id, created_at);
+CREATE INDEX idx_guild_message_history_message ON guild_message_history(guild_id, channel_id, message_id, event_at);
+CREATE INDEX idx_guild_message_history_user ON guild_message_history(guild_id, user_id, event_at);
+CREATE INDEX idx_guild_message_history_type ON guild_message_history(guild_id, event_type, event_at);

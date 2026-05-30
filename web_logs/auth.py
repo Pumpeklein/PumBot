@@ -110,6 +110,13 @@ def fetch_discord_user(access_token: str) -> dict | None:
     return resp.json()
 
 
+def _discord_asset_url(user_id: str, asset_hash: str | None, asset_type: str) -> str | None:
+    if not asset_hash:
+        return None
+    ext = "gif" if asset_hash.startswith("a_") else "png"
+    return f"https://cdn.discordapp.com/{asset_type}/{user_id}/{asset_hash}.{ext}"
+
+
 def fetch_guild_member_roles(discord_user_id: str) -> list[str]:
     bot_token = Config.DISCORD_BOT_TOKEN
     if not bot_token:
@@ -182,13 +189,17 @@ def fetch_guild_member_display_name(discord_user_id: str) -> str | None:
     display_name = member.get("nick") or user.get("global_name") or user.get("username")
 
     if user.get("id") and display_name:
-        avatar = user.get("avatar")
-        avatar_url = (
-            f"https://cdn.discordapp.com/avatars/{user['id']}/{avatar}.png"
-            if avatar
-            else None
+        avatar_url = _discord_asset_url(user["id"], user.get("avatar"), "avatars")
+        banner_url = _discord_asset_url(user["id"], user.get("banner"), "banners")
+        upsert_user(
+            user["id"],
+            display_name,
+            avatar_url,
+            discord_banner=banner_url,
+            accent_color=user.get("accent_color"),
+            locale=user.get("locale"),
+            discord_bio=user.get("bio"),
         )
-        upsert_user(user["id"], display_name, avatar_url)
         _set_cached_display_name(discord_user_id, display_name)
 
     return display_name or cached_name
@@ -213,14 +224,18 @@ def login_user_from_oauth(code: str) -> bool:
 
         discord_id = discord_user["id"]
         username = discord_user.get("global_name") or discord_user.get("username", "Unknown")
-        avatar = discord_user.get("avatar")
-        avatar_url = (
-            f"https://cdn.discordapp.com/avatars/{discord_id}/{avatar}.png"
-            if avatar
-            else None
-        )
+        avatar_url = _discord_asset_url(discord_id, discord_user.get("avatar"), "avatars")
+        banner_url = _discord_asset_url(discord_id, discord_user.get("banner"), "banners")
 
-        upsert_user(discord_id, username, avatar_url)
+        upsert_user(
+            discord_id,
+            username,
+            avatar_url,
+            discord_banner=banner_url,
+            accent_color=discord_user.get("accent_color"),
+            locale=discord_user.get("locale"),
+            discord_bio=discord_user.get("bio"),
+        )
 
         guild_roles = fetch_guild_member_roles(discord_id)
         permissions = get_permissions_for_discord_roles(DEFAULT_GUILD_ID, guild_roles)

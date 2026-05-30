@@ -9,6 +9,10 @@ CREATE TABLE IF NOT EXISTS users (
   discord_id TEXT UNIQUE NOT NULL,
   discord_username TEXT NOT NULL,
   discord_avatar TEXT,
+  discord_banner TEXT,
+  accent_color INTEGER,
+  locale TEXT,
+  discord_bio TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   last_login TEXT
 );
@@ -22,6 +26,10 @@ CREATE TABLE IF NOT EXISTS guild_members (
   display_name TEXT NOT NULL,
   discriminator TEXT,
   avatar_url TEXT,
+  banner_url TEXT,
+  accent_color INTEGER,
+  bio TEXT,
+  locale TEXT,
   roles_json TEXT,
   is_bot INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'active',
@@ -66,6 +74,22 @@ CREATE TABLE IF NOT EXISTS guild_messages (
   deleted_at TEXT,
   synced_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(guild_id, channel_id, message_id)
+);
+
+CREATE TABLE IF NOT EXISTS guild_message_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  guild_id TEXT NOT NULL,
+  channel_id TEXT NOT NULL,
+  channel_name TEXT,
+  message_id TEXT NOT NULL,
+  user_id TEXT,
+  event_type TEXT NOT NULL,
+  old_content TEXT,
+  new_content TEXT,
+  attachment_count INTEGER NOT NULL DEFAULT 0,
+  jump_url TEXT,
+  event_at TEXT NOT NULL DEFAULT (datetime('now')),
+  synced_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 -- ── Roles & Permissions ──
@@ -265,3 +289,6 @@ CREATE INDEX IF NOT EXISTS idx_guild_member_name_history_user ON guild_member_na
 CREATE INDEX IF NOT EXISTS idx_guild_messages_guild_created ON guild_messages(guild_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_guild_messages_user ON guild_messages(guild_id, user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_guild_messages_channel ON guild_messages(guild_id, channel_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_guild_message_history_message ON guild_message_history(guild_id, channel_id, message_id, event_at);
+CREATE INDEX IF NOT EXISTS idx_guild_message_history_user ON guild_message_history(guild_id, user_id, event_at);
+CREATE INDEX IF NOT EXISTS idx_guild_message_history_type ON guild_message_history(guild_id, event_type, event_at);

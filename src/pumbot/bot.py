@@ -141,6 +141,10 @@ class PumpeBot(commands.Bot):
             "display_name": member.display_name,
             "discriminator": member.discriminator,
             "avatar_url": self._avatar_url(member),
+            "banner_url": str(member.banner.url) if getattr(member, "banner", None) else None,
+            "accent_color": int(member.accent_color.value) if getattr(member, "accent_color", None) else None,
+            "bio": getattr(member, "bio", None),
+            "locale": str(member.locale) if getattr(member, "locale", None) else None,
             "roles": [
                 {"id": str(role.id), "name": role.name}
                 for role in sorted(member.roles, key=lambda role: role.position, reverse=True)
@@ -393,6 +397,7 @@ class PumpeBot(commands.Bot):
             or before.global_name != after.global_name
             or before.display_name != after.display_name
             or before.display_avatar.url != after.display_avatar.url
+            or [role.id for role in before.roles] != [role.id for role in after.roles]
         ):
             await self._upsert_member(after, status="active")
 

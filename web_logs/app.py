@@ -78,10 +78,15 @@ try:
         list_all_warnings,
         list_close_reasons,
         list_guild_members,
+<<<<<<< HEAD
         list_guild_messages,
+=======
+        count_tickets_for_user,
+>>>>>>> 67dc9c0650671adf943dbe0e42c59da4220ad175
         list_logs_for_ticket,
         list_roles,
         list_tickets,
+        list_tickets_for_user,
         mark_birthday_congrats,
         mark_guild_member_left,
         remove_auto_publisher_channel,
@@ -171,10 +176,15 @@ except ImportError:
         list_all_warnings,
         list_close_reasons,
         list_guild_members,
+<<<<<<< HEAD
         list_guild_messages,
+=======
+        count_tickets_for_user,
+>>>>>>> 67dc9c0650671adf943dbe0e42c59da4220ad175
         list_logs_for_ticket,
         list_roles,
         list_tickets,
+        list_tickets_for_user,
         mark_birthday_congrats,
         mark_guild_member_left,
         remove_auto_publisher_channel,
@@ -894,8 +904,11 @@ def user_detail_page(user_id: str):
             "status_updated_at",
         )[0],
         history=_format_date_fields(history, "changed_at"),
+<<<<<<< HEAD
         message_stats=_format_date_fields([message_stats], "last_message_at")[0],
         channel_stats=_format_date_fields(channel_stats, "last_message_at"),
+=======
+>>>>>>> 67dc9c0650671adf943dbe0e42c59da4220ad175
         guild_id=guild_id,
         active_page="users",
         **ctx,
@@ -1197,6 +1210,23 @@ def panel_api_tickets():
         item["detail_url"] = url_for("ticket_detail", ticket_id=item["ticket_id"])
         rows.append(item)
     return _paginated_response(rows, count_tickets(q=q), page, page_size)
+
+
+@app.get("/panel-api/users/<user_id>/tickets")
+@login_required
+def panel_api_user_tickets(user_id: str):
+    guild_id = _active_panel_guild_id()
+    page, page_size, offset = _pagination_args()
+    rows = []
+    for ticket in list_tickets_for_user(
+        guild_id, user_id, limit=page_size, offset=offset
+    ):
+        item = dict(ticket)
+        item["detail_url"] = url_for("ticket_detail", ticket_id=item["ticket_id"])
+        rows.append(item)
+    return _paginated_response(
+        rows, count_tickets_for_user(guild_id, user_id), page, page_size
+    )
 
 
 @app.get("/panel-api/users")

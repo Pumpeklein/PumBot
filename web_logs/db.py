@@ -1480,6 +1480,29 @@ def count_tickets(q: str = "") -> int:
         return int(row["total"] if row else 0)
 
 
+def list_tickets_for_user(
+    guild_id: str, user_id: str, limit: int = 100, offset: int = 0
+) -> list[dict[str, Any]]:
+    with _connect() as conn:
+        rows = conn.execute(
+            """SELECT * FROM tickets
+               WHERE creator_user_id = ? AND (guild_id = ? OR guild_id IS NULL)
+               ORDER BY updated_at DESC LIMIT ? OFFSET ?""",
+            (str(user_id), str(guild_id), limit, offset),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def count_tickets_for_user(guild_id: str, user_id: str) -> int:
+    with _connect() as conn:
+        row = conn.execute(
+            """SELECT COUNT(*) AS total FROM tickets
+               WHERE creator_user_id = ? AND (guild_id = ? OR guild_id IS NULL)""",
+            (str(user_id), str(guild_id)),
+        ).fetchone()
+        return int(row["total"] if row else 0)
+
+
 # ══════════ Ticket Messages ══════════
 
 def add_ticket_message(

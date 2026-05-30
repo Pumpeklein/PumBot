@@ -78,11 +78,8 @@ try:
         list_all_warnings,
         list_close_reasons,
         list_guild_members,
-<<<<<<< HEAD
         list_guild_messages,
-=======
         count_tickets_for_user,
->>>>>>> 67dc9c0650671adf943dbe0e42c59da4220ad175
         list_logs_for_ticket,
         list_roles,
         list_tickets,
@@ -176,11 +173,8 @@ except ImportError:
         list_all_warnings,
         list_close_reasons,
         list_guild_members,
-<<<<<<< HEAD
         list_guild_messages,
-=======
         count_tickets_for_user,
->>>>>>> 67dc9c0650671adf943dbe0e42c59da4220ad175
         list_logs_for_ticket,
         list_roles,
         list_tickets,
@@ -904,11 +898,8 @@ def user_detail_page(user_id: str):
             "status_updated_at",
         )[0],
         history=_format_date_fields(history, "changed_at"),
-<<<<<<< HEAD
         message_stats=_format_date_fields([message_stats], "last_message_at")[0],
         channel_stats=_format_date_fields(channel_stats, "last_message_at"),
-=======
->>>>>>> 67dc9c0650671adf943dbe0e42c59da4220ad175
         guild_id=guild_id,
         active_page="users",
         **ctx,

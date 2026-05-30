@@ -1503,6 +1503,25 @@ def count_tickets_for_user(guild_id: str, user_id: str) -> int:
         return int(row["total"] if row else 0)
 
 
+def get_ticket_stats_for_user(guild_id: str, user_id: str) -> dict:
+    with _connect() as conn:
+        row = conn.execute(
+            """SELECT COUNT(*) AS ticket_count,
+                      SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) AS open_tickets,
+                      SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) AS closed_tickets,
+                      MAX(updated_at) AS last_ticket_at
+               FROM tickets
+               WHERE creator_user_id = ? AND (guild_id = ? OR guild_id IS NULL)""",
+            (str(user_id), str(guild_id)),
+        ).fetchone()
+        return dict(row) if row else {
+            "ticket_count": 0,
+            "open_tickets": 0,
+            "closed_tickets": 0,
+            "last_ticket_at": None,
+        }
+
+
 # ══════════ Ticket Messages ══════════
 
 def add_ticket_message(

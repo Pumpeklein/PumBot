@@ -91,24 +91,34 @@
     const prev = root.querySelector("[data-page-prev]");
     const next = root.querySelector("[data-page-next]");
     const pageSize = root.querySelector("[data-page-size]");
+    const refreshMs = Number(root.dataset.autoRefreshMs || 0);
     let page = 1;
+    let loading = false;
 
-    const load = async () => {
-      const params = collectParams(form);
-      params.set("page", page);
-      params.set("page_size", pageSize ? pageSize.value : root.dataset.pageSize || "10");
-      body.innerHTML = `<tr><td colspan="${columns.length}" class="px-3 py-8 text-center text-slate-500">Lädt...</td></tr>`;
-      const response = await fetch(`${endpoint}?${params.toString()}`, { headers: { Accept: "application/json" } });
-      const data = await response.json();
-      const items = data.items || [];
-      const pagination = data.pagination || { page: 1, pages: 1, total: 0 };
-      body.innerHTML = items
-        .map((row) => `<tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]">${columns.map((column) => `<td class="${column.class || "px-3 py-2.5"}">${renderCell(row, column)}</td>`).join("")}</tr>`)
-        .join("");
-      empty.classList.toggle("hidden", items.length > 0);
-      status.textContent = `${pagination.total} Einträge - Seite ${pagination.page} von ${pagination.pages}`;
-      prev.disabled = pagination.page <= 1;
-      next.disabled = pagination.page >= pagination.pages;
+    const load = async (quiet = false) => {
+      if (loading) return;
+      loading = true;
+      try {
+        const params = collectParams(form);
+        params.set("page", page);
+        params.set("page_size", pageSize ? pageSize.value : root.dataset.pageSize || "10");
+        if (!quiet) {
+          body.innerHTML = `<tr><td colspan="${columns.length}" class="px-3 py-8 text-center text-slate-500">Lädt...</td></tr>`;
+        }
+        const response = await fetch(`${endpoint}?${params.toString()}`, { headers: { Accept: "application/json" } });
+        const data = await response.json();
+        const items = data.items || [];
+        const pagination = data.pagination || { page: 1, pages: 1, total: 0 };
+        body.innerHTML = items
+          .map((row) => `<tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]">${columns.map((column) => `<td class="${column.class || "px-3 py-2.5"}">${renderCell(row, column)}</td>`).join("")}</tr>`)
+          .join("");
+        empty.classList.toggle("hidden", items.length > 0);
+        status.textContent = `${pagination.total} Einträge - Seite ${pagination.page} von ${pagination.pages}`;
+        prev.disabled = pagination.page <= 1;
+        next.disabled = pagination.page >= pagination.pages;
+      } finally {
+        loading = false;
+      }
     };
 
     if (form) {
@@ -117,11 +127,26 @@
         page = 1;
         load();
       });
+      form.querySelectorAll("input[data-live-search]").forEach((input) => {
+        let timeoutId;
+        input.addEventListener("input", () => {
+          window.clearTimeout(timeoutId);
+          timeoutId = window.setTimeout(() => {
+            page = 1;
+            load(true);
+          }, 250);
+        });
+      });
     }
     if (pageSize) pageSize.addEventListener("change", () => { page = 1; load(); });
     prev.addEventListener("click", () => { if (page > 1) { page -= 1; load(); } });
     next.addEventListener("click", () => { page += 1; load(); });
     load();
+    if (refreshMs > 0) {
+      window.setInterval(() => {
+        if (!document.hidden) load(true);
+      }, refreshMs);
+    }
   };
 
   document.addEventListener("DOMContentLoaded", () => {

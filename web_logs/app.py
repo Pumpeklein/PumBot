@@ -68,6 +68,7 @@ try:
         get_server_stats,
         get_ticket,
         get_ticket_messages,
+        get_ticket_stats_for_user,
         get_twitch_config,
         get_user_by_discord_id,
         get_warnings,
@@ -163,6 +164,7 @@ except ImportError:
         get_server_stats,
         get_ticket,
         get_ticket_messages,
+        get_ticket_stats_for_user,
         get_twitch_config,
         get_user_by_discord_id,
         get_warnings,
@@ -886,6 +888,7 @@ def user_detail_page(user_id: str):
     history = get_guild_member_name_history(guild_id, user_id)
     message_stats = get_user_message_stats(guild_id, user_id)
     channel_stats = get_user_channel_message_stats(guild_id, user_id)
+    ticket_stats = get_ticket_stats_for_user(guild_id, user_id)
     return render_template(
         "user_detail.html",
         member=_format_date_fields(
@@ -900,6 +903,7 @@ def user_detail_page(user_id: str):
         history=_format_date_fields(history, "changed_at"),
         message_stats=_format_date_fields([message_stats], "last_message_at")[0],
         channel_stats=_format_date_fields(channel_stats, "last_message_at"),
+        ticket_stats=_format_date_fields([ticket_stats], "last_ticket_at")[0],
         guild_id=guild_id,
         active_page="users",
         **ctx,
@@ -911,10 +915,16 @@ def user_detail_page(user_id: str):
 def stats_page():
     ctx = _ctx()
     guild_id = _active_panel_guild_id()
+    q = request.args.get("q", "").strip()
+    user_id = request.args.get("user_id", "").strip()
+    channel_id = request.args.get("channel_id", "").strip()
     overview = get_guild_message_overview(guild_id)
     return render_template(
         "stats.html",
         guild_id=guild_id,
+        q=q,
+        filter_user_id=user_id,
+        filter_channel_id=channel_id,
         overview={
             **overview,
             "totals": _format_date_fields([overview.get("totals") or {}], "last_message_at")[0],

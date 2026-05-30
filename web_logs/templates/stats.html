@@ -36,7 +36,7 @@
                 {% endif %}
                 <span>
                   <span class="block font-medium text-slate-200">{{ row.display_name or row.username or row.user_id }}</span>
-                  <span class="block text-xs text-slate-500">{{ row.user_id }}</span>
+                  <span class="block text-xs text-slate-500">@{{ row.username or row.display_name or row.user_id }}</span>
                 </span>
               </a>
             </td>

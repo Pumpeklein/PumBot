@@ -334,6 +334,8 @@ def replace_user_connections(discord_id: str, connections: list[dict[str, Any]])
             name = str(item.get("name") or "").strip()
             if not connection_id or not connection_type or not name:
                 continue
+            show_activity = item.get("show_activity")
+            two_way_link = item.get("two_way_link")
             conn.execute(
                 """INSERT INTO user_connections (
                      discord_id, connection_id, connection_type, name, verified,
@@ -346,8 +348,8 @@ def replace_user_connections(discord_id: str, connections: list[dict[str, Any]])
                     name,
                     1 if item.get("verified") else 0,
                     item.get("visibility"),
-                    1 if item.get("show_activity") else 0 if item.get("show_activity") is not None else None,
-                    1 if item.get("two_way_link") else 0 if item.get("two_way_link") is not None else None,
+                    1 if show_activity else 0 if show_activity is not None else None,
+                    1 if two_way_link else 0 if two_way_link is not None else None,
                     json.dumps(item.get("metadata") or {}, ensure_ascii=False),
                 ),
             )

@@ -1023,8 +1023,16 @@ def user_detail_page(user_id: str):
         elif error and error != "Bot ist nicht verbunden.":
             app.logger.warning("Discord profile fetch failed: %s", error)
     member_roles = parse_member_roles(member)
-    web_roles = list_roles(guild_id)
-    web_role_ids = {str(role["discord_role_id"]) for role in web_roles}
+    web_roles_by_discord_id = {
+        str(role["discord_role_id"]): role
+        for role in list_roles(guild_id)
+    }
+    member_web_roles = [
+        web_roles_by_discord_id[str(role.get("id"))]
+        for role in member_roles
+        if str(role.get("id")) in web_roles_by_discord_id
+    ]
+    web_role_ids = set(web_roles_by_discord_id)
     discord_roles = _live_discord_roles(guild_id)
     current_role_ids = {str(role.get("id")) for role in member_roles}
     message_stats = get_user_message_stats(guild_id, user_id)
@@ -1043,7 +1051,7 @@ def user_detail_page(user_id: str):
         )[0],
         history=_format_date_fields(history, "changed_at"),
         member_roles=member_roles,
-        web_roles=web_roles,
+        member_web_roles=member_web_roles,
         discord_roles=discord_roles,
         discord_member_roles=[
             {**role, "is_web_role": str(role.get("id")) in web_role_ids}
@@ -1118,18 +1126,33 @@ def stats_page():
     user_id = request.args.get("user_id", "").strip()
     channel_id = request.args.get("channel_id", "").strip()
     overview = get_guild_message_overview(guild_id)
+    totals = _format_date_fields([overview.get("totals") or {}], "last_message_at")[0]
+    top_channels = _format_date_fields(overview.get("top_channels") or [], "last_message_at")
+    filter_users = list_message_filter_users(guild_id)
+    filter_channels = list_message_filter_channels(guild_id)
+    evaluated_stats = [
+        {"label": "Nachrichten gesamt", "value": totals.get("message_count") or 0},
+        {"label": "Schreibende User", "value": totals.get("active_writers") or 0},
+        {"label": "Aktive Channels", "value": totals.get("active_channels") or 0},
+        {"label": "Letzte Nachricht", "value": totals.get("last_message_at") or "-"},
+        {"label": "Top-User ausgewertet", "value": len(overview.get("top_users") or [])},
+        {"label": "Top-Channels ausgewertet", "value": len(top_channels)},
+        {"label": "Nachrichtenfilter User", "value": len(filter_users)},
+        {"label": "Nachrichtenfilter Channels", "value": len(filter_channels)},
+    ]
     return render_template(
         "stats.html",
         guild_id=guild_id,
         q=q,
         filter_user_id=user_id,
         filter_channel_id=channel_id,
-        filter_users=list_message_filter_users(guild_id),
-        filter_channels=list_message_filter_channels(guild_id),
+        filter_users=filter_users,
+        filter_channels=filter_channels,
+        evaluated_stats=evaluated_stats,
         overview={
             **overview,
-            "totals": _format_date_fields([overview.get("totals") or {}], "last_message_at")[0],
-            "top_channels": _format_date_fields(overview.get("top_channels") or [], "last_message_at"),
+            "totals": totals,
+            "top_channels": top_channels,
         },
         active_page="stats",
         **ctx,

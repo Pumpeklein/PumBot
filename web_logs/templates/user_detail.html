@@ -2,7 +2,7 @@
 {% from "_macros.html" import page_header, stat, badge, empty_state, field, btn %}
 
 {% block content %}
-{{ page_header("User", member.display_name or member.username, "Profil, Aktivität, Nachrichten, Tickets und Namenshistorie aus der Datenbank.") }}
+{{ page_header("User", member.display_name or member.username, "Profil, Aktivität, Nachrichten, Tickets und Historie aus der Datenbank.") }}
 
 <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
   {{ stat("Nachrichten", message_stats.message_count or 0) }}
@@ -11,305 +11,248 @@
   {{ stat("Offene Tickets", ticket_stats.open_tickets or 0) }}
 </div>
 
-<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-  <div class="flex flex-wrap items-center gap-4">
-    {% if member.avatar_url %}
-    <img src="{{ member.avatar_url }}" alt="" class="h-16 w-16 rounded-full">
-    {% endif %}
-    <div>
-      <div class="text-lg font-semibold text-white">{{ member.display_name or member.username }}</div>
-      <div class="mt-1 text-xs text-slate-500">@{{ member.username or member.display_name }}</div>
-      <button type="button" data-copy-user-id="{{ member.user_id }}"
-        class="mt-2 inline-flex items-center rounded border border-white/10 bg-white/5 px-2 py-1 font-mono text-[11px] text-slate-400 transition hover:bg-white/10 hover:text-white">
-        ID: {{ member.user_id }}
-      </button>
-      <div class="mt-3 flex flex-wrap gap-2">
-        {% if member.status == "active" %}
-        {{ badge("Aktiv", "success") }}
-        {% elif member.status == "left" %}
-        {{ badge("Verlassen", "default") }}
-        {% else %}
-        {{ badge("Unbekannt", "default") }}
-        {% endif %}
-        {% if member.presence_status == "online" %}
-        {{ badge("Online", "success") }}
-        {% elif member.presence_status == "idle" %}
-        {{ badge("Abwesend", "warning") }}
-        {% elif member.presence_status == "dnd" %}
-        {{ badge("Nicht stören", "danger") }}
-        {% elif member.presence_status %}
-        {{ badge(member.presence_status, "default") }}
-        {% else %}
-        {{ badge("Online unbekannt", "default") }}
-        {% endif %}
-      </div>
-    </div>
-  </div>
-  <dl class="mt-6 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
-    <div>
-      <dt class="text-slate-500">Global Name</dt>
-      <dd class="mt-1 text-slate-200">{{ member.global_name or "-" }}</dd>
-    </div>
-    <div>
-      <dt class="text-slate-500">Locale</dt>
-      <dd class="mt-1 text-slate-200">{{ member.locale or "-" }}</dd>
-    </div>
-    <div>
-      <dt class="text-slate-500">Beigetreten</dt>
-      <dd class="mt-1 text-slate-200">{{ member.joined_at or "-" }}</dd>
-    </div>
-    <div>
-      <dt class="text-slate-500">Letzte Nachricht</dt>
-      <dd class="mt-1 text-slate-200">{{ message_stats.last_message_at or "-" }}</dd>
-    </div>
-    <div>
-      <dt class="text-slate-500">Letztes Ticket</dt>
-      <dd class="mt-1 text-slate-200">{{ ticket_stats.last_ticket_at or "-" }}</dd>
-    </div>
-    <div>
-      <dt class="text-slate-500">Aktivität</dt>
-      <dd class="mt-1 text-slate-200">{{ member.activity_name or "-" }}</dd>
-    </div>
-  </dl>
-  <div class="mt-5 grid gap-4 text-sm lg:grid-cols-3">
-    <div>
-      <div class="text-slate-500">Profilfarbe</div>
-      <div class="mt-1 text-slate-200">{{ member.accent_color or "-" }}</div>
-      {% if member.banner_url %}
-      <img src="{{ member.banner_url }}" alt="" class="mt-3 aspect-[3/1] w-full rounded-lg object-cover">
+<div class="mb-6 flex flex-wrap gap-2 border-b border-white/[0.06] pb-3" data-tabs>
+  <button type="button" data-tab-target="profile" class="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-300">Profil</button>
+  <button type="button" data-tab-target="activity" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300">Aktivität</button>
+  <button type="button" data-tab-target="history" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300">Historie</button>
+  <button type="button" data-tab-target="tickets" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300">Tickets</button>
+</div>
+
+<section data-tab-panel="profile">
+  <div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+    <div class="flex flex-wrap items-center gap-4">
+      {% if member.avatar_url %}
+      <img src="{{ member.avatar_url }}" alt="" class="h-16 w-16 rounded-full">
       {% endif %}
-    </div>
-  </div>
-</div>
-
-<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-  <h2 class="mb-4 text-sm font-semibold text-white">Verknüpfungen</h2>
-  {% if connections %}
-  <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-    {% for connection in connections %}
-    <div class="rounded-lg border border-white/[0.06] bg-black/10 px-3 py-2">
-      <div class="text-xs uppercase text-slate-500">{{ connection.connection_type }}</div>
-      <div class="mt-1 font-medium text-slate-200">{{ connection.name }}</div>
-      <div class="mt-1 text-xs text-slate-500">
-        {% if connection.verified %}verifiziert{% else %}nicht verifiziert{% endif %}
-      </div>
-    </div>
-    {% endfor %}
-  </div>
-  {% else %}
-  {{ empty_state("Keine Verknüpfungen", "Für diesen User wurden keine OAuth-Verknüpfungen gespeichert.") }}
-  {% endif %}
-</div>
-
-<div class="mb-6 grid gap-6 lg:grid-cols-2">
-  <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-    <h2 class="mb-4 text-sm font-semibold text-white">Web Rollen</h2>
-    {% if web_roles %}
-    <div class="space-y-2">
-      {% for role in web_roles %}
-      <div class="flex items-center justify-between gap-3 rounded-lg border border-white/[0.06] bg-black/10 px-3 py-2">
-        <div>
-          <div class="font-medium text-slate-200">{{ role.role_name }}</div>
-          <div class="font-mono text-xs text-slate-500">{{ role.discord_role_id }}</div>
-        </div>
-        <div class="text-xs text-slate-400">{{ role.permissions|join(", ") }}</div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    {{ empty_state("Keine Web Rollen", "Es sind noch keine Web-Berechtigungsrollen angelegt.") }}
-    {% endif %}
-  </div>
-
-  <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-    <h2 class="mb-4 text-sm font-semibold text-white">Discord Rollen</h2>
-    {% if discord_member_roles %}
-    <div class="mb-4 flex flex-wrap gap-2">
-      {% for role in discord_member_roles %}
-      <form method="post" action="{{ url_for('user_discord_role_remove', user_id=member.user_id, role_id=role.id, guild_id=guild_id) }}" onsubmit="return confirm('Discord Rolle wirklich entfernen?')">
-        <button type="submit" class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-200 transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300">
-          {{ role.name or role.id }}{% if role.is_web_role %}<span class="text-slate-500">Web</span>{% endif %}
-        </button>
-      </form>
-      {% endfor %}
-    </div>
-    {% else %}
-    <div class="mb-4 text-sm text-slate-500">Keine Discord Rollen gespeichert.</div>
-    {% endif %}
-    <form method="post" action="{{ url_for('user_discord_role_add', user_id=member.user_id, guild_id=guild_id) }}" class="mb-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
       <div>
-        <label for="role_id" class="mb-1.5 block text-sm font-medium text-slate-400">Rolle hinzufügen</label>
-        <select id="role_id" name="role_id" class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
-          {% for role in assignable_discord_roles %}
-          <option value="{{ role.id }}">{{ role.name }}</option>
-          {% endfor %}
-        </select>
+        <div class="text-lg font-semibold text-white">{{ member.display_name or member.username }}</div>
+        <div class="mt-1 text-xs text-slate-500">@{{ member.username or member.display_name }}</div>
+        <button type="button" data-copy-user-id="{{ member.user_id }}"
+          class="mt-2 inline-flex items-center rounded border border-white/10 bg-white/5 px-2 py-1 font-mono text-[11px] text-slate-400 transition hover:bg-white/10 hover:text-white">
+          ID: {{ member.user_id }}
+        </button>
+        <div class="mt-3 flex flex-wrap gap-2">
+          {% if member.status == "active" %}
+          {{ badge("Aktiv", "success") }}
+          {% elif member.status == "left" %}
+          {{ badge("Verlassen", "default") }}
+          {% else %}
+          {{ badge("Unbekannt", "default") }}
+          {% endif %}
+          {% if member.presence_status == "online" %}
+          {{ badge("Online", "success") }}
+          {% elif member.presence_status == "idle" %}
+          {{ badge("Abwesend", "warning") }}
+          {% elif member.presence_status == "dnd" %}
+          {{ badge("Nicht stören", "danger") }}
+          {% elif member.presence_status %}
+          {{ badge(member.presence_status, "default") }}
+          {% else %}
+          {{ badge("Online unbekannt", "default") }}
+          {% endif %}
+        </div>
       </div>
-      {{ btn("Hinzufügen") }}
-    </form>
-    <form method="post" action="{{ url_for('user_discord_role_create', user_id=member.user_id, guild_id=guild_id) }}" class="grid gap-3 sm:grid-cols-[1fr_120px_auto_auto] sm:items-end">
-      {{ field("role_name", "Neue Discord Rolle", placeholder="Rollenname", required=false) }}
-      {{ field("color", "Farbe", placeholder="#5865F2", required=false) }}
-      <label class="flex items-center gap-2 pb-3 text-sm text-slate-300"><input type="checkbox" name="assign_created" value="1" class="rounded border-white/10 bg-[#151c2c]"> zuweisen</label>
-      {{ btn("Erstellen") }}
-    </form>
+    </div>
+    <dl class="mt-6 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+      <div><dt class="text-slate-500">Global Name</dt><dd class="mt-1 text-slate-200">{{ member.global_name or "-" }}</dd></div>
+      <div><dt class="text-slate-500">Locale</dt><dd class="mt-1 text-slate-200">{{ member.locale or "-" }}</dd></div>
+      <div><dt class="text-slate-500">Beigetreten</dt><dd class="mt-1 text-slate-200">{{ member.joined_at or "-" }}</dd></div>
+      <div><dt class="text-slate-500">Letzte Nachricht</dt><dd class="mt-1 text-slate-200">{{ message_stats.last_message_at or "-" }}</dd></div>
+      <div><dt class="text-slate-500">Letztes Ticket</dt><dd class="mt-1 text-slate-200">{{ ticket_stats.last_ticket_at or "-" }}</dd></div>
+      <div><dt class="text-slate-500">Aktivität</dt><dd class="mt-1 text-slate-200">{{ member.activity_name or "-" }}</dd></div>
+      <div><dt class="text-slate-500">Profilfarbe</dt><dd class="mt-1 text-slate-200">{{ member.accent_color or "-" }}</dd></div>
+    </dl>
+    {% if member.banner_url %}
+    <img src="{{ member.banner_url }}" alt="" class="mt-5 aspect-[3/1] w-full max-w-xl rounded-lg object-cover">
+    {% endif %}
   </div>
-</div>
 
-<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-  <h2 class="mb-4 text-sm font-semibold text-white">Nachrichten pro Channel</h2>
-  {% if channel_stats %}
-  <div class="overflow-x-auto">
-    <table class="w-full text-left text-sm">
-      <thead>
-        <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
-          <th class="px-3 py-2.5">Channel</th>
-          <th class="px-3 py-2.5">Nachrichten</th>
-          <th class="px-3 py-2.5">Letzte Nachricht</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in channel_stats %}
-        <tr class="border-b border-white/[0.04]">
-          <td class="px-3 py-2.5">
-            <button type="button" class="font-medium text-white hover:text-cyan-300" data-channel-filter="{{ row.channel_id }}">#{{ row.channel_name }}</button>
-          </td>
-          <td class="px-3 py-2.5">
-            <button type="button" class="text-cyan-300 hover:text-cyan-200" data-channel-filter="{{ row.channel_id }}">{{ row.message_count }}</button>
-          </td>
-          <td class="px-3 py-2.5 text-slate-500">{{ row.last_message_at or "-" }}</td>
-        </tr>
+  <div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+    <h2 class="mb-4 text-sm font-semibold text-white">Verknüpfungen</h2>
+    {% if connections %}
+    <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {% for connection in connections %}
+      <div class="rounded-lg border border-white/[0.06] bg-black/10 px-3 py-2">
+        <div class="text-xs uppercase text-slate-500">{{ connection.connection_type }}</div>
+        <div class="mt-1 font-medium text-slate-200">{{ connection.name }}</div>
+        <div class="mt-1 text-xs text-slate-500">{% if connection.verified %}verifiziert{% else %}nicht verifiziert{% endif %}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    {{ empty_state("Keine Verknüpfungen", "Für diesen User wurden keine OAuth-Verknüpfungen gespeichert.") }}
+    {% endif %}
+  </div>
+
+  <div class="grid gap-6 {% if member_web_roles %}lg:grid-cols-2{% endif %}">
+    {% if member_web_roles %}
+    <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+      <h2 class="mb-4 text-sm font-semibold text-white">Web Rollen</h2>
+      <div class="grid gap-2">
+        {% for role in member_web_roles %}
+        <div class="rounded-lg border border-white/[0.06] bg-black/10 p-3">
+          <div class="font-medium text-slate-200">{{ role.role_name }}</div>
+          <div class="mt-1 font-mono text-xs text-slate-500">{{ role.discord_role_id }}</div>
+          <div class="mt-2 flex flex-wrap gap-1">
+            {% for perm in role.permissions %}
+            <span class="rounded border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[11px] text-cyan-300">{{ perm }}</span>
+            {% endfor %}
+          </div>
+        </div>
         {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  {{ empty_state("Keine Nachrichten", "Für diesen User wurden noch keine Nachrichten synchronisiert.") }}
-  {% endif %}
-</div>
+      </div>
+    </div>
+    {% endif %}
 
-<div data-paginated-table data-endpoint="{{ url_for('panel_api_messages') }}" data-form="#messages-filter" data-page-size="10" data-auto-refresh-ms="5000" class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-  <script type="application/json">
-    [
-      {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},
-      {"key":"content","type":"message","originalKey":"original_content","editedAtKey":"edited_at","deletedAtKey":"deleted_at","fallback":"-","class":"px-3 py-2.5"},
-      {"key":"message_status","type":"badge","variants":{"Gelöscht":"danger","Bearbeitet":"warning","Original":"default"},"class":"px-3 py-2.5"},
-      {"key":"created_at","type":"date","class":"px-3 py-2.5 text-slate-500 whitespace-nowrap"}
-    ]
-  </script>
-  <form id="messages-filter">
-    <input type="hidden" name="guild_id" value="{{ guild_id }}">
-    <input type="hidden" name="user_id" value="{{ member.user_id }}">
-    <input type="hidden" name="channel_id" value="">
-  </form>
-  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-    <h2 class="text-sm font-semibold text-white">Letzte Nachrichten</h2>
-    <button type="button" id="clear-channel-filter" class="hidden rounded border border-white/10 px-3 py-1 text-xs text-slate-300 transition hover:bg-white/10">Alle Channels</button>
-  </div>
-  <div class="overflow-x-auto">
-    <table class="w-full text-left text-sm">
-      <thead>
-        <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
-          <th class="px-3 py-2.5">Channel</th>
-          <th class="px-3 py-2.5">Inhalt</th>
-          <th class="px-3 py-2.5">Status</th>
-          <th class="px-3 py-2.5">Zeitpunkt</th>
-        </tr>
-      </thead>
-      <tbody data-table-body></tbody>
-    </table>
-  </div>
-  <div data-table-empty class="hidden">{{ empty_state("Keine Nachrichten", "Der Message-Sync hat für diesen User noch nichts gespeichert.") }}</div>
-  <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400">
-    <span data-table-status></span>
-    <div class="flex items-center gap-2">
-      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
-      <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button>
-      <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
+    <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+      <h2 class="mb-4 text-sm font-semibold text-white">Discord Rollen</h2>
+      {% if discord_member_roles %}
+      <div class="mb-4 flex flex-wrap gap-2">
+        {% for role in discord_member_roles %}
+        <form method="post" action="{{ url_for('user_discord_role_remove', user_id=member.user_id, role_id=role.id, guild_id=guild_id) }}" onsubmit="return confirm('Discord Rolle wirklich entfernen?')">
+          <button type="submit" class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-200 transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300">
+            {{ role.name or role.id }}{% if role.is_web_role %}<span class="text-slate-500">Web</span>{% endif %}
+          </button>
+        </form>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="mb-4 text-sm text-slate-500">Keine Discord Rollen gespeichert.</div>
+      {% endif %}
+      <form method="post" action="{{ url_for('user_discord_role_add', user_id=member.user_id, guild_id=guild_id) }}" class="mb-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+        <div>
+          <label for="role_id" class="mb-1.5 block text-sm font-medium text-slate-400">Rolle hinzufügen</label>
+          <select id="role_id" name="role_id" class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
+            {% for role in assignable_discord_roles %}
+            <option value="{{ role.id }}">{{ role.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {{ btn("Hinzufügen") }}
+      </form>
+      <form method="post" action="{{ url_for('user_discord_role_create', user_id=member.user_id, guild_id=guild_id) }}" class="grid gap-3 sm:grid-cols-[1fr_120px_auto_auto] sm:items-end">
+        {{ field("role_name", "Neue Discord Rolle", placeholder="Rollenname", required=false) }}
+        {{ field("color", "Farbe", placeholder="#5865F2", required=false) }}
+        <label class="flex items-center gap-2 pb-3 text-sm text-slate-300"><input type="checkbox" name="assign_created" value="1" class="rounded border-white/10 bg-[#151c2c]"> zuweisen</label>
+        {{ btn("Erstellen") }}
+      </form>
     </div>
   </div>
-</div>
+</section>
 
-<div class="mb-6 grid gap-6 lg:grid-cols-2">
-  <div data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#edited-history-filter" data-page-size="10" class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+<section data-tab-panel="activity" class="hidden">
+  <div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+    <h2 class="mb-4 text-sm font-semibold text-white">Nachrichten pro Channel</h2>
+    {% if channel_stats %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Nachrichten</th><th class="px-3 py-2.5">Letzte Nachricht</th></tr></thead>
+        <tbody>
+          {% for row in channel_stats %}
+          <tr class="border-b border-white/[0.04]">
+            <td class="px-3 py-2.5"><button type="button" class="font-medium text-white hover:text-cyan-300" data-channel-filter="{{ row.channel_id }}">#{{ row.channel_name }}</button></td>
+            <td class="px-3 py-2.5"><button type="button" class="text-cyan-300 hover:text-cyan-200" data-channel-filter="{{ row.channel_id }}">{{ row.message_count }}</button></td>
+            <td class="px-3 py-2.5 text-slate-500">{{ row.last_message_at or "-" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    {{ empty_state("Keine Nachrichten", "Für diesen User wurden noch keine Nachrichten synchronisiert.") }}
+    {% endif %}
+  </div>
+
+  <div data-paginated-table data-endpoint="{{ url_for('panel_api_messages') }}" data-form="#messages-filter" data-page-size="10" data-auto-refresh-ms="5000" class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
     <script type="application/json">
       [
         {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},
-        {"key":"old_content","fallback":"-","class":"px-3 py-2.5 text-slate-400"},
-        {"key":"new_content","fallback":"-","class":"px-3 py-2.5 text-slate-200"},
-        {"key":"event_at","type":"date","class":"px-3 py-2.5 text-slate-500 whitespace-nowrap"}
+        {"key":"content","type":"message","originalKey":"original_content","editedAtKey":"edited_at","deletedAtKey":"deleted_at","fallback":"-","class":"px-3 py-2.5"},
+        {"key":"message_status","type":"badge","variants":{"Gelöscht":"danger","Bearbeitet":"warning","Original":"default"},"class":"px-3 py-2.5"},
+        {"key":"created_at","type":"date","class":"px-3 py-2.5 text-slate-500 whitespace-nowrap"}
       ]
     </script>
-    <form id="edited-history-filter">
+    <form id="messages-filter">
       <input type="hidden" name="guild_id" value="{{ guild_id }}">
       <input type="hidden" name="user_id" value="{{ member.user_id }}">
-      <input type="hidden" name="event_type" value="edit">
+      <input type="hidden" name="channel_id" value="">
     </form>
-    <h2 class="mb-4 text-sm font-semibold text-white">Bearbeitete Nachrichten</h2>
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <h2 class="text-sm font-semibold text-white">Letzte Nachrichten</h2>
+      <button type="button" id="clear-channel-filter" class="hidden rounded border border-white/10 px-3 py-1 text-xs text-slate-300 transition hover:bg-white/10">Alle Channels</button>
+    </div>
     <div class="overflow-x-auto">
       <table class="w-full text-left text-sm">
-        <thead>
-          <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
-            <th class="px-3 py-2.5">Channel</th>
-            <th class="px-3 py-2.5">Vorher</th>
-            <th class="px-3 py-2.5">Nachher</th>
-            <th class="px-3 py-2.5">Zeitpunkt</th>
-          </tr>
-        </thead>
+        <thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Inhalt</th><th class="px-3 py-2.5">Status</th><th class="px-3 py-2.5">Zeitpunkt</th></tr></thead>
         <tbody data-table-body></tbody>
       </table>
     </div>
-    <div data-table-empty class="hidden">{{ empty_state("Keine Edits", "Für diesen User wurden keine bearbeiteten Nachrichten gespeichert.") }}</div>
+    <div data-table-empty class="hidden">{{ empty_state("Keine Nachrichten", "Der Message-Sync hat für diesen User noch nichts gespeichert.") }}</div>
     <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400">
       <span data-table-status></span>
       <div class="flex items-center gap-2">
-        <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option></select>
+        <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
         <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button>
         <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
       </div>
     </div>
   </div>
+</section>
 
-  <div data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#deleted-history-filter" data-page-size="10" class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-    <script type="application/json">
-      [
-        {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},
-        {"key":"old_content","fallback":"-","class":"px-3 py-2.5 text-slate-200"},
-        {"key":"event_at","type":"date","class":"px-3 py-2.5 text-slate-500 whitespace-nowrap"}
-      ]
-    </script>
-    <form id="deleted-history-filter">
-      <input type="hidden" name="guild_id" value="{{ guild_id }}">
-      <input type="hidden" name="user_id" value="{{ member.user_id }}">
-      <input type="hidden" name="event_type" value="delete">
-    </form>
-    <h2 class="mb-4 text-sm font-semibold text-white">Gelöschte Nachrichten</h2>
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-sm">
-        <thead>
-          <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
-            <th class="px-3 py-2.5">Channel</th>
-            <th class="px-3 py-2.5">Gelöschter Inhalt</th>
-            <th class="px-3 py-2.5">Zeitpunkt</th>
-          </tr>
-        </thead>
-        <tbody data-table-body></tbody>
-      </table>
+<section data-tab-panel="history" class="hidden">
+  <div class="mb-6 grid gap-6 lg:grid-cols-2">
+    <div data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#edited-history-filter" data-page-size="10" class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+      <script type="application/json">
+        [
+          {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},
+          {"key":"old_content","fallback":"-","class":"px-3 py-2.5 text-slate-400"},
+          {"key":"new_content","fallback":"-","class":"px-3 py-2.5 text-slate-200"},
+          {"key":"event_at","type":"date","class":"px-3 py-2.5 text-slate-500 whitespace-nowrap"}
+        ]
+      </script>
+      <form id="edited-history-filter"><input type="hidden" name="guild_id" value="{{ guild_id }}"><input type="hidden" name="user_id" value="{{ member.user_id }}"><input type="hidden" name="event_type" value="edit"></form>
+      <h2 class="mb-4 text-sm font-semibold text-white">Bearbeitete Nachrichten</h2>
+      <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Vorher</th><th class="px-3 py-2.5">Nachher</th><th class="px-3 py-2.5">Zeitpunkt</th></tr></thead><tbody data-table-body></tbody></table></div>
+      <div data-table-empty class="hidden">{{ empty_state("Keine Edits", "Für diesen User wurden keine bearbeiteten Nachrichten gespeichert.") }}</div>
+      <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400"><span data-table-status></span><div class="flex items-center gap-2"><select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option></select><button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button><button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button></div></div>
     </div>
-    <div data-table-empty class="hidden">{{ empty_state("Keine gelöschten Nachrichten", "Für diesen User wurden keine Löschungen gespeichert.") }}</div>
-    <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400">
-      <span data-table-status></span>
-      <div class="flex items-center gap-2">
-        <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option></select>
-        <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button>
-        <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
-      </div>
+
+    <div data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#deleted-history-filter" data-page-size="10" class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+      <script type="application/json">
+        [
+          {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},
+          {"key":"old_content","fallback":"-","class":"px-3 py-2.5 text-slate-200"},
+          {"key":"event_at","type":"date","class":"px-3 py-2.5 text-slate-500 whitespace-nowrap"}
+        ]
+      </script>
+      <form id="deleted-history-filter"><input type="hidden" name="guild_id" value="{{ guild_id }}"><input type="hidden" name="user_id" value="{{ member.user_id }}"><input type="hidden" name="event_type" value="delete"></form>
+      <h2 class="mb-4 text-sm font-semibold text-white">Gelöschte Nachrichten</h2>
+      <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Gelöschter Inhalt</th><th class="px-3 py-2.5">Zeitpunkt</th></tr></thead><tbody data-table-body></tbody></table></div>
+      <div data-table-empty class="hidden">{{ empty_state("Keine gelöschten Nachrichten", "Für diesen User wurden keine Löschungen gespeichert.") }}</div>
+      <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400"><span data-table-status></span><div class="flex items-center gap-2"><select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option></select><button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button><button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button></div></div>
     </div>
   </div>
-</div>
 
-<div class="mb-6">
-  <h2 class="mb-4 text-sm font-semibold text-white">Tickets</h2>
+  <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+    <h2 class="mb-4 text-sm font-semibold text-white">Namenshistorie</h2>
+    {% if history %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Zeitpunkt</th><th class="px-3 py-2.5">Alter Anzeigename</th><th class="px-3 py-2.5">Neuer Anzeigename</th><th class="px-3 py-2.5">Alter Username</th><th class="px-3 py-2.5">Neuer Username</th></tr></thead>
+        <tbody>
+          {% for h in history %}
+          <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]"><td class="px-3 py-2.5 text-slate-400">{{ h.changed_at }}</td><td class="px-3 py-2.5 text-slate-300">{{ h.old_display_name or "-" }}</td><td class="px-3 py-2.5 text-white">{{ h.new_display_name or "-" }}</td><td class="px-3 py-2.5 text-slate-400">{{ h.old_username or "-" }}</td><td class="px-3 py-2.5 text-slate-300">{{ h.new_username or "-" }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    {{ empty_state("Keine Namensänderungen", "Für diesen User wurde noch keine Namensänderung gespeichert.") }}
+    {% endif %}
+  </div>
+</section>
+
+<section data-tab-panel="tickets" class="hidden">
   <div data-paginated-table data-endpoint="{{ url_for('panel_api_user_tickets', user_id=member.user_id, guild_id=guild_id) }}" data-page-size="10" class="overflow-hidden rounded-xl border border-white/[0.06]">
     <script type="application/json">
       [
@@ -321,76 +264,37 @@
         {"key":"updated_at","type":"date","class":"whitespace-nowrap px-4 py-3 text-slate-500"}
       ]
     </script>
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-sm">
-        <thead>
-          <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
-            <th class="px-4 py-3 font-medium">Ticket</th>
-            <th class="px-4 py-3 font-medium">Betreff</th>
-            <th class="px-4 py-3 font-medium">Status</th>
-            <th class="px-4 py-3 font-medium">Kategorie</th>
-            <th class="px-4 py-3 font-medium">Erstellt</th>
-            <th class="px-4 py-3 font-medium">Aktualisiert</th>
-          </tr>
-        </thead>
-        <tbody data-table-body class="divide-y divide-white/[0.04]"></tbody>
-      </table>
-    </div>
+    <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-4 py-3 font-medium">Ticket</th><th class="px-4 py-3 font-medium">Betreff</th><th class="px-4 py-3 font-medium">Status</th><th class="px-4 py-3 font-medium">Kategorie</th><th class="px-4 py-3 font-medium">Erstellt</th><th class="px-4 py-3 font-medium">Aktualisiert</th></tr></thead><tbody data-table-body class="divide-y divide-white/[0.04]"></tbody></table></div>
     <div data-table-empty class="hidden">{{ empty_state("Keine Tickets", "Dieser User hat noch keine Tickets geöffnet.") }}</div>
-    <div class="flex items-center justify-between border-t border-white/[0.06] px-4 py-3 text-sm text-slate-400">
-      <span data-table-status></span>
-      <div class="flex items-center gap-2">
-        <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
-        <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button>
-        <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
-      </div>
-    </div>
+    <div class="flex items-center justify-between border-t border-white/[0.06] px-4 py-3 text-sm text-slate-400"><span data-table-status></span><div class="flex items-center gap-2"><select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select><button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button><button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button></div></div>
   </div>
-</div>
-
-<div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-  <h2 class="mb-4 text-sm font-semibold text-white">Namenshistorie</h2>
-  {% if history %}
-  <div class="overflow-x-auto">
-    <table class="w-full text-left text-sm">
-      <thead>
-        <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
-          <th class="px-3 py-2.5">Zeitpunkt</th>
-          <th class="px-3 py-2.5">Alter Anzeigename</th>
-          <th class="px-3 py-2.5">Neuer Anzeigename</th>
-          <th class="px-3 py-2.5">Alter Username</th>
-          <th class="px-3 py-2.5">Neuer Username</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for h in history %}
-        <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]">
-          <td class="px-3 py-2.5 text-slate-400">{{ h.changed_at }}</td>
-          <td class="px-3 py-2.5 text-slate-300">{{ h.old_display_name or "-" }}</td>
-          <td class="px-3 py-2.5 text-white">{{ h.new_display_name or "-" }}</td>
-          <td class="px-3 py-2.5 text-slate-400">{{ h.old_username or "-" }}</td>
-          <td class="px-3 py-2.5 text-slate-300">{{ h.new_username or "-" }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  {{ empty_state("Keine Namensänderungen", "Für diesen User wurde noch keine Namensänderung gespeichert.") }}
-  {% endif %}
-</div>
+</section>
 {% endblock %}
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
 <script>
   document.addEventListener("DOMContentLoaded", () => {
+    const tabButtons = Array.from(document.querySelectorAll("[data-tab-target]"));
+    const panels = Array.from(document.querySelectorAll("[data-tab-panel]"));
+    const activateTab = (name) => {
+      tabButtons.forEach((button) => {
+        const active = button.dataset.tabTarget === name;
+        button.className = active
+          ? "rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-300"
+          : "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300";
+      });
+      panels.forEach((panel) => panel.classList.toggle("hidden", panel.dataset.tabPanel !== name));
+    };
+    tabButtons.forEach((button) => button.addEventListener("click", () => activateTab(button.dataset.tabTarget)));
+
     const form = document.querySelector("#messages-filter");
     const channelInput = form ? form.querySelector('input[name="channel_id"]') : null;
     const clearButton = document.querySelector("#clear-channel-filter");
     const table = document.querySelector('[data-form="#messages-filter"]');
     const submitFilter = () => {
       if (!form) return;
+      activateTab("activity");
       form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
       table?.scrollIntoView({ behavior: "smooth", block: "start" });
       clearButton?.classList.toggle("hidden", !channelInput?.value);
@@ -416,14 +320,10 @@
         try {
           await navigator.clipboard.writeText(userId);
           button.textContent = "ID kopiert";
-          window.setTimeout(() => {
-            button.textContent = originalText;
-          }, 1400);
+          window.setTimeout(() => { button.textContent = originalText; }, 1400);
         } catch {
           button.textContent = "Kopieren fehlgeschlagen";
-          window.setTimeout(() => {
-            button.textContent = originalText;
-          }, 1600);
+          window.setTimeout(() => { button.textContent = originalText; }, 1600);
         }
       });
     });

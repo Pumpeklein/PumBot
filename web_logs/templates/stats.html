@@ -12,147 +12,200 @@
 </div>
 <div class="mb-4 text-xs text-slate-500">Guild ID: {{ guild_id }}</div>
 
-<div class="grid gap-6 lg:grid-cols-2">
+<div class="mb-6 flex flex-wrap gap-2 border-b border-white/[0.06] pb-3" data-tabs>
+  <button type="button" data-tab-target="overview" class="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-300">Auswertung</button>
+  <button type="button" data-tab-target="rankings" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300">Rankings</button>
+  <button type="button" data-tab-target="messages" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300">Nachrichten</button>
+</div>
+
+<section data-tab-panel="overview">
   <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-    <h2 class="mb-4 text-sm font-semibold text-white">Top User</h2>
-    {% if overview.top_users %}
+    <h2 class="mb-4 text-sm font-semibold text-white">Ausgewertete Statistiken</h2>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead>
+          <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+            <th class="px-3 py-2.5">Statistik</th>
+            <th class="px-3 py-2.5">Wert</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in evaluated_stats %}
+          <tr class="border-b border-white/[0.04]">
+            <td class="px-3 py-2.5 text-slate-300">{{ item.label }}</td>
+            <td class="px-3 py-2.5 font-medium text-white">{{ item.value }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section data-tab-panel="rankings" class="hidden">
+  <div class="grid gap-6 lg:grid-cols-2">
+    <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+      <h2 class="mb-4 text-sm font-semibold text-white">Top User</h2>
+      {% if overview.top_users %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead>
+            <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+              <th class="px-3 py-2.5">User</th>
+              <th class="px-3 py-2.5">Nachrichten</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in overview.top_users %}
+            <tr class="border-b border-white/[0.04]">
+              <td class="px-3 py-2.5">
+                <a href="{{ url_for('user_detail_page', user_id=row.user_id, guild_id=guild_id) }}" class="flex items-center gap-3 hover:text-white">
+                  {% if row.avatar_url %}
+                  <img src="{{ row.avatar_url }}" alt="" class="h-8 w-8 rounded-full">
+                  {% else %}
+                  <span class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-xs font-semibold text-white">{{ (row.display_name or row.username or row.user_id)[:2]|upper }}</span>
+                  {% endif %}
+                  <span>
+                    <span class="block font-medium text-slate-200">{{ row.display_name or row.username or row.user_id }}</span>
+                    <span class="block text-xs text-slate-500">@{{ row.username or row.display_name or row.user_id }}</span>
+                  </span>
+                </a>
+              </td>
+              <td class="px-3 py-2.5">
+                <a class="text-cyan-300 hover:text-cyan-200" href="{{ url_for('stats_page', guild_id=guild_id, user_id=row.user_id) }}">{{ row.message_count }}</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      {{ empty_state("Keine Nachrichten", "Führe zuerst /messagesync in Discord aus.") }}
+      {% endif %}
+    </div>
+
+    <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+      <h2 class="mb-4 text-sm font-semibold text-white">Top Channels</h2>
+      {% if overview.top_channels %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead>
+            <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+              <th class="px-3 py-2.5">Channel</th>
+              <th class="px-3 py-2.5">Nachrichten</th>
+              <th class="px-3 py-2.5">Letzte Nachricht</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in overview.top_channels %}
+            <tr class="border-b border-white/[0.04]">
+              <td class="px-3 py-2.5">
+                <a class="font-medium text-white hover:text-cyan-300" href="{{ url_for('stats_page', guild_id=guild_id, channel_id=row.channel_id) }}">#{{ row.channel_name }}</a>
+              </td>
+              <td class="px-3 py-2.5">
+                <a class="text-cyan-300 hover:text-cyan-200" href="{{ url_for('stats_page', guild_id=guild_id, channel_id=row.channel_id) }}">{{ row.message_count }}</a>
+              </td>
+              <td class="px-3 py-2.5 text-slate-500">{{ row.last_message_at or "-" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      {{ empty_state("Keine Channel-Daten", "Nach dem ersten Message-Sync werden hier Channel-Statistiken angezeigt.") }}
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+<section data-tab-panel="messages" class="hidden">
+  <div data-paginated-table data-endpoint="{{ url_for('panel_api_messages') }}" data-form="#all-messages-filter" data-page-size="10" data-auto-refresh-ms="5000" class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+    <script type="application/json">
+      [
+        {"type":"user","nameKey":"display_name","subKey":"username","avatarKey":"avatar_url","urlKey":"user_detail_url","class":"px-3 py-2.5"},
+        {"key":"channel_name","class":"px-3 py-2.5 text-white"},
+        {"key":"content","type":"message","originalKey":"original_content","editedAtKey":"edited_at","deletedAtKey":"deleted_at","fallback":"-","class":"px-3 py-2.5"},
+        {"key":"message_status","type":"badge","variants":{"Gelöscht":"danger","Bearbeitet":"warning","Original":"default"},"class":"px-3 py-2.5"},
+        {"key":"created_at","type":"date","class":"px-3 py-2.5 text-slate-500 whitespace-nowrap"}
+      ]
+    </script>
+    <form id="all-messages-filter" class="mb-4 grid gap-4 lg:grid-cols-[1fr_220px_220px_auto_auto] lg:items-end">
+      <input type="hidden" name="guild_id" value="{{ guild_id }}">
+      <div>
+        <label for="q" class="mb-1.5 block text-sm font-medium text-slate-400">Suche in allen Nachrichten</label>
+        <input id="q" name="q" type="text" value="{{ q }}" placeholder="Inhalt, Channel oder User" data-live-search
+          class="w-full rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-white placeholder-slate-500 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
+      </div>
+      <div>
+        <label for="filter-user" class="mb-1.5 block text-sm font-medium text-slate-400">User</label>
+        <select id="filter-user" name="user_id" class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
+          <option value="">Alle User</option>
+          {% for user in filter_users %}
+          <option value="{{ user.user_id }}" {% if filter_user_id == user.user_id %}selected{% endif %}>{{ user.display_name or user.username or user.user_id }} ({{ user.message_count }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="filter-channel" class="mb-1.5 block text-sm font-medium text-slate-400">Channel</label>
+        <select id="filter-channel" name="channel_id" class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
+          <option value="">Alle Channels</option>
+          {% for channel in filter_channels %}
+          <option value="{{ channel.channel_id }}" {% if filter_channel_id == channel.channel_id %}selected{% endif %}>#{{ channel.channel_name }} ({{ channel.message_count }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-cyan-500">Filtern</button>
+      {% if filter_user_id or filter_channel_id or q %}
+      <a href="{{ url_for('stats_page', guild_id=guild_id) }}" class="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-center text-sm font-medium text-slate-300 transition hover:bg-white/10">Zurücksetzen</a>
+      {% endif %}
+    </form>
+    <h2 class="mb-4 text-sm font-semibold text-white">Nachrichten</h2>
     <div class="overflow-x-auto">
       <table class="w-full text-left text-sm">
         <thead>
           <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
             <th class="px-3 py-2.5">User</th>
-            <th class="px-3 py-2.5">Nachrichten</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in overview.top_users %}
-          <tr class="border-b border-white/[0.04]">
-            <td class="px-3 py-2.5">
-              <a href="{{ url_for('user_detail_page', user_id=row.user_id, guild_id=guild_id) }}" class="flex items-center gap-3 hover:text-white">
-                {% if row.avatar_url %}
-                <img src="{{ row.avatar_url }}" alt="" class="h-8 w-8 rounded-full">
-                {% else %}
-                <span class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-xs font-semibold text-white">{{ (row.display_name or row.username or row.user_id)[:2]|upper }}</span>
-                {% endif %}
-                <span>
-                  <span class="block font-medium text-slate-200">{{ row.display_name or row.username or row.user_id }}</span>
-                  <span class="block text-xs text-slate-500">@{{ row.username or row.display_name or row.user_id }}</span>
-                </span>
-              </a>
-            </td>
-            <td class="px-3 py-2.5">
-              <a class="text-cyan-300 hover:text-cyan-200" href="{{ url_for('stats_page', guild_id=guild_id, user_id=row.user_id) }}">{{ row.message_count }}</a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% else %}
-    {{ empty_state("Keine Nachrichten", "Führe zuerst /messagesync in Discord aus.") }}
-    {% endif %}
-  </div>
-
-  <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-    <h2 class="mb-4 text-sm font-semibold text-white">Top Channels</h2>
-    {% if overview.top_channels %}
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-sm">
-        <thead>
-          <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
             <th class="px-3 py-2.5">Channel</th>
-            <th class="px-3 py-2.5">Nachrichten</th>
-            <th class="px-3 py-2.5">Letzte Nachricht</th>
+            <th class="px-3 py-2.5">Inhalt</th>
+            <th class="px-3 py-2.5">Status</th>
+            <th class="px-3 py-2.5">Zeitpunkt</th>
           </tr>
         </thead>
-        <tbody>
-          {% for row in overview.top_channels %}
-          <tr class="border-b border-white/[0.04]">
-            <td class="px-3 py-2.5">
-              <a class="font-medium text-white hover:text-cyan-300" href="{{ url_for('stats_page', guild_id=guild_id, channel_id=row.channel_id) }}">#{{ row.channel_name }}</a>
-            </td>
-            <td class="px-3 py-2.5">
-              <a class="text-cyan-300 hover:text-cyan-200" href="{{ url_for('stats_page', guild_id=guild_id, channel_id=row.channel_id) }}">{{ row.message_count }}</a>
-            </td>
-            <td class="px-3 py-2.5 text-slate-500">{{ row.last_message_at or "-" }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
+        <tbody data-table-body></tbody>
       </table>
     </div>
-    {% else %}
-    {{ empty_state("Keine Channel-Daten", "Nach dem ersten Message-Sync werden hier Channel-Statistiken angezeigt.") }}
-    {% endif %}
-  </div>
-</div>
-
-<div data-paginated-table data-endpoint="{{ url_for('panel_api_messages') }}" data-form="#all-messages-filter" data-page-size="10" data-auto-refresh-ms="5000" class="mt-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-  <script type="application/json">
-    [
-      {"type":"user","nameKey":"display_name","subKey":"username","avatarKey":"avatar_url","urlKey":"user_detail_url","class":"px-3 py-2.5"},
-      {"key":"channel_name","class":"px-3 py-2.5 text-white"},
-      {"key":"content","type":"message","originalKey":"original_content","editedAtKey":"edited_at","deletedAtKey":"deleted_at","fallback":"-","class":"px-3 py-2.5"},
-      {"key":"message_status","type":"badge","variants":{"Gelöscht":"danger","Bearbeitet":"warning","Original":"default"},"class":"px-3 py-2.5"},
-      {"key":"created_at","type":"date","class":"px-3 py-2.5 text-slate-500 whitespace-nowrap"}
-    ]
-  </script>
-  <form id="all-messages-filter" class="mb-4 grid gap-4 lg:grid-cols-[1fr_220px_220px_auto_auto] lg:items-end">
-    <input type="hidden" name="guild_id" value="{{ guild_id }}">
-    <div>
-      <label for="q" class="mb-1.5 block text-sm font-medium text-slate-400">Suche in allen Nachrichten</label>
-      <input id="q" name="q" type="text" value="{{ q }}" placeholder="Inhalt, Channel oder User" data-live-search
-        class="w-full rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-white placeholder-slate-500 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
-    </div>
-    <div>
-      <label for="filter-user" class="mb-1.5 block text-sm font-medium text-slate-400">User</label>
-      <select id="filter-user" name="user_id" class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
-        <option value="">Alle User</option>
-        {% for user in filter_users %}
-        <option value="{{ user.user_id }}" {% if filter_user_id == user.user_id %}selected{% endif %}>{{ user.display_name or user.username or user.user_id }} ({{ user.message_count }})</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div>
-      <label for="filter-channel" class="mb-1.5 block text-sm font-medium text-slate-400">Channel</label>
-      <select id="filter-channel" name="channel_id" class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
-        <option value="">Alle Channels</option>
-        {% for channel in filter_channels %}
-        <option value="{{ channel.channel_id }}" {% if filter_channel_id == channel.channel_id %}selected{% endif %}>#{{ channel.channel_name }} ({{ channel.message_count }})</option>
-        {% endfor %}
-      </select>
-    </div>
-    <button type="submit" class="rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-cyan-500">Filtern</button>
-    {% if filter_user_id or filter_channel_id or q %}
-    <a href="{{ url_for('stats_page', guild_id=guild_id) }}" class="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-center text-sm font-medium text-slate-300 transition hover:bg-white/10">Zurücksetzen</a>
-    {% endif %}
-  </form>
-  <h2 class="mb-4 text-sm font-semibold text-white">Nachrichten</h2>
-  <div class="overflow-x-auto">
-    <table class="w-full text-left text-sm">
-      <thead>
-        <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
-          <th class="px-3 py-2.5">User</th>
-          <th class="px-3 py-2.5">Channel</th>
-          <th class="px-3 py-2.5">Inhalt</th>
-          <th class="px-3 py-2.5">Status</th>
-          <th class="px-3 py-2.5">Zeitpunkt</th>
-        </tr>
-      </thead>
-      <tbody data-table-body></tbody>
-    </table>
-  </div>
-  <div data-table-empty class="hidden">{{ empty_state("Keine Nachrichten", "Der Message-Sync hat keine passenden Nachrichten gespeichert.") }}</div>
-  <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400">
-    <span data-table-status></span>
-    <div class="flex items-center gap-2">
-      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
-      <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button>
-      <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
+    <div data-table-empty class="hidden">{{ empty_state("Keine Nachrichten", "Der Message-Sync hat keine passenden Nachrichten gespeichert.") }}</div>
+    <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400">
+      <span data-table-status></span>
+      <div class="flex items-center gap-2">
+        <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+        <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button>
+        <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
+      </div>
     </div>
   </div>
-</div>
+</section>
 {% endblock %}
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const buttons = Array.from(document.querySelectorAll("[data-tab-target]"));
+    const panels = Array.from(document.querySelectorAll("[data-tab-panel]"));
+    const activate = (name) => {
+      buttons.forEach((button) => {
+        const active = button.dataset.tabTarget === name;
+        button.className = active
+          ? "rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-300"
+          : "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300";
+      });
+      panels.forEach((panel) => panel.classList.toggle("hidden", panel.dataset.tabPanel !== name));
+    };
+    buttons.forEach((button) => button.addEventListener("click", () => activate(button.dataset.tabTarget)));
+    if (new URLSearchParams(window.location.search).has("user_id") || new URLSearchParams(window.location.search).has("channel_id") || new URLSearchParams(window.location.search).has("q")) {
+      activate("messages");
+    }
+  });
+</script>
 {% endblock %}

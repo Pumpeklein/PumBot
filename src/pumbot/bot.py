@@ -141,6 +141,11 @@ class PumpeBot(commands.Bot):
             "display_name": member.display_name,
             "discriminator": member.discriminator,
             "avatar_url": self._avatar_url(member),
+            "roles": [
+                {"id": str(role.id), "name": role.name}
+                for role in sorted(member.roles, key=lambda role: role.position, reverse=True)
+                if role.name != "@everyone"
+            ],
             "is_bot": member.bot,
             "status": status,
             "presence_status": str(member.status) if getattr(member, "status", None) else None,

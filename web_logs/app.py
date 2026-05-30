@@ -1252,6 +1252,18 @@ def panel_api_users():
         row["detail_url"] = url_for(
             "user_detail_page", user_id=row["user_id"], guild_id=guild_id
         )
+        try:
+            roles = json.loads(row.get("roles_json") or "[]")
+        except (TypeError, json.JSONDecodeError):
+            roles = []
+        role_names = [
+            str(role.get("name") or role.get("id"))
+            for role in roles
+            if isinstance(role, dict) and (role.get("name") or role.get("id"))
+        ]
+        row["roles_label"] = ", ".join(role_names[:3]) if role_names else "-"
+        if len(role_names) > 3:
+            row["roles_label"] += f" +{len(role_names) - 3}"
     return _paginated_response(
         _format_date_fields(rows, "joined_at", "left_at", "first_seen_at", "last_seen_at", "updated_at", "last_message_at", "status_updated_at"),
         count_guild_members(guild_id, q=q, status=status),

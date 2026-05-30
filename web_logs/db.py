@@ -28,6 +28,7 @@ def init_db() -> None:
     with _connect() as conn:
         conn.executescript(sql)
         _ensure_columns(conn, "guild_members", {
+            "roles_json": "TEXT",
             "presence_status": "TEXT",
             "activity_name": "TEXT",
             "activity_type": "TEXT",
@@ -233,6 +234,7 @@ def upsert_guild_member(guild_id: str, member: dict[str, Any]) -> dict:
     global_name = member.get("global_name")
     discriminator = member.get("discriminator")
     avatar_url = member.get("avatar_url")
+    roles_json = json.dumps(member.get("roles") or [], ensure_ascii=False)
     is_bot = 1 if member.get("is_bot") else 0
     status = member.get("status") or "active"
     presence_status = member.get("presence_status")
@@ -274,16 +276,17 @@ def upsert_guild_member(guild_id: str, member: dict[str, Any]) -> dict:
         conn.execute(
             """INSERT INTO guild_members (
                  guild_id, user_id, username, global_name, display_name, discriminator,
-                 avatar_url, is_bot, status, presence_status, activity_name, activity_type,
+                 avatar_url, roles_json, is_bot, status, presence_status, activity_name, activity_type,
                  status_updated_at, joined_at, left_at, first_seen_at,
                  last_seen_at, updated_at
-               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, datetime('now'), datetime('now'), datetime('now'))
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, datetime('now'), datetime('now'), datetime('now'))
                ON CONFLICT(guild_id, user_id) DO UPDATE SET
                  username = excluded.username,
                  global_name = excluded.global_name,
                  display_name = excluded.display_name,
                  discriminator = excluded.discriminator,
                  avatar_url = excluded.avatar_url,
+                 roles_json = excluded.roles_json,
                  is_bot = excluded.is_bot,
                  status = excluded.status,
                  presence_status = COALESCE(excluded.presence_status, guild_members.presence_status),
@@ -305,6 +308,7 @@ def upsert_guild_member(guild_id: str, member: dict[str, Any]) -> dict:
                 display_name,
                 discriminator,
                 avatar_url,
+                roles_json,
                 is_bot,
                 status,
                 presence_status,
@@ -363,16 +367,17 @@ def sync_guild_members(
             conn.execute(
                 """INSERT INTO guild_members (
                      guild_id, user_id, username, global_name, display_name, discriminator,
-                     avatar_url, is_bot, status, presence_status, activity_name, activity_type,
+                     avatar_url, roles_json, is_bot, status, presence_status, activity_name, activity_type,
                      status_updated_at, joined_at, left_at, first_seen_at,
                      last_seen_at, updated_at
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, datetime('now'), ?, NULL, datetime('now'), datetime('now'), datetime('now'))
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, datetime('now'), ?, NULL, datetime('now'), datetime('now'), datetime('now'))
                    ON CONFLICT(guild_id, user_id) DO UPDATE SET
                      username = excluded.username,
                      global_name = excluded.global_name,
                      display_name = excluded.display_name,
                      discriminator = excluded.discriminator,
                      avatar_url = excluded.avatar_url,
+                     roles_json = excluded.roles_json,
                      is_bot = excluded.is_bot,
                      status = 'active',
                      presence_status = COALESCE(excluded.presence_status, guild_members.presence_status),
@@ -394,6 +399,7 @@ def sync_guild_members(
                     display_name,
                     member.get("discriminator"),
                     member.get("avatar_url"),
+                    json.dumps(member.get("roles") or [], ensure_ascii=False),
                     1 if member.get("is_bot") else 0,
                     member.get("presence_status"),
                     member.get("activity_name"),

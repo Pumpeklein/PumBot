@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS guild_members (
   display_name TEXT NOT NULL,
   discriminator TEXT,
   avatar_url TEXT,
+  roles_json TEXT,
   is_bot INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL DEFAULT 'active',
   presence_status TEXT,

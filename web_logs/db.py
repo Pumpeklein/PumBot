@@ -761,6 +761,41 @@ def get_guild_message_overview(guild_id: str) -> dict:
         }
 
 
+def list_message_filter_users(guild_id: str, limit: int = 500) -> list[dict]:
+    with _connect() as conn:
+        rows = conn.execute(
+            """SELECT gm.user_id,
+                      COUNT(*) AS message_count,
+                      m.display_name,
+                      m.username
+               FROM guild_messages gm
+               LEFT JOIN guild_members m
+                 ON m.guild_id = gm.guild_id AND m.user_id = gm.user_id
+               WHERE gm.guild_id = ? AND gm.deleted_at IS NULL
+               GROUP BY gm.user_id
+               ORDER BY COALESCE(m.display_name, m.username, gm.user_id) COLLATE NOCASE ASC
+               LIMIT ?""",
+            (guild_id, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def list_message_filter_channels(guild_id: str, limit: int = 500) -> list[dict]:
+    with _connect() as conn:
+        rows = conn.execute(
+            """SELECT channel_id,
+                      COALESCE(channel_name, channel_id) AS channel_name,
+                      COUNT(*) AS message_count
+               FROM guild_messages
+               WHERE guild_id = ? AND deleted_at IS NULL
+               GROUP BY channel_id
+               ORDER BY channel_name COLLATE NOCASE ASC
+               LIMIT ?""",
+            (guild_id, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
 # ══════════ Roles & Permissions ══════════
 
 ALL_PERMISSIONS = [

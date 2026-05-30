@@ -77,10 +77,10 @@
         {% for row in channel_stats %}
         <tr class="border-b border-white/[0.04]">
           <td class="px-3 py-2.5">
-            <a class="font-medium text-white hover:text-cyan-300" href="{{ url_for('stats_page', guild_id=guild_id, user_id=member.user_id, channel_id=row.channel_id) }}">#{{ row.channel_name }}</a>
+            <button type="button" class="font-medium text-white hover:text-cyan-300" data-channel-filter="{{ row.channel_id }}">#{{ row.channel_name }}</button>
           </td>
           <td class="px-3 py-2.5">
-            <a class="text-cyan-300 hover:text-cyan-200" href="{{ url_for('stats_page', guild_id=guild_id, user_id=member.user_id, channel_id=row.channel_id) }}">{{ row.message_count }}</a>
+            <button type="button" class="text-cyan-300 hover:text-cyan-200" data-channel-filter="{{ row.channel_id }}">{{ row.message_count }}</button>
           </td>
           <td class="px-3 py-2.5 text-slate-500">{{ row.last_message_at or "-" }}</td>
         </tr>
@@ -104,8 +104,12 @@
   <form id="messages-filter">
     <input type="hidden" name="guild_id" value="{{ guild_id }}">
     <input type="hidden" name="user_id" value="{{ member.user_id }}">
+    <input type="hidden" name="channel_id" value="">
   </form>
-  <h2 class="mb-4 text-sm font-semibold text-white">Letzte Nachrichten</h2>
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <h2 class="text-sm font-semibold text-white">Letzte Nachrichten</h2>
+    <button type="button" id="clear-channel-filter" class="hidden rounded border border-white/10 px-3 py-1 text-xs text-slate-300 transition hover:bg-white/10">Alle Channels</button>
+  </div>
   <div class="overflow-x-auto">
     <table class="w-full text-left text-sm">
       <thead>
@@ -204,4 +208,30 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const form = document.querySelector("#messages-filter");
+    const channelInput = form ? form.querySelector('input[name="channel_id"]') : null;
+    const clearButton = document.querySelector("#clear-channel-filter");
+    const table = document.querySelector('[data-form="#messages-filter"]');
+    const submitFilter = () => {
+      if (!form) return;
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      table?.scrollIntoView({ behavior: "smooth", block: "start" });
+      clearButton?.classList.toggle("hidden", !channelInput?.value);
+    };
+    document.querySelectorAll("[data-channel-filter]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (!channelInput) return;
+        channelInput.value = button.dataset.channelFilter || "";
+        submitFilter();
+      });
+    });
+    clearButton?.addEventListener("click", () => {
+      if (!channelInput) return;
+      channelInput.value = "";
+      submitFilter();
+    });
+  });
+</script>
 {% endblock %}

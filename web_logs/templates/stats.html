@@ -95,26 +95,36 @@
       {"key":"created_at","type":"date","class":"px-3 py-2.5 text-slate-500 whitespace-nowrap"}
     ]
   </script>
-  <form id="all-messages-filter" class="mb-4 grid gap-4 md:grid-cols-[1fr_auto_auto_auto] md:items-end">
+  <form id="all-messages-filter" class="mb-4 grid gap-4 lg:grid-cols-[1fr_220px_220px_auto_auto] lg:items-end">
     <input type="hidden" name="guild_id" value="{{ guild_id }}">
-    <input type="hidden" name="user_id" value="{{ filter_user_id }}">
-    <input type="hidden" name="channel_id" value="{{ filter_channel_id }}">
     <div>
       <label for="q" class="mb-1.5 block text-sm font-medium text-slate-400">Suche in allen Nachrichten</label>
       <input id="q" name="q" type="text" value="{{ q }}" placeholder="Inhalt, Channel oder User" data-live-search
         class="w-full rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-white placeholder-slate-500 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
+    </div>
+    <div>
+      <label for="filter-user" class="mb-1.5 block text-sm font-medium text-slate-400">User</label>
+      <select id="filter-user" name="user_id" class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
+        <option value="">Alle User</option>
+        {% for user in filter_users %}
+        <option value="{{ user.user_id }}" {% if filter_user_id == user.user_id %}selected{% endif %}>{{ user.display_name or user.username or user.user_id }} ({{ user.message_count }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="filter-channel" class="mb-1.5 block text-sm font-medium text-slate-400">Channel</label>
+      <select id="filter-channel" name="channel_id" class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
+        <option value="">Alle Channels</option>
+        {% for channel in filter_channels %}
+        <option value="{{ channel.channel_id }}" {% if filter_channel_id == channel.channel_id %}selected{% endif %}>#{{ channel.channel_name }} ({{ channel.message_count }})</option>
+        {% endfor %}
+      </select>
     </div>
     <button type="submit" class="rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-cyan-500">Filtern</button>
     {% if filter_user_id or filter_channel_id or q %}
     <a href="{{ url_for('stats_page', guild_id=guild_id) }}" class="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-center text-sm font-medium text-slate-300 transition hover:bg-white/10">Zurücksetzen</a>
     {% endif %}
   </form>
-  {% if filter_user_id or filter_channel_id %}
-  <div class="mb-4 flex flex-wrap gap-2 text-xs">
-    {% if filter_user_id %}<span class="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-cyan-300">User: {{ filter_user_id }}</span>{% endif %}
-    {% if filter_channel_id %}<span class="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-cyan-300">Channel: {{ filter_channel_id }}</span>{% endif %}
-  </div>
-  {% endif %}
   <h2 class="mb-4 text-sm font-semibold text-white">Nachrichten</h2>
   <div class="overflow-x-auto">
     <table class="w-full text-left text-sm">

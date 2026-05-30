@@ -204,13 +204,13 @@ def get_birthdays_panel_guild_id(default_guild_id: str) -> str:
                UNION
                SELECT 1
                FROM guild_config
-               WHERE guild_id = ? AND config_key LIKE 'birthday_%'
+               WHERE guild_id = ? AND config_key LIKE ?
                UNION
                SELECT 1
                FROM bot_messages
                WHERE guild_id = ? AND message_type = 'birthday_list'
                LIMIT 1""",
-            (default_guild_id, default_guild_id, default_guild_id),
+            (default_guild_id, default_guild_id, "birthday_%", default_guild_id),
         ).fetchone()
         if has_default:
             return default_guild_id
@@ -228,9 +228,10 @@ def get_birthdays_panel_guild_id(default_guild_id: str) -> str:
         row = conn.execute(
             """SELECT guild_id
                FROM guild_config
-               WHERE config_key LIKE 'birthday_%'
+               WHERE config_key LIKE ?
                ORDER BY guild_id ASC
-               LIMIT 1"""
+               LIMIT 1""",
+            ("birthday_%",),
         ).fetchone()
         if row:
             return row["guild_id"]

@@ -40,7 +40,9 @@
                 </span>
               </a>
             </td>
-            <td class="px-3 py-2.5 text-slate-300">{{ row.message_count }}</td>
+            <td class="px-3 py-2.5">
+              <a class="text-cyan-300 hover:text-cyan-200" href="{{ url_for('stats_page', guild_id=guild_id, user_id=row.user_id) }}">{{ row.message_count }}</a>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
@@ -66,8 +68,12 @@
         <tbody>
           {% for row in overview.top_channels %}
           <tr class="border-b border-white/[0.04]">
-            <td class="px-3 py-2.5 text-white">#{{ row.channel_name }}</td>
-            <td class="px-3 py-2.5 text-slate-300">{{ row.message_count }}</td>
+            <td class="px-3 py-2.5">
+              <a class="font-medium text-white hover:text-cyan-300" href="{{ url_for('stats_page', guild_id=guild_id, channel_id=row.channel_id) }}">#{{ row.channel_name }}</a>
+            </td>
+            <td class="px-3 py-2.5">
+              <a class="text-cyan-300 hover:text-cyan-200" href="{{ url_for('stats_page', guild_id=guild_id, channel_id=row.channel_id) }}">{{ row.message_count }}</a>
+            </td>
             <td class="px-3 py-2.5 text-slate-500">{{ row.last_message_at or "-" }}</td>
           </tr>
           {% endfor %}
@@ -80,7 +86,7 @@
   </div>
 </div>
 
-<div data-paginated-table data-endpoint="{{ url_for('panel_api_messages') }}" data-form="#all-messages-filter" data-page-size="10" class="mt-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+<div data-paginated-table data-endpoint="{{ url_for('panel_api_messages') }}" data-form="#all-messages-filter" data-page-size="10" data-auto-refresh-ms="5000" class="mt-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
   <script type="application/json">
     [
       {"type":"user","nameKey":"display_name","subKey":"username","avatarKey":"avatar_url","urlKey":"user_detail_url","class":"px-3 py-2.5"},
@@ -89,16 +95,27 @@
       {"key":"created_at","type":"date","class":"px-3 py-2.5 text-slate-500 whitespace-nowrap"}
     ]
   </script>
-  <form id="all-messages-filter" class="mb-4 grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
+  <form id="all-messages-filter" class="mb-4 grid gap-4 md:grid-cols-[1fr_auto_auto_auto] md:items-end">
     <input type="hidden" name="guild_id" value="{{ guild_id }}">
+    <input type="hidden" name="user_id" value="{{ filter_user_id }}">
+    <input type="hidden" name="channel_id" value="{{ filter_channel_id }}">
     <div>
-      <label for="q" class="mb-1.5 block text-sm font-medium text-slate-400">Suche</label>
-      <input id="q" name="q" type="text" placeholder="Inhalt, Channel oder User"
+      <label for="q" class="mb-1.5 block text-sm font-medium text-slate-400">Suche in allen Nachrichten</label>
+      <input id="q" name="q" type="text" value="{{ q }}" placeholder="Inhalt, Channel oder User" data-live-search
         class="w-full rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-white placeholder-slate-500 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
     </div>
     <button type="submit" class="rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-cyan-500">Filtern</button>
+    {% if filter_user_id or filter_channel_id or q %}
+    <a href="{{ url_for('stats_page', guild_id=guild_id) }}" class="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-center text-sm font-medium text-slate-300 transition hover:bg-white/10">Zurücksetzen</a>
+    {% endif %}
   </form>
-  <h2 class="mb-4 text-sm font-semibold text-white">Letzte Nachrichten</h2>
+  {% if filter_user_id or filter_channel_id %}
+  <div class="mb-4 flex flex-wrap gap-2 text-xs">
+    {% if filter_user_id %}<span class="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-cyan-300">User: {{ filter_user_id }}</span>{% endif %}
+    {% if filter_channel_id %}<span class="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-cyan-300">Channel: {{ filter_channel_id }}</span>{% endif %}
+  </div>
+  {% endif %}
+  <h2 class="mb-4 text-sm font-semibold text-white">Nachrichten</h2>
   <div class="overflow-x-auto">
     <table class="w-full text-left text-sm">
       <thead>
@@ -112,7 +129,7 @@
       <tbody data-table-body></tbody>
     </table>
   </div>
-  <div data-table-empty class="hidden">{{ empty_state("Keine Nachrichten", "Der Message-Sync hat noch keine Nachrichten gespeichert.") }}</div>
+  <div data-table-empty class="hidden">{{ empty_state("Keine Nachrichten", "Der Message-Sync hat keine passenden Nachrichten gespeichert.") }}</div>
   <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400">
     <span data-table-status></span>
     <div class="flex items-center gap-2">

@@ -2,13 +2,13 @@
 {% from "_macros.html" import page_header, stat, badge, empty_state %}
 
 {% block content %}
-{{ page_header("User", member.display_name or member.username, "Profil, Aktivität, Nachrichten und Namenshistorie aus der lokalen Datenbank.") }}
+{{ page_header("User", member.display_name or member.username, "Profil, Aktivität, Nachrichten, Tickets und Namenshistorie aus der lokalen Datenbank.") }}
 
 <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-  {{ stat("User ID", member.user_id) }}
   {{ stat("Nachrichten", message_stats.message_count or 0) }}
   {{ stat("Aktive Channels", message_stats.channel_count or 0) }}
-  {{ stat("Anhänge", message_stats.attachment_count or 0) }}
+  {{ stat("Tickets", ticket_stats.ticket_count or 0) }}
+  {{ stat("Offene Tickets", ticket_stats.open_tickets or 0) }}
 </div>
 
 <div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
@@ -47,12 +47,12 @@
       <dd class="mt-1 text-slate-200">{{ member.joined_at or "-" }}</dd>
     </div>
     <div>
-      <dt class="text-slate-500">Verlassen</dt>
-      <dd class="mt-1 text-slate-200">{{ member.left_at or "-" }}</dd>
-    </div>
-    <div>
       <dt class="text-slate-500">Letzte Nachricht</dt>
       <dd class="mt-1 text-slate-200">{{ message_stats.last_message_at or "-" }}</dd>
+    </div>
+    <div>
+      <dt class="text-slate-500">Letztes Ticket</dt>
+      <dd class="mt-1 text-slate-200">{{ ticket_stats.last_ticket_at or "-" }}</dd>
     </div>
     <div>
       <dt class="text-slate-500">Aktivität</dt>
@@ -76,8 +76,12 @@
       <tbody>
         {% for row in channel_stats %}
         <tr class="border-b border-white/[0.04]">
-          <td class="px-3 py-2.5 text-white">#{{ row.channel_name }}</td>
-          <td class="px-3 py-2.5 text-slate-300">{{ row.message_count }}</td>
+          <td class="px-3 py-2.5">
+            <a class="font-medium text-white hover:text-cyan-300" href="{{ url_for('stats_page', guild_id=guild_id, user_id=member.user_id, channel_id=row.channel_id) }}">#{{ row.channel_name }}</a>
+          </td>
+          <td class="px-3 py-2.5">
+            <a class="text-cyan-300 hover:text-cyan-200" href="{{ url_for('stats_page', guild_id=guild_id, user_id=member.user_id, channel_id=row.channel_id) }}">{{ row.message_count }}</a>
+          </td>
           <td class="px-3 py-2.5 text-slate-500">{{ row.last_message_at or "-" }}</td>
         </tr>
         {% endfor %}
@@ -89,7 +93,7 @@
   {% endif %}
 </div>
 
-<div data-paginated-table data-endpoint="{{ url_for('panel_api_messages') }}" data-form="#messages-filter" data-page-size="10" class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+<div data-paginated-table data-endpoint="{{ url_for('panel_api_messages') }}" data-form="#messages-filter" data-page-size="10" data-auto-refresh-ms="5000" class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
   <script type="application/json">
     [
       {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},

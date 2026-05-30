@@ -1,89 +1,142 @@
 {% extends "base.html" %}
-{% from "_macros.html" import page_header, stat, stat_tile, badge, empty_state, field, btn %}
+{% from "_macros.html" import stat_tile, badge, empty_state, field, btn, scrollspy_nav %}
 
 {% block content %}
-{{ page_header("User", member.display_name or member.username, "Profil, Aktivität, Nachrichten, Tickets und Historie aus der Datenbank.") }}
 
-<div class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-  {{ stat_tile("Nachrichten", message_stats.message_count or 0, accent="cyan", sub="Insgesamt geschrieben") }}
-  {{ stat_tile("Aktive Channels", message_stats.channel_count or 0, accent="violet", sub="Mit Nachrichten") }}
-  {{ stat_tile("Tickets gesamt", ticket_stats.ticket_count or 0, accent="emerald") }}
-  {{ stat_tile("Offene Tickets", ticket_stats.open_tickets or 0, accent=("amber" if (ticket_stats.open_tickets or 0) else "slate")) }}
-</div>
+{# ════════════════ HERO ════════════════ #}
+{% set accent = member.accent_color or "#22d3ee" %}
+<div class="relative mb-6 overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0d1320]">
+  <div class="relative h-40 sm:h-48 lg:h-56"
+       {% if member.banner_url %}style="background-image:linear-gradient(180deg, rgba(13,19,32,0.05) 0%, rgba(13,19,32,0.92) 100%), url('{{ member.banner_url }}'); background-size:cover; background-position:center;"
+       {% else %}style="background:radial-gradient(120% 100% at 0% 0%, {{ accent }}33 0%, transparent 60%), linear-gradient(135deg, #0c1424 0%, #0d1320 100%);"{% endif %}>
+  </div>
 
-<div class="mb-6 flex flex-wrap gap-2 border-b border-white/[0.06] pb-3" data-tabs>
-  <button type="button" data-tab-target="profile" class="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-300">Profil</button>
-  <button type="button" data-tab-target="roles" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300">Rollen</button>
-  <button type="button" data-tab-target="activity" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300">Aktivität</button>
-  <button type="button" data-tab-target="history" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300">Historie</button>
-  <button type="button" data-tab-target="tickets" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300">Tickets</button>
-</div>
+  <div class="px-5 pb-5 pt-0 sm:px-7">
+    <div class="-mt-14 flex flex-col gap-5 sm:-mt-16 sm:flex-row sm:items-end">
+      {# Avatar #}
+      <div class="relative shrink-0">
+        {% if member.avatar_url %}
+        <img src="{{ member.avatar_url }}" alt=""
+             class="h-28 w-28 rounded-full ring-4 ring-[#0d1320] sm:h-32 sm:w-32"
+             style="border:2px solid {{ accent }}55">
+        {% else %}
+        <div class="flex h-28 w-28 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-violet-600 text-3xl font-bold text-white ring-4 ring-[#0d1320] sm:h-32 sm:w-32"
+             style="border:2px solid {{ accent }}55">
+          {{ (member.display_name or member.username or "?")[:2]|upper }}
+        </div>
+        {% endif %}
+        {% if member.presence_status == "online" %}
+        <span class="absolute bottom-1 right-1 h-5 w-5 rounded-full bg-emerald-400 ring-4 ring-[#0d1320]" title="Online"></span>
+        {% elif member.presence_status == "idle" %}
+        <span class="absolute bottom-1 right-1 h-5 w-5 rounded-full bg-amber-400 ring-4 ring-[#0d1320]" title="Abwesend"></span>
+        {% elif member.presence_status == "dnd" %}
+        <span class="absolute bottom-1 right-1 h-5 w-5 rounded-full bg-red-500 ring-4 ring-[#0d1320]" title="Nicht stören"></span>
+        {% else %}
+        <span class="absolute bottom-1 right-1 h-5 w-5 rounded-full bg-slate-600 ring-4 ring-[#0d1320]" title="Offline"></span>
+        {% endif %}
+      </div>
 
-<section data-tab-panel="profile">
-  <div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-    <div class="flex flex-wrap items-center gap-4">
-      {% if member.avatar_url %}
-      <img src="{{ member.avatar_url }}" alt="" class="h-16 w-16 rounded-full">
-      {% endif %}
-      <div>
-        <div class="text-lg font-semibold text-white">{{ member.display_name or member.username }}</div>
-        <div class="mt-1 text-xs text-slate-500">@{{ member.username or member.display_name }}</div>
-        <button type="button" data-copy-user-id="{{ member.user_id }}"
-          class="mt-2 inline-flex items-center rounded border border-white/10 bg-white/5 px-2 py-1 font-mono text-[11px] text-slate-400 transition hover:bg-white/10 hover:text-white">
-          ID: {{ member.user_id }}
-        </button>
-        <div class="mt-3 flex flex-wrap gap-2">
-          {% if member.status == "active" %}
-          {{ badge("Aktiv", "success") }}
-          {% elif member.status == "left" %}
-          {{ badge("Verlassen", "default") }}
-          {% else %}
-          {{ badge("Unbekannt", "default") }}
+      {# Identity #}
+      <div class="flex min-w-0 flex-1 flex-col gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <h1 class="text-2xl font-bold text-white sm:text-3xl">{{ member.display_name or member.username or member.user_id }}</h1>
+          {% if member.is_bot %}
+          <span class="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-300">Bot</span>
           {% endif %}
-          {% if member.presence_status == "online" %}
-          {{ badge("Online", "success") }}
-          {% elif member.presence_status == "idle" %}
-          {{ badge("Abwesend", "warning") }}
-          {% elif member.presence_status == "dnd" %}
-          {{ badge("Nicht stören", "danger") }}
-          {% elif member.presence_status %}
-          {{ badge(member.presence_status, "default") }}
-          {% else %}
-          {{ badge("Online unbekannt", "default") }}
+        </div>
+        <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+          <span>@{{ member.username or member.display_name or "—" }}</span>
+          <span class="text-slate-700">·</span>
+          <button type="button" data-copy-user-id="{{ member.user_id }}"
+            class="inline-flex items-center gap-1.5 rounded border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[11px] text-slate-400 transition hover:bg-white/10 hover:text-white">
+            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            {{ member.user_id }}
+          </button>
+        </div>
+        <div class="mt-1 flex flex-wrap gap-2">
+          {% if member.status == "active" %}{{ badge("Aktiv", "success") }}
+          {% elif member.status == "left" %}{{ badge("Verlassen", "default") }}
+          {% else %}{{ badge("Unbekannt", "default") }}{% endif %}
+          {% if member.presence_status == "online" %}{{ badge("Online", "success") }}
+          {% elif member.presence_status == "idle" %}{{ badge("Abwesend", "warning") }}
+          {% elif member.presence_status == "dnd" %}{{ badge("Nicht stören", "danger") }}
+          {% elif member.presence_status %}{{ badge(member.presence_status, "default") }}
+          {% endif %}
+          {% if member.activity_name %}
+          <span class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-0.5 text-xs text-slate-300">
+            <span class="h-1.5 w-1.5 rounded-full bg-cyan-400"></span>{{ member.activity_name }}
+          </span>
           {% endif %}
           {% for role in member_web_roles %}
-          <span class="inline-flex items-center gap-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-0.5 text-xs font-medium text-cyan-300" title="Web Rolle: {{ role.role_name }}">
-            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0-1.66-1.34-3-3-3S6 9.34 6 11s1.34 3 3 3 3-1.34 3-3zm0 0V5a2 2 0 012-2h4a2 2 0 012 2v6m-8 0v6a2 2 0 002 2h4a2 2 0 002-2v-6"/></svg>
+          <span class="inline-flex items-center gap-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-0.5 text-xs font-medium text-cyan-300" title="Web Rolle">
+            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0-1.66-1.34-3-3-3S6 9.34 6 11s1.34 3 3 3 3-1.34 3-3z"/></svg>
             {{ role.role_name }}
           </span>
           {% endfor %}
         </div>
       </div>
+
+      {# Quick stats column #}
+      <div class="grid w-full grid-cols-2 gap-2 sm:w-auto sm:grid-cols-4">
+        <div class="rounded-lg border border-white/[0.06] bg-black/30 px-3 py-2 backdrop-blur">
+          <div class="text-[10px] uppercase tracking-wider text-slate-500">Nachrichten</div>
+          <div class="text-lg font-bold text-white">{{ message_stats.message_count or 0 }}</div>
+        </div>
+        <div class="rounded-lg border border-white/[0.06] bg-black/30 px-3 py-2 backdrop-blur">
+          <div class="text-[10px] uppercase tracking-wider text-slate-500">Channels</div>
+          <div class="text-lg font-bold text-white">{{ message_stats.channel_count or 0 }}</div>
+        </div>
+        <div class="rounded-lg border border-white/[0.06] bg-black/30 px-3 py-2 backdrop-blur">
+          <div class="text-[10px] uppercase tracking-wider text-slate-500">Tickets</div>
+          <div class="text-lg font-bold text-white">{{ ticket_stats.ticket_count or 0 }}</div>
+        </div>
+        <div class="rounded-lg border border-white/[0.06] bg-black/30 px-3 py-2 backdrop-blur">
+          <div class="text-[10px] uppercase tracking-wider text-slate-500">Offen</div>
+          <div class="text-lg font-bold {{ 'text-amber-300' if (ticket_stats.open_tickets or 0) else 'text-white' }}">{{ ticket_stats.open_tickets or 0 }}</div>
+        </div>
+      </div>
     </div>
-    <dl class="mt-6 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
-      <div><dt class="text-slate-500">Global Name</dt><dd class="mt-1 text-slate-200">{{ member.global_name or "-" }}</dd></div>
-      <div><dt class="text-slate-500">Locale</dt><dd class="mt-1 text-slate-200">{{ member.locale or "-" }}</dd></div>
-      <div><dt class="text-slate-500">Geburtstag</dt><dd class="mt-1 text-slate-200">{{ birthday_label or "-" }}</dd></div>
-      <div><dt class="text-slate-500">Beigetreten</dt><dd class="mt-1 text-slate-200">{{ member.joined_at or "-" }}</dd></div>
-      <div><dt class="text-slate-500">Letzte Nachricht</dt><dd class="mt-1 text-slate-200">{{ message_stats.last_message_at or "-" }}</dd></div>
-      <div><dt class="text-slate-500">Letztes Ticket</dt><dd class="mt-1 text-slate-200">{{ ticket_stats.last_ticket_at or "-" }}</dd></div>
-      <div><dt class="text-slate-500">Aktivität</dt><dd class="mt-1 text-slate-200">{{ member.activity_name or "-" }}</dd></div>
-      <div><dt class="text-slate-500">Profilfarbe</dt><dd class="mt-1 text-slate-200">{{ member.accent_color or "-" }}</dd></div>
+  </div>
+</div>
+
+{{ scrollspy_nav([
+  {"id": "profile", "label": "Profil"},
+  {"id": "roles", "label": "Rollen", "badge": member_web_roles|length + (discord_member_roles|length)},
+  {"id": "activity", "label": "Aktivität"},
+  {"id": "history", "label": "Historie"},
+  {"id": "tickets", "label": "Tickets", "badge": ticket_stats.ticket_count or 0}
+]) }}
+
+{# ════════════════ PROFIL ════════════════ #}
+<section id="profile" class="scroll-mt-24 mb-10">
+  <h2 class="mb-4 text-base font-semibold text-white">Profil</h2>
+  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    <dl class="grid gap-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
+      <div><dt class="text-[11px] uppercase tracking-wider text-slate-500">Global Name</dt><dd class="mt-1 text-slate-200">{{ member.global_name or "—" }}</dd></div>
+      <div><dt class="text-[11px] uppercase tracking-wider text-slate-500">Locale</dt><dd class="mt-1 text-slate-200">{{ member.locale or "—" }}</dd></div>
+      <div><dt class="text-[11px] uppercase tracking-wider text-slate-500">Geburtstag</dt><dd class="mt-1 text-slate-200">{{ birthday_label or "—" }}</dd></div>
+      <div><dt class="text-[11px] uppercase tracking-wider text-slate-500">Beigetreten</dt><dd class="mt-1 text-slate-200">{{ member.joined_at or "—" }}</dd></div>
+      <div><dt class="text-[11px] uppercase tracking-wider text-slate-500">Letzte Nachricht</dt><dd class="mt-1 text-slate-200">{{ message_stats.last_message_at or "—" }}</dd></div>
+      <div><dt class="text-[11px] uppercase tracking-wider text-slate-500">Letztes Ticket</dt><dd class="mt-1 text-slate-200">{{ ticket_stats.last_ticket_at or "—" }}</dd></div>
+      <div><dt class="text-[11px] uppercase tracking-wider text-slate-500">Aktivität</dt><dd class="mt-1 text-slate-200">{{ member.activity_name or "—" }}</dd></div>
+      <div>
+        <dt class="text-[11px] uppercase tracking-wider text-slate-500">Profilfarbe</dt>
+        <dd class="mt-1 flex items-center gap-2 text-slate-200">
+          {% if member.accent_color %}<span class="h-3 w-3 rounded-full ring-1 ring-white/10" style="background:{{ member.accent_color }}"></span>{{ member.accent_color }}{% else %}—{% endif %}
+        </dd>
+      </div>
     </dl>
-    {% if member.banner_url %}
-    <img src="{{ member.banner_url }}" alt="" class="mt-5 aspect-[3/1] w-full max-w-xl rounded-lg object-cover">
-    {% endif %}
   </div>
 
-  <div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-    <h2 class="mb-4 text-sm font-semibold text-white">Verknüpfungen</h2>
+  <div class="mt-5 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    <h3 class="mb-4 text-sm font-semibold text-white">Verknüpfungen</h3>
     {% if connections %}
     <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {% for connection in connections %}
       <div class="rounded-lg border border-white/[0.06] bg-black/10 px-3 py-2">
-        <div class="text-xs uppercase text-slate-500">{{ connection.connection_type }}</div>
+        <div class="text-[10px] uppercase tracking-wider text-slate-500">{{ connection.connection_type }}</div>
         <div class="mt-1 font-medium text-slate-200">{{ connection.name }}</div>
-        <div class="mt-1 text-xs text-slate-500">{% if connection.verified %}verifiziert{% else %}nicht verifiziert{% endif %}</div>
+        <div class="mt-1 text-xs {{ 'text-emerald-400' if connection.verified else 'text-slate-500' }}">{% if connection.verified %}verifiziert{% else %}nicht verifiziert{% endif %}</div>
       </div>
       {% endfor %}
     </div>
@@ -91,15 +144,16 @@
     {{ empty_state("Keine Verknüpfungen", "Für diesen User wurden keine OAuth-Verknüpfungen gespeichert.") }}
     {% endif %}
   </div>
-
 </section>
 
-<section data-tab-panel="roles" class="hidden">
-  <div class="grid gap-6 {% if member_web_roles %}lg:grid-cols-2{% endif %}">
+{# ════════════════ ROLLEN ════════════════ #}
+<section id="roles" class="scroll-mt-24 mb-10">
+  <h2 class="mb-4 text-base font-semibold text-white">Rollen</h2>
+  <div class="grid gap-5 {% if member_web_roles %}lg:grid-cols-2{% endif %}">
     {% if member_web_roles %}
     <div class="rounded-xl border border-cyan-500/20 bg-cyan-500/[0.04] p-5">
       <div class="mb-4 flex items-center justify-between gap-3">
-        <h2 class="text-sm font-semibold text-white">Web Rollen <span class="ml-1 rounded-full bg-cyan-500/15 px-2 py-0.5 text-[10px] uppercase tracking-wide text-cyan-300">{{ member_web_roles|length }}</span></h2>
+        <h3 class="text-sm font-semibold text-white">Web Rollen <span class="ml-1 rounded-full bg-cyan-500/15 px-2 py-0.5 text-[10px] uppercase tracking-wide text-cyan-300">{{ member_web_roles|length }}</span></h3>
         <span class="text-xs text-slate-500">Panel-Rechte aus diesen Rollen</span>
       </div>
       <div class="grid gap-3 sm:grid-cols-2">
@@ -123,15 +177,15 @@
     </div>
     {% endif %}
 
-    <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-      <h2 class="mb-4 text-sm font-semibold text-white">Discord Rollen</h2>
+    <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+      <h3 class="mb-4 text-sm font-semibold text-white">Discord Rollen</h3>
       {% if discord_member_roles %}
       <div class="mb-4 flex flex-wrap gap-2">
         {% for role in discord_member_roles %}
         <form method="post" action="{{ url_for('user_discord_role_remove', user_id=member.user_id, role_id=role.id, guild_id=guild_id) }}" onsubmit="return confirm('Discord Rolle wirklich entfernen?')">
           <button type="submit" {% if not role.manageable %}disabled title="{{ role.blocked_reason }}"{% endif %}
             class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-200 transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-white/10 disabled:hover:bg-white/5 disabled:hover:text-slate-200">
-            {{ role.name or role.id }}{% if role.is_web_role %}<span class="text-slate-500">Web</span>{% endif %}
+            {{ role.name or role.id }}{% if role.is_web_role %} <span class="text-slate-500">Web</span>{% endif %}
           </button>
         </form>
         {% endfor %}
@@ -144,7 +198,7 @@
           <label for="role_id" class="mb-1.5 block text-sm font-medium text-slate-400">Rolle hinzufügen</label>
           <select id="role_id" name="role_id" class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
             {% if not assignable_discord_roles %}
-            <option value="">Keine verwaltbaren Rollen verfuegbar</option>
+            <option value="">Keine verwaltbaren Rollen verfügbar</option>
             {% endif %}
             {% for role in assignable_discord_roles %}
             <option value="{{ role.id }}">{{ role.name }}</option>
@@ -164,9 +218,12 @@
   </div>
 </section>
 
-<section data-tab-panel="activity" class="hidden">
-  <div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-    <h2 class="mb-4 text-sm font-semibold text-white">Nachrichten pro Channel</h2>
+{# ════════════════ AKTIVITÄT ════════════════ #}
+<section id="activity" class="scroll-mt-24 mb-10">
+  <h2 class="mb-4 text-base font-semibold text-white">Aktivität</h2>
+
+  <div class="mb-5 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    <h3 class="mb-4 text-sm font-semibold text-white">Nachrichten pro Channel</h3>
     {% if channel_stats %}
     <div class="overflow-x-auto">
       <table class="w-full text-left text-sm">
@@ -176,7 +233,7 @@
           <tr class="border-b border-white/[0.04]">
             <td class="px-3 py-2.5"><button type="button" class="font-medium text-white hover:text-cyan-300" data-channel-filter="{{ row.channel_id }}">#{{ row.channel_name }}</button></td>
             <td class="px-3 py-2.5"><button type="button" class="text-cyan-300 hover:text-cyan-200" data-channel-filter="{{ row.channel_id }}">{{ row.message_count }}</button></td>
-            <td class="px-3 py-2.5 text-slate-500">{{ row.last_message_at or "-" }}</td>
+            <td class="px-3 py-2.5 text-slate-500">{{ row.last_message_at or "—" }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -187,7 +244,7 @@
     {% endif %}
   </div>
 
-  <div data-paginated-table data-endpoint="{{ url_for('panel_api_messages') }}" data-form="#messages-filter" data-page-size="10" class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <div data-paginated-table data-endpoint="{{ url_for('panel_api_messages') }}" data-form="#messages-filter" data-page-size="10" class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
     <script type="application/json">
       [
         {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},
@@ -202,7 +259,7 @@
       <input type="hidden" name="channel_id" value="">
     </form>
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-      <h2 class="text-sm font-semibold text-white">Letzte Nachrichten</h2>
+      <h3 class="text-sm font-semibold text-white">Letzte Nachrichten</h3>
       <button type="button" id="clear-channel-filter" class="hidden rounded border border-white/10 px-3 py-1 text-xs text-slate-300 transition hover:bg-white/10">Alle Channels</button>
     </div>
     <div class="overflow-x-auto">
@@ -213,18 +270,21 @@
     </div>
     <div data-table-empty class="hidden">{{ empty_state("Keine Nachrichten", "Der Message-Sync hat für diesen User noch nichts gespeichert.") }}</div>
     <div class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
-    <label class="flex items-center gap-2 text-xs text-slate-500">
-      Pro Seite
-      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
-    </label>
-    <div data-table-pagination class="flex-1"></div>
-  </div>
+      <label class="flex items-center gap-2 text-xs text-slate-500">
+        Pro Seite
+        <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+      </label>
+      <div data-table-pagination class="flex-1"></div>
+    </div>
   </div>
 </section>
 
-<section data-tab-panel="history" class="hidden">
-  <div class="mb-6 grid gap-6 lg:grid-cols-2">
-    <div data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#edited-history-filter" data-page-size="10" class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+{# ════════════════ HISTORIE ════════════════ #}
+<section id="history" class="scroll-mt-24 mb-10">
+  <h2 class="mb-4 text-base font-semibold text-white">Historie</h2>
+
+  <div class="mb-5 grid gap-5 lg:grid-cols-2">
+    <div data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#edited-history-filter" data-page-size="10" class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
       <script type="application/json">
         [
           {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},
@@ -234,19 +294,18 @@
         ]
       </script>
       <form id="edited-history-filter"><input type="hidden" name="guild_id" value="{{ guild_id }}"><input type="hidden" name="user_id" value="{{ member.user_id }}"><input type="hidden" name="event_type" value="edit"></form>
-      <h2 class="mb-4 text-sm font-semibold text-white">Bearbeitete Nachrichten</h2>
+      <h3 class="mb-4 text-sm font-semibold text-white">Bearbeitete Nachrichten</h3>
       <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Vorher</th><th class="px-3 py-2.5">Nachher</th><th class="px-3 py-2.5">Zeitpunkt</th></tr></thead><tbody data-table-body></tbody></table></div>
       <div data-table-empty class="hidden">{{ empty_state("Keine Edits", "Für diesen User wurden keine bearbeiteten Nachrichten gespeichert.") }}</div>
-      <div class="flex flex-col gap-3 border-t border-white/[0.06] px-4 py-3 sm:flex-row sm:items-center">
-    <label class="flex items-center gap-2 text-xs text-slate-500">
-      Pro Seite
-      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
-    </label>
-    <div data-table-pagination class="flex-1"></div>
-  </div>
+      <div class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
+        <label class="flex items-center gap-2 text-xs text-slate-500">Pro Seite
+          <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+        </label>
+        <div data-table-pagination class="flex-1"></div>
+      </div>
     </div>
 
-    <div data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#deleted-history-filter" data-page-size="10" class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+    <div data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#deleted-history-filter" data-page-size="10" class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
       <script type="application/json">
         [
           {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},
@@ -255,28 +314,27 @@
         ]
       </script>
       <form id="deleted-history-filter"><input type="hidden" name="guild_id" value="{{ guild_id }}"><input type="hidden" name="user_id" value="{{ member.user_id }}"><input type="hidden" name="event_type" value="delete"></form>
-      <h2 class="mb-4 text-sm font-semibold text-white">Gelöschte Nachrichten</h2>
+      <h3 class="mb-4 text-sm font-semibold text-white">Gelöschte Nachrichten</h3>
       <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Gelöschter Inhalt</th><th class="px-3 py-2.5">Zeitpunkt</th></tr></thead><tbody data-table-body></tbody></table></div>
       <div data-table-empty class="hidden">{{ empty_state("Keine gelöschten Nachrichten", "Für diesen User wurden keine Löschungen gespeichert.") }}</div>
-      <div class="flex flex-col gap-3 border-t border-white/[0.06] px-4 py-3 sm:flex-row sm:items-center">
-    <label class="flex items-center gap-2 text-xs text-slate-500">
-      Pro Seite
-      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
-    </label>
-    <div data-table-pagination class="flex-1"></div>
-  </div>
+      <div class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
+        <label class="flex items-center gap-2 text-xs text-slate-500">Pro Seite
+          <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+        </label>
+        <div data-table-pagination class="flex-1"></div>
+      </div>
     </div>
   </div>
 
-  <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-    <h2 class="mb-4 text-sm font-semibold text-white">Namenshistorie</h2>
+  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    <h3 class="mb-4 text-sm font-semibold text-white">Namenshistorie</h3>
     {% if history %}
     <div class="overflow-x-auto">
       <table class="w-full text-left text-sm">
         <thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Zeitpunkt</th><th class="px-3 py-2.5">Alter Anzeigename</th><th class="px-3 py-2.5">Neuer Anzeigename</th><th class="px-3 py-2.5">Alter Username</th><th class="px-3 py-2.5">Neuer Username</th></tr></thead>
         <tbody>
           {% for h in history %}
-          <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]"><td class="px-3 py-2.5 text-slate-400">{{ h.changed_at }}</td><td class="px-3 py-2.5 text-slate-300">{{ h.old_display_name or "-" }}</td><td class="px-3 py-2.5 text-white">{{ h.new_display_name or "-" }}</td><td class="px-3 py-2.5 text-slate-400">{{ h.old_username or "-" }}</td><td class="px-3 py-2.5 text-slate-300">{{ h.new_username or "-" }}</td></tr>
+          <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]"><td class="px-3 py-2.5 text-slate-400">{{ h.changed_at }}</td><td class="px-3 py-2.5 text-slate-300">{{ h.old_display_name or "—" }}</td><td class="px-3 py-2.5 text-white">{{ h.new_display_name or "—" }}</td><td class="px-3 py-2.5 text-slate-400">{{ h.old_username or "—" }}</td><td class="px-3 py-2.5 text-slate-300">{{ h.new_username or "—" }}</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -287,8 +345,10 @@
   </div>
 </section>
 
-<section data-tab-panel="tickets" class="hidden">
-  <div data-paginated-table data-endpoint="{{ url_for('panel_api_user_tickets', user_id=member.user_id, guild_id=guild_id) }}" data-page-size="10" class="overflow-hidden rounded-xl border border-white/[0.06]">
+{# ════════════════ TICKETS ════════════════ #}
+<section id="tickets" class="scroll-mt-24 mb-10">
+  <h2 class="mb-4 text-base font-semibold text-white">Tickets</h2>
+  <div data-paginated-table data-endpoint="{{ url_for('panel_api_user_tickets', user_id=member.user_id, guild_id=guild_id) }}" data-page-size="10" class="overflow-hidden rounded-xl border border-white/[0.06] bg-[#0d1320]">
     <script type="application/json">
       [
         {"key":"ticket_id","type":"link","urlKey":"detail_url","class":"whitespace-nowrap px-4 py-3"},
@@ -302,46 +362,33 @@
     <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-4 py-3 font-medium">Ticket</th><th class="px-4 py-3 font-medium">Betreff</th><th class="px-4 py-3 font-medium">Status</th><th class="px-4 py-3 font-medium">Kategorie</th><th class="px-4 py-3 font-medium">Erstellt</th><th class="px-4 py-3 font-medium">Aktualisiert</th></tr></thead><tbody data-table-body class="divide-y divide-white/[0.04]"></tbody></table></div>
     <div data-table-empty class="hidden">{{ empty_state("Keine Tickets", "Dieser User hat noch keine Tickets geöffnet.") }}</div>
     <div class="flex flex-col gap-3 border-t border-white/[0.06] px-4 py-3 sm:flex-row sm:items-center">
-    <label class="flex items-center gap-2 text-xs text-slate-500">
-      Pro Seite
-      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
-    </label>
-    <div data-table-pagination class="flex-1"></div>
-  </div>
+      <label class="flex items-center gap-2 text-xs text-slate-500">Pro Seite
+        <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+      </label>
+      <div data-table-pagination class="flex-1"></div>
+    </div>
   </div>
 </section>
+
 {% endblock %}
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
 <script>
   document.addEventListener("DOMContentLoaded", () => {
-    const tabButtons = Array.from(document.querySelectorAll("[data-tab-target]"));
-    const panels = Array.from(document.querySelectorAll("[data-tab-panel]"));
-    const storageKey = `pumbot:tab:${window.location.pathname}`;
-    const activateTab = (name) => {
-      tabButtons.forEach((button) => {
-        const active = button.dataset.tabTarget === name;
-        button.className = active
-          ? "rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-300"
-          : "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300";
-      });
-      panels.forEach((panel) => panel.classList.toggle("hidden", panel.dataset.tabPanel !== name));
-      window.sessionStorage.setItem(storageKey, name);
-    };
-    tabButtons.forEach((button) => button.addEventListener("click", () => activateTab(button.dataset.tabTarget)));
-    activateTab(window.sessionStorage.getItem(storageKey) || "profile");
-
+    const scroller = document.querySelector("main");
     const form = document.querySelector("#messages-filter");
-    const channelInput = form ? form.querySelector('input[name="channel_id"]') : null;
+    const channelInput = form?.querySelector('input[name="channel_id"]');
     const clearButton = document.querySelector("#clear-channel-filter");
-    const table = document.querySelector('[data-form="#messages-filter"]');
     const submitFilter = () => {
       if (!form) return;
-      activateTab("activity");
       form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-      table?.scrollIntoView({ behavior: "smooth", block: "start" });
       clearButton?.classList.toggle("hidden", !channelInput?.value);
+      const target = document.getElementById("activity");
+      if (target && scroller) {
+        const top = target.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop - 80;
+        scroller.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+      }
     };
     document.querySelectorAll("[data-channel-filter]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -354,22 +401,6 @@
       if (!channelInput) return;
       channelInput.value = "";
       submitFilter();
-    });
-
-    document.querySelectorAll("[data-copy-user-id]").forEach((button) => {
-      const originalText = button.textContent.trim();
-      button.addEventListener("click", async () => {
-        const userId = button.dataset.copyUserId || "";
-        if (!userId) return;
-        try {
-          await navigator.clipboard.writeText(userId);
-          button.textContent = "ID kopiert";
-          window.setTimeout(() => { button.textContent = originalText; }, 1400);
-        } catch {
-          button.textContent = "Kopieren fehlgeschlagen";
-          window.setTimeout(() => { button.textContent = originalText; }, 1600);
-        }
-      });
     });
   });
 </script>

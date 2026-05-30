@@ -35,6 +35,7 @@ try:
         list_role_members,
         count_role_members,
         get_role,
+        get_selfrole_role_ids,
         add_auto_publisher_channel,
         add_close_reason,
         add_selfrole_mapping,
@@ -154,6 +155,7 @@ except ImportError:
         list_role_members,
         count_role_members,
         get_role,
+        get_selfrole_role_ids,
         add_auto_publisher_channel,
         add_close_reason,
         add_selfrole_mapping,
@@ -308,7 +310,12 @@ def _refresh_session_permissions():
 def _ctx() -> dict:
     u = current_user()
     if not u:
-        return {"username": None, "avatar": None, "permissions": set(), "discord_id": None}
+        return {
+            "username": None,
+            "avatar": None,
+            "permissions": set(),
+            "discord_id": None,
+        }
     return {
         "username": u["username"],
         "avatar": u.get("avatar"),
@@ -978,10 +985,15 @@ def roles_page():
     total_permissions_assigned = sum(
         len(role.get("permissions") or []) for role in roles
     )
+    selfrole_ids = get_selfrole_role_ids(DEFAULT_GUILD_ID)
+    regular_server_roles = [r for r in server_roles if str(r["id"]) not in selfrole_ids]
+    selfrole_server_roles = [r for r in server_roles if str(r["id"]) in selfrole_ids]
     return render_template(
         "roles.html",
         roles=roles,
         server_roles=server_roles,
+        regular_server_roles=regular_server_roles,
+        selfrole_server_roles=selfrole_server_roles,
         all_permissions=ALL_PERMISSIONS,
         permission_groups=PERMISSION_GROUPS,
         command_permission_groups=COMMAND_PERMISSION_GROUPS,
@@ -1365,13 +1377,21 @@ def users_page():
     status = request.args.get("status", "all")
     if status not in {"all", "active", "left"}:
         status = "all"
+    role_id = request.args.get("role_id", "").strip()
+    presence = request.args.get("presence", "").strip().lower()
+    if presence not in {"online", "idle", "dnd", "offline"}:
+        presence = ""
     active_count = count_guild_members(guild_id, status="active")
     left_count = count_guild_members(guild_id, status="left")
+    server_roles = _live_discord_roles(guild_id)
     return render_template(
         "users.html",
         q=q,
         guild_id=guild_id,
         status=status,
+        role_id=role_id,
+        presence=presence,
+        server_roles=server_roles,
         active_count=active_count,
         left_count=left_count,
         active_page="users",
@@ -1646,6 +1666,7 @@ def birthdays_page():
     birthday_channel = get_config(birthdays_guild_id, "birthday_channel_id")
     birthday_messages = list_bot_messages(birthdays_guild_id, "birthday_list")
     from datetime import datetime
+
     today = datetime.now()
     today_list = get_birthdays_today(birthdays_guild_id)
     cache: dict[str, str | None] = {}
@@ -1881,8 +1902,7 @@ def auto_publisher_page():
     raw = get_auto_publisher_channels(DEFAULT_GUILD_ID)
     names = get_channel_names(DEFAULT_GUILD_ID, raw)
     channels = [
-        {"channel_id": str(cid), "channel_name": names.get(str(cid))}
-        for cid in raw
+        {"channel_id": str(cid), "channel_name": names.get(str(cid))} for cid in raw
     ]
     return render_template(
         "auto_publisher.html",
@@ -1978,7 +1998,10 @@ def panel_api_tickets():
         item["detail_url"] = url_for("ticket_detail", ticket_id=item["ticket_id"])
         rows.append(item)
     return _paginated_response(
-        rows, count_tickets(q=q, categories=categories, status=status_arg), page, page_size
+        rows,
+        count_tickets(q=q, categories=categories, status=status_arg),
+        page,
+        page_size,
     )
 
 
@@ -2013,9 +2036,19 @@ def panel_api_users():
     status = request.args.get("status", "all")
     if status not in {"all", "active", "left"}:
         status = "all"
+    role_id = request.args.get("role_id", "").strip() or None
+    presence = request.args.get("presence", "").strip().lower() or None
+    if presence not in {"online", "idle", "dnd", "offline", None}:
+        presence = None
     page, page_size, offset = _pagination_args()
     rows = list_guild_members(
-        guild_id, q=q, status=status, limit=page_size, offset=offset
+        guild_id,
+        q=q,
+        status=status,
+        limit=page_size,
+        offset=offset,
+        role_id=role_id,
+        presence=presence,
     )
     web_roles_by_discord_id = {
         str(role["discord_role_id"]): role["role_name"] for role in list_roles(guild_id)
@@ -2085,10 +2118,30 @@ def panel_api_users():
             "last_message_at",
             "status_updated_at",
         ),
-        count_guild_members(guild_id, q=q, status=status),
+        count_guild_members(guild_id, q=q, status=status, role_id=role_id, presence=presence),
         page,
         page_size,
     )
+
+
+@app.get("/panel-api/users/suggest")
+@permission_required("users.view")
+def panel_api_users_suggest():
+    guild_id = _active_panel_guild_id()
+    q = request.args.get("q", "").strip()
+    if len(q) < 2:
+        return jsonify([])
+    rows = list_guild_members(guild_id, q=q, status="all", limit=8, offset=0)
+    suggestions = []
+    for row in rows:
+        suggestions.append({
+            "user_id": row.get("user_id"),
+            "display_name": row.get("display_name") or row.get("global_name") or row.get("username"),
+            "username": row.get("username"),
+            "avatar_url": row.get("avatar_url"),
+            "status": row.get("status"),
+        })
+    return jsonify(suggestions)
 
 
 @app.get("/panel-api/messages")
@@ -2265,11 +2318,24 @@ def panel_api_birthdays():
 def panel_api_warnings():
     guild_id = request.args.get("guild_id") or DEFAULT_GUILD_ID
     q_user = request.args.get("user_id", "").strip()
+    q_mod = request.args.get("moderator_id", "").strip()
+    q_reason = request.args.get("reason", "").strip()
+    q_from = request.args.get("date_from", "").strip() or None
+    q_to = request.args.get("date_to", "").strip() or None
     page, page_size, offset = _pagination_args()
-    if q_user:
-        warnings = get_warnings(guild_id, q_user, limit=page_size, offset=offset)
-    else:
-        warnings = list_all_warnings(guild_id, limit=page_size, offset=offset)
+    filters = dict(
+        moderator_id=q_mod or None,
+        reason_query=q_reason or None,
+        date_from=q_from,
+        date_to=q_to,
+    )
+    warnings = list_all_warnings(
+        guild_id,
+        limit=page_size,
+        offset=offset,
+        user_id=q_user or None,
+        **filters,
+    )
     rows = []
     for warning in warnings:
         item = _attach_member_profile(warning, guild_id, "user_id", "user")
@@ -2277,7 +2343,10 @@ def panel_api_warnings():
         item["delete_url"] = url_for("warnings_delete", warning_id=item["id"])
         rows.append(item)
     return _paginated_response(
-        rows, count_warnings(guild_id, q_user or None), page, page_size
+        rows,
+        count_warnings(guild_id, q_user or None, **filters),
+        page,
+        page_size,
     )
 
 

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import page_header, stat, stat_tile, empty_state, id_chip %}
+{% from "_macros.html" import page_header, stat_tile, empty_state, id_chip, scrollspy_nav %}
 
 {% block content %}
 {{ page_header("Statistiken", "Server-Übersicht", "Allgemeine Aktivitäts- und Nachrichtenstatistiken aus der Datenbank.") }}
@@ -12,87 +12,102 @@
 </div>
 <div class="mb-4 flex items-center gap-2 text-xs text-slate-500">Guild: {{ id_chip(guild_id) }}</div>
 
-<div class="mb-6 flex flex-wrap gap-2 border-b border-white/[0.06] pb-3" data-tabs>
-  <button type="button" data-tab-target="overview" class="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-300">Auswertung</button>
-  <button type="button" data-tab-target="rankings" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300">Rankings</button>
-  <button type="button" data-tab-target="messages" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300">Nachrichten</button>
-</div>
+{{ scrollspy_nav([
+  {"id": "auswertung", "label": "Auswertung"},
+  {"id": "rankings", "label": "Rankings"},
+  {"id": "messages", "label": "Nachrichten"}
+]) }}
 
-<section data-tab-panel="overview">
+{# ════════════════ AUSWERTUNG ════════════════ #}
+<section id="auswertung" class="scroll-mt-24 mb-10">
   <script id="stats-chart-data" type="application/json">{{ chart_data | tojson }}</script>
-  <div class="mb-6 grid gap-6 lg:grid-cols-3">
-    <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-      <h2 class="mb-4 text-sm font-semibold text-white">User</h2>
-      <canvas data-pie-chart="users" height="220" class="w-full"></canvas>
-      <div data-pie-legend="users" class="mt-4 grid gap-2 text-xs text-slate-400"></div>
+
+  <div class="mb-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+    {# Donut Gesamt #}
+    <div class="rounded-xl border border-white/[0.06] bg-gradient-to-br from-cyan-500/[0.04] to-transparent p-5">
+      <div class="mb-1 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-white">Aktivitätsverteilung</h2>
+        <span class="rounded-full bg-cyan-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-cyan-300">Gesamt</span>
+      </div>
+      <p class="mb-4 text-xs text-slate-500">Anteil der Top-Beitragenden am gesamten Nachrichtenvolumen.</p>
+      <div class="relative">
+        <canvas data-pie-chart="overall" height="260" class="w-full"></canvas>
+        <div data-pie-center="overall" class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+          <div class="text-[10px] uppercase tracking-wider text-slate-500">Nachrichten</div>
+          <div class="text-2xl font-bold text-white">{{ overview.totals.message_count or 0 }}</div>
+        </div>
+      </div>
+      <div data-pie-legend="overall" class="mt-5 grid gap-1.5 text-xs text-slate-400"></div>
     </div>
-    <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-      <h2 class="mb-4 text-sm font-semibold text-white">Channels</h2>
-      <canvas data-pie-chart="channels" height="220" class="w-full"></canvas>
-      <div data-pie-legend="channels" class="mt-4 grid gap-2 text-xs text-slate-400"></div>
-    </div>
-    <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-      <h2 class="mb-4 text-sm font-semibold text-white">Gesamt</h2>
-      <canvas data-pie-chart="overall" height="220" class="w-full"></canvas>
-      <div data-pie-legend="overall" class="mt-4 grid gap-2 text-xs text-slate-400"></div>
+
+    {# Horizontal bars #}
+    <div class="grid gap-5">
+      <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+        <div class="mb-4 flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-white">Top User</h2>
+          <span class="text-[10px] uppercase tracking-wider text-slate-500">nach Nachrichten</span>
+        </div>
+        <div data-bar-chart="users" class="space-y-2">
+          {% if not chart_data.users %}
+          <div class="py-8 text-center text-sm text-slate-500">Keine Daten</div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+        <div class="mb-4 flex items-center justify-between">
+          <h2 class="text-sm font-semibold text-white">Top Channels</h2>
+          <span class="text-[10px] uppercase tracking-wider text-slate-500">nach Nachrichten</span>
+        </div>
+        <div data-bar-chart="channels" class="space-y-2">
+          {% if not chart_data.channels %}
+          <div class="py-8 text-center text-sm text-slate-500">Keine Daten</div>
+          {% endif %}
+        </div>
+      </div>
     </div>
   </div>
 
+  {# Evaluated stats as a card grid #}
   <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
     <h2 class="mb-4 text-sm font-semibold text-white">Ausgewertete Statistiken</h2>
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-sm">
-        <thead>
-          <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
-            <th class="px-3 py-2.5">Statistik</th>
-            <th class="px-3 py-2.5">Wert</th>
-          </tr>
-        </thead>
-        <tbody id="evaluated-stats-body">
-          {% for item in evaluated_stats %}
-          <tr class="border-b border-white/[0.04]">
-            <td class="px-3 py-2.5 text-slate-300">{{ item.label }}</td>
-            <td class="px-3 py-2.5 font-medium text-white">{{ item.value }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div id="evaluated-stats-grid" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {% for item in evaluated_stats %}
+      <div class="rounded-lg border border-white/[0.06] bg-black/20 p-4 transition hover:border-cyan-500/30 hover:bg-cyan-500/[0.04]">
+        <div class="text-[11px] uppercase tracking-wider text-slate-500">{{ item.label }}</div>
+        <div class="mt-1.5 text-lg font-bold text-white">{{ item.value }}</div>
+      </div>
+      {% endfor %}
     </div>
+    {% if not evaluated_stats %}
+    {{ empty_state("Keine Auswertungen", "Sobald Nachrichten synchronisiert sind, werden hier Kennzahlen angezeigt.") }}
+    {% endif %}
   </div>
 </section>
 
-<section data-tab-panel="rankings" class="hidden">
-  <div class="grid gap-6 lg:grid-cols-2">
+{# ════════════════ RANKINGS ════════════════ #}
+<section id="rankings" class="scroll-mt-24 mb-10">
+  <h2 class="mb-4 text-base font-semibold text-white">Rankings</h2>
+  <div class="grid gap-5 lg:grid-cols-2">
     <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-      <h2 class="mb-4 text-sm font-semibold text-white">Top User</h2>
+      <h3 class="mb-4 text-sm font-semibold text-white">Top User</h3>
       {% if overview.top_users %}
       <div class="overflow-x-auto">
         <table class="w-full text-left text-sm">
-          <thead>
-            <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
-              <th class="px-3 py-2.5">User</th>
-              <th class="px-3 py-2.5">Nachrichten</th>
-            </tr>
-          </thead>
+          <thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">User</th><th class="px-3 py-2.5">Nachrichten</th></tr></thead>
           <tbody>
             {% for row in overview.top_users %}
             <tr class="border-b border-white/[0.04]">
               <td class="px-3 py-2.5">
                 <a href="{{ url_for('user_detail_page', user_id=row.user_id, guild_id=guild_id) }}" class="flex items-center gap-3 hover:text-white">
-                  {% if row.avatar_url %}
-                  <img src="{{ row.avatar_url }}" alt="" class="h-8 w-8 rounded-full">
-                  {% else %}
-                  <span class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-xs font-semibold text-white">{{ (row.display_name or row.username or row.user_id)[:2]|upper }}</span>
-                  {% endif %}
+                  {% if row.avatar_url %}<img src="{{ row.avatar_url }}" alt="" class="h-8 w-8 rounded-full">
+                  {% else %}<span class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-xs font-semibold text-white">{{ (row.display_name or row.username or row.user_id)[:2]|upper }}</span>{% endif %}
                   <span>
                     <span class="block font-medium text-slate-200">{{ row.display_name or row.username or row.user_id }}</span>
                     <span class="block text-xs text-slate-500">@{{ row.username or row.display_name or row.user_id }}</span>
                   </span>
                 </a>
               </td>
-              <td class="px-3 py-2.5">
-                <a class="text-cyan-300 hover:text-cyan-200" href="{{ url_for('stats_page', guild_id=guild_id, user_id=row.user_id) }}">{{ row.message_count }}</a>
-              </td>
+              <td class="px-3 py-2.5"><a class="text-cyan-300 hover:text-cyan-200" href="{{ url_for('stats_page', guild_id=guild_id, user_id=row.user_id) }}">{{ row.message_count }}</a></td>
             </tr>
             {% endfor %}
           </tbody>
@@ -104,26 +119,16 @@
     </div>
 
     <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-      <h2 class="mb-4 text-sm font-semibold text-white">Top Channels</h2>
+      <h3 class="mb-4 text-sm font-semibold text-white">Top Channels</h3>
       {% if overview.top_channels %}
       <div class="overflow-x-auto">
         <table class="w-full text-left text-sm">
-          <thead>
-            <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
-              <th class="px-3 py-2.5">Channel</th>
-              <th class="px-3 py-2.5">Nachrichten</th>
-              <th class="px-3 py-2.5">Letzte Nachricht</th>
-            </tr>
-          </thead>
+          <thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Nachrichten</th><th class="px-3 py-2.5">Letzte Nachricht</th></tr></thead>
           <tbody>
             {% for row in overview.top_channels %}
             <tr class="border-b border-white/[0.04]">
-              <td class="px-3 py-2.5">
-                <a class="font-medium text-white hover:text-cyan-300" href="{{ url_for('stats_page', guild_id=guild_id, channel_id=row.channel_id) }}">#{{ row.channel_name }}</a>
-              </td>
-              <td class="px-3 py-2.5">
-                <a class="text-cyan-300 hover:text-cyan-200" href="{{ url_for('stats_page', guild_id=guild_id, channel_id=row.channel_id) }}">{{ row.message_count }}</a>
-              </td>
+              <td class="px-3 py-2.5"><a class="font-medium text-white hover:text-cyan-300" href="{{ url_for('stats_page', guild_id=guild_id, channel_id=row.channel_id) }}">#{{ row.channel_name }}</a></td>
+              <td class="px-3 py-2.5"><a class="text-cyan-300 hover:text-cyan-200" href="{{ url_for('stats_page', guild_id=guild_id, channel_id=row.channel_id) }}">{{ row.message_count }}</a></td>
               <td class="px-3 py-2.5 text-slate-500">{{ row.last_message_at or "-" }}</td>
             </tr>
             {% endfor %}
@@ -137,7 +142,9 @@
   </div>
 </section>
 
-<section data-tab-panel="messages" class="hidden">
+{# ════════════════ NACHRICHTEN ════════════════ #}
+<section id="messages" class="scroll-mt-24 mb-10">
+  <h2 class="mb-4 text-base font-semibold text-white">Nachrichten</h2>
   <div data-paginated-table data-endpoint="{{ url_for('panel_api_messages') }}" data-form="#all-messages-filter" data-page-size="10" class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
     <script type="application/json">
       [
@@ -178,29 +185,19 @@
       <a href="{{ url_for('stats_page', guild_id=guild_id) }}" class="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-center text-sm font-medium text-slate-300 transition hover:bg-white/10">Zurücksetzen</a>
       {% endif %}
     </form>
-    <h2 class="mb-4 text-sm font-semibold text-white">Nachrichten</h2>
     <div class="overflow-x-auto">
       <table class="w-full text-left text-sm">
-        <thead>
-          <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
-            <th class="px-3 py-2.5">User</th>
-            <th class="px-3 py-2.5">Channel</th>
-            <th class="px-3 py-2.5">Inhalt</th>
-            <th class="px-3 py-2.5">Status</th>
-            <th class="px-3 py-2.5">Zeitpunkt</th>
-          </tr>
-        </thead>
+        <thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">User</th><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Inhalt</th><th class="px-3 py-2.5">Status</th><th class="px-3 py-2.5">Zeitpunkt</th></tr></thead>
         <tbody data-table-body></tbody>
       </table>
     </div>
     <div data-table-empty class="hidden">{{ empty_state("Keine Nachrichten", "Der Message-Sync hat keine passenden Nachrichten gespeichert.") }}</div>
     <div class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
-    <label class="flex items-center gap-2 text-xs text-slate-500">
-      Pro Seite
-      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
-    </label>
-    <div data-table-pagination class="flex-1"></div>
-  </div>
+      <label class="flex items-center gap-2 text-xs text-slate-500">Pro Seite
+        <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+      </label>
+      <div data-table-pagination class="flex-1"></div>
+    </div>
   </div>
 </section>
 {% endblock %}
@@ -209,83 +206,97 @@
 <script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
 <script>
   document.addEventListener("DOMContentLoaded", () => {
-    const buttons = Array.from(document.querySelectorAll("[data-tab-target]"));
-    const panels = Array.from(document.querySelectorAll("[data-tab-panel]"));
-    const storageKey = `pumbot:tab:${window.location.pathname}`;
-    const activate = (name) => {
-      buttons.forEach((button) => {
-        const active = button.dataset.tabTarget === name;
-        button.className = active
-          ? "rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-300"
-          : "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300";
-      });
-      panels.forEach((panel) => panel.classList.toggle("hidden", panel.dataset.tabPanel !== name));
-      window.sessionStorage.setItem(storageKey, name);
-    };
-    buttons.forEach((button) => button.addEventListener("click", () => activate(button.dataset.tabTarget)));
-    if (new URLSearchParams(window.location.search).has("user_id") || new URLSearchParams(window.location.search).has("channel_id") || new URLSearchParams(window.location.search).has("q")) {
-      activate("messages");
-    } else {
-      activate(window.sessionStorage.getItem(storageKey) || "overview");
-    }
-
     const colors = ["#22d3ee", "#34d399", "#f59e0b", "#f87171", "#a78bfa", "#60a5fa", "#f472b6", "#a3e635", "#94a3b8"];
     const escapeHtml = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
-    const drawPie = (name, rows) => {
+
+    const drawDonut = (name, rows) => {
       const canvas = document.querySelector(`[data-pie-chart="${name}"]`);
       const legend = document.querySelector(`[data-pie-legend="${name}"]`);
-      if (!canvas || !legend) return;
-      const context = canvas.getContext("2d");
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
       const rect = canvas.getBoundingClientRect();
       const ratio = window.devicePixelRatio || 1;
-      canvas.width = Math.max(260, rect.width) * ratio;
-      canvas.height = 220 * ratio;
-      context.scale(ratio, ratio);
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      const total = (rows || []).reduce((sum, row) => sum + Number(row.value || 0), 0);
-      const cx = Math.max(130, rect.width / 2);
-      const cy = 106;
-      const radius = 82;
+      const width = Math.max(260, rect.width);
+      const height = 260;
+      canvas.width = width * ratio;
+      canvas.height = height * ratio;
+      canvas.style.height = height + "px";
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      const total = (rows || []).reduce((s, r) => s + Number(r.value || 0), 0);
+      const cx = width / 2, cy = height / 2;
+      const rOuter = Math.min(width, height) / 2 - 8;
+      const rInner = rOuter * 0.62;
       if (!total) {
-        context.fillStyle = "#334155";
-        context.beginPath();
-        context.arc(cx, cy, radius, 0, Math.PI * 2);
-        context.fill();
-        legend.innerHTML = '<div class="text-slate-500">Keine Daten</div>';
+        ctx.fillStyle = "#1f2937";
+        ctx.beginPath(); ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
+        ctx.arc(cx, cy, rInner, 0, Math.PI * 2, true); ctx.fill();
+        if (legend) legend.innerHTML = '<div class="text-slate-500">Keine Daten</div>';
         return;
       }
       let start = -Math.PI / 2;
-      legend.innerHTML = rows.map((row, index) => {
+      const items = [];
+      rows.forEach((row, i) => {
         const value = Number(row.value || 0);
         const angle = (value / total) * Math.PI * 2;
-        context.fillStyle = colors[index % colors.length];
-        context.beginPath();
-        context.moveTo(cx, cy);
-        context.arc(cx, cy, radius, start, start + angle);
-        context.closePath();
-        context.fill();
-        start += angle;
+        const color = colors[i % colors.length];
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(cx, cy, rOuter, start, start + angle);
+        ctx.arc(cx, cy, rInner, start + angle, start, true);
+        ctx.closePath();
+        ctx.fill();
         const percent = Math.round((value / total) * 100);
-        return `<div class="flex items-center justify-between gap-3"><span class="flex min-w-0 items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background:${colors[index % colors.length]}"></span><span class="truncate">${escapeHtml(row.label)}</span></span><span class="text-slate-300">${value} (${percent}%)</span></div>`;
+        items.push(`<div class="flex items-center justify-between gap-3 rounded-md px-2 py-1 transition hover:bg-white/[0.04]"><span class="flex min-w-0 items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background:${color}"></span><span class="truncate text-slate-300">${escapeHtml(row.label)}</span></span><span class="shrink-0 font-medium text-white">${value}<span class="ml-1 text-[10px] text-slate-500">${percent}%</span></span></div>`);
+        start += angle;
+      });
+      if (legend) legend.innerHTML = items.join("");
+    };
+
+    const drawBars = (name, rows) => {
+      const wrap = document.querySelector(`[data-bar-chart="${name}"]`);
+      if (!wrap) return;
+      if (!rows || !rows.length) {
+        wrap.innerHTML = '<div class="py-8 text-center text-sm text-slate-500">Keine Daten</div>';
+        return;
+      }
+      const max = Math.max(...rows.map((r) => Number(r.value || 0)), 1);
+      wrap.innerHTML = rows.slice(0, 8).map((row, i) => {
+        const value = Number(row.value || 0);
+        const width = Math.round((value / max) * 100);
+        const color = colors[i % colors.length];
+        return `<div class="group">
+          <div class="mb-1 flex items-center justify-between text-xs">
+            <span class="truncate text-slate-300">${escapeHtml(row.label)}</span>
+            <span class="ml-2 shrink-0 font-medium text-white">${value}</span>
+          </div>
+          <div class="h-2 overflow-hidden rounded-full bg-white/[0.04]">
+            <div class="h-full rounded-full transition-all duration-700" style="width:${width}%;background:linear-gradient(90deg, ${color}cc, ${color})"></div>
+          </div>
+        </div>`;
       }).join("");
-      context.fillStyle = "#0f172a";
-      context.beginPath();
-      context.arc(cx, cy, 38, 0, Math.PI * 2);
-      context.fill();
     };
+
     const renderCharts = (chartData) => {
-      drawPie("users", chartData.users || []);
-      drawPie("channels", chartData.channels || []);
-      drawPie("overall", chartData.overall || []);
+      drawDonut("overall", chartData.overall || []);
+      drawBars("users", chartData.users || []);
+      drawBars("channels", chartData.channels || []);
     };
+
     const updateEvaluatedStats = (items) => {
-      const body = document.querySelector("#evaluated-stats-body");
-      if (!body) return;
-      body.innerHTML = (items || []).map((item) => `<tr class="border-b border-white/[0.04]"><td class="px-3 py-2.5 text-slate-300">${escapeHtml(item.label)}</td><td class="px-3 py-2.5 font-medium text-white">${escapeHtml(item.value)}</td></tr>`).join("");
+      const grid = document.querySelector("#evaluated-stats-grid");
+      if (!grid) return;
+      grid.innerHTML = (items || []).map((item) => `
+        <div class="rounded-lg border border-white/[0.06] bg-black/20 p-4 transition hover:border-cyan-500/30 hover:bg-cyan-500/[0.04]">
+          <div class="text-[11px] uppercase tracking-wider text-slate-500">${escapeHtml(item.label)}</div>
+          <div class="mt-1.5 text-lg font-bold text-white">${escapeHtml(item.value)}</div>
+        </div>`).join("");
     };
+
     const initialChartData = JSON.parse(document.querySelector("#stats-chart-data")?.textContent || "{}");
     renderCharts(initialChartData);
     window.addEventListener("resize", () => renderCharts(initialChartData));
+
     const refreshStats = async () => {
       const params = new URLSearchParams({ guild_id: "{{ guild_id }}" });
       const response = await fetch(`{{ url_for('panel_api_stats_overview') }}?${params.toString()}`, { headers: { Accept: "application/json" } });
@@ -294,9 +305,20 @@
       renderCharts(data.chart_data || {});
       updateEvaluatedStats(data.evaluated_stats || []);
     };
-    window.setInterval(() => {
-      if (!document.hidden) refreshStats();
-    }, 5000);
+    window.setInterval(() => { if (!document.hidden) refreshStats(); }, 15000);
+
+    // Auto-jump to Nachrichten if any filter is present
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("user_id") || params.has("channel_id") || params.has("q")) {
+      const target = document.getElementById("messages");
+      const scroller = document.querySelector("main");
+      if (target && scroller) {
+        window.requestAnimationFrame(() => {
+          const top = target.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop - 80;
+          scroller.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+        });
+      }
+    }
   });
 </script>
 {% endblock %}

@@ -671,7 +671,11 @@ def get_guild_member(guild_id: str, user_id: str) -> dict | None:
 
 
 def _guild_members_where(
-    guild_id: str, q: str = "", status: str = "all"
+    guild_id: str,
+    q: str = "",
+    status: str = "all",
+    role_id: str | None = None,
+    presence: str | None = None,
 ) -> tuple[list[str], list[Any]]:
     clauses = ["guild_id = ?"]
     params: list[Any] = [guild_id]
@@ -680,8 +684,18 @@ def _guild_members_where(
         params.append(status)
     if q:
         q_like = f"%{q}%"
-        clauses.append("(username LIKE ? OR global_name LIKE ? OR display_name LIKE ?)")
-        params.extend([q_like, q_like, q_like])
+        clauses.append("(username LIKE ? OR global_name LIKE ? OR display_name LIKE ? OR user_id LIKE ?)")
+        params.extend([q_like, q_like, q_like, q_like])
+    if role_id:
+        clauses.append("(roles_json LIKE ? OR roles_json LIKE ?)")
+        params.extend([f'%"id":"{role_id}"%', f'%"id": "{role_id}"%'])
+    if presence:
+        p = presence.lower()
+        if p == "offline":
+            clauses.append("(LOWER(COALESCE(presence_status, '')) = 'offline' OR presence_status IS NULL OR presence_status = '')")
+        elif p in {"online", "idle", "dnd"}:
+            clauses.append("LOWER(COALESCE(presence_status, '')) = ?")
+            params.append(p)
     return clauses, params
 
 
@@ -691,8 +705,11 @@ def list_guild_members(
     status: str = "all",
     limit: int = 200,
     offset: int = 0,
+    *,
+    role_id: str | None = None,
+    presence: str | None = None,
 ) -> list[dict]:
-    clauses, params = _guild_members_where(guild_id, q, status)
+    clauses, params = _guild_members_where(guild_id, q, status, role_id, presence)
     params.append(limit)
     params.append(offset)
     joined_clauses = []
@@ -703,8 +720,14 @@ def list_guild_members(
             joined_clauses.append("gm.status = ?")
         elif clause.startswith("(username LIKE"):
             joined_clauses.append(
-                "(gm.username LIKE ? OR gm.global_name LIKE ? OR gm.display_name LIKE ?)"
+                "(gm.username LIKE ? OR gm.global_name LIKE ? OR gm.display_name LIKE ? OR gm.user_id LIKE ?)"
             )
+        elif clause == "(roles_json LIKE ? OR roles_json LIKE ?)":
+            joined_clauses.append("(gm.roles_json LIKE ? OR gm.roles_json LIKE ?)")
+        elif clause.startswith("LOWER(COALESCE(presence_status"):
+            joined_clauses.append("LOWER(COALESCE(gm.presence_status, '')) = ?")
+        elif clause.startswith("(LOWER(COALESCE(presence_status"):
+            joined_clauses.append("(LOWER(COALESCE(gm.presence_status, '')) = 'offline' OR gm.presence_status IS NULL OR gm.presence_status = '')")
         else:
             joined_clauses.append(clause)
     with _connect() as conn:
@@ -726,8 +749,15 @@ def list_guild_members(
         return [dict(r) for r in rows]
 
 
-def count_guild_members(guild_id: str, q: str = "", status: str = "all") -> int:
-    clauses, params = _guild_members_where(guild_id, q, status)
+def count_guild_members(
+    guild_id: str,
+    q: str = "",
+    status: str = "all",
+    *,
+    role_id: str | None = None,
+    presence: str | None = None,
+) -> int:
+    clauses, params = _guild_members_where(guild_id, q, status, role_id, presence)
     with _connect() as conn:
         row = conn.execute(
             f"SELECT COUNT(*) AS total FROM guild_members WHERE {' AND '.join(clauses)}",
@@ -1716,7 +1746,9 @@ def count_birthdays_in_month(guild_id: str, month: int) -> int:
         return int(row["total"] if row else 0)
 
 
-def get_upcoming_birthdays(guild_id: str, days: int = 30, limit: int = 10) -> list[dict]:
+def get_upcoming_birthdays(
+    guild_id: str, days: int = 30, limit: int = 10
+) -> list[dict]:
     """Return birthdays within the next `days` days (wraps year), ordered chronologically."""
     today = berlin_today()
     with _connect() as conn:
@@ -1734,7 +1766,9 @@ def get_upcoming_birthdays(guild_id: str, days: int = 30, limit: int = 10) -> li
         delta = (this_year - today).days
         if delta < 0:
             try:
-                next_year = today.replace(year=today.year + 1, month=int(d["month"]), day=int(d["day"]))
+                next_year = today.replace(
+                    year=today.year + 1, month=int(d["month"]), day=int(d["day"])
+                )
                 delta = (next_year - today).days
             except ValueError:
                 continue
@@ -1850,30 +1884,76 @@ def clear_warnings(guild_id: str, user_id: str) -> int:
         return cursor.rowcount
 
 
-def list_all_warnings(guild_id: str, limit: int = 200, offset: int = 0) -> list[dict]:
+def _warnings_filter_clauses(
+    guild_id: str,
+    user_id: str | None = None,
+    moderator_id: str | None = None,
+    reason_query: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+) -> tuple[str, list[Any]]:
+    clauses = ["guild_id = ?"]
+    params: list[Any] = [guild_id]
+    if user_id:
+        clauses.append("user_id = ?")
+        params.append(user_id)
+    if moderator_id:
+        clauses.append("moderator_id = ?")
+        params.append(moderator_id)
+    if reason_query:
+        clauses.append("LOWER(COALESCE(reason, '')) LIKE ?")
+        params.append(f"%{reason_query.lower()}%")
+    if date_from:
+        clauses.append("created_at >= ?")
+        params.append(date_from)
+    if date_to:
+        clauses.append("created_at <= ?")
+        params.append(date_to)
+    return " AND ".join(clauses), params
+
+
+def list_all_warnings(
+    guild_id: str,
+    limit: int = 200,
+    offset: int = 0,
+    *,
+    user_id: str | None = None,
+    moderator_id: str | None = None,
+    reason_query: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+) -> list[dict]:
+    where, params = _warnings_filter_clauses(
+        guild_id, user_id, moderator_id, reason_query, date_from, date_to
+    )
     with _connect() as conn:
         rows = conn.execute(
-            """SELECT * FROM warnings
-               WHERE guild_id = ?
+            f"""SELECT * FROM warnings
+               WHERE {where}
                ORDER BY created_at DESC
                LIMIT ? OFFSET ?""",
-            (guild_id, limit, offset),
+            (*params, limit, offset),
         ).fetchall()
         return [dict(r) for r in rows]
 
 
-def count_warnings(guild_id: str, user_id: str | None = None) -> int:
+def count_warnings(
+    guild_id: str,
+    user_id: str | None = None,
+    *,
+    moderator_id: str | None = None,
+    reason_query: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+) -> int:
+    where, params = _warnings_filter_clauses(
+        guild_id, user_id, moderator_id, reason_query, date_from, date_to
+    )
     with _connect() as conn:
-        if user_id:
-            row = conn.execute(
-                "SELECT COUNT(*) AS total FROM warnings WHERE guild_id = ? AND user_id = ?",
-                (guild_id, user_id),
-            ).fetchone()
-        else:
-            row = conn.execute(
-                "SELECT COUNT(*) AS total FROM warnings WHERE guild_id = ?",
-                (guild_id,),
-            ).fetchone()
+        row = conn.execute(
+            f"SELECT COUNT(*) AS total FROM warnings WHERE {where}",
+            tuple(params),
+        ).fetchone()
         return int(row["total"] if row else 0)
 
 
@@ -2036,6 +2116,19 @@ def get_selfrole_panel(message_id: str) -> dict | None:
         ).fetchall()
         panel["roles"] = {m["emoji"]: m["role_id"] for m in mappings}
         return panel
+
+
+def get_selfrole_role_ids(guild_id: str) -> set[str]:
+    """Return the set of Discord role IDs used in any selfrole panel mapping."""
+    with _connect() as conn:
+        rows = conn.execute(
+            """SELECT DISTINCT m.role_id
+                 FROM selfrole_mappings m
+                 JOIN selfrole_panels p ON p.id = m.panel_id
+                WHERE p.guild_id = ?""",
+            (guild_id,),
+        ).fetchall()
+        return {str(r["role_id"]) for r in rows if r.get("role_id")}
 
 
 def get_all_selfrole_panels(guild_id: str) -> list[dict]:
@@ -2534,7 +2627,9 @@ def list_tickets(
         return [dict(r) for r in rows]
 
 
-def count_tickets(q: str = "", categories: set[str] | None = None, status: str | None = None) -> int:
+def count_tickets(
+    q: str = "", categories: set[str] | None = None, status: str | None = None
+) -> int:
     where_sql, params = _ticket_filter_sql(q, categories, status)
     with _connect() as conn:
         row = conn.execute(

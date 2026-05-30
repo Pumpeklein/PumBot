@@ -15,18 +15,43 @@
 </div>
 
 <div class="mb-6 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
-  <form id="warnings-filter" method="get" class="flex flex-wrap items-end gap-3">
+  <form id="warnings-filter" method="get" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
     <input type="hidden" name="guild_id" value="{{ guild_id }}">
-    <div class="w-64 flex-1 min-w-[200px]">
-      {{ field("user_id", "User-ID filtern", placeholder="z.B. 123456789012345678", value=q_user) }}
+    <div>
+      <label class="mb-1 block text-xs font-medium text-slate-400">User-ID</label>
+      <input type="text" name="user_id" value="{{ request.args.get('user_id', '') }}" data-live-search
+             placeholder="z.B. 123456789012345678"
+             class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30">
     </div>
-    {{ btn("Suchen") }}
-    {% if q_user %}
-    <a href="{{ url_for('warnings_page') }}"
-       class="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/10">
-      Filter zurücksetzen
-    </a>
-    {% endif %}
+    <div>
+      <label class="mb-1 block text-xs font-medium text-slate-400">Moderator-ID</label>
+      <input type="text" name="moderator_id" value="{{ request.args.get('moderator_id', '') }}" data-live-search
+             placeholder="z.B. 234567890123456789"
+             class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30">
+    </div>
+    <div>
+      <label class="mb-1 block text-xs font-medium text-slate-400">Grund enthält</label>
+      <input type="search" name="reason" value="{{ request.args.get('reason', '') }}" data-live-search
+             placeholder="z.B. Spam"
+             class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30">
+    </div>
+    <div>
+      <label class="mb-1 block text-xs font-medium text-slate-400">Von</label>
+      <input type="date" name="date_from" value="{{ request.args.get('date_from', '') }}" data-live-search
+             class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30">
+    </div>
+    <div>
+      <label class="mb-1 block text-xs font-medium text-slate-400">Bis</label>
+      <input type="date" name="date_to" value="{{ request.args.get('date_to', '') }}" data-live-search
+             class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30">
+    </div>
+    <div class="sm:col-span-2 lg:col-span-5 flex flex-wrap items-center gap-2 pt-1">
+      {{ btn("Suchen") }}
+      <a href="{{ url_for('warnings_page') }}"
+         class="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/10">
+        Filter zurücksetzen
+      </a>
+    </div>
   </form>
 </div>
 

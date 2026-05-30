@@ -30,6 +30,27 @@
     *::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, .35); border: 2px solid transparent; background-clip: padding-box; }
     *::-webkit-scrollbar-corner { background: transparent; }
     html { scrollbar-color: rgba(148, 163, 184, .25) transparent; scrollbar-width: thin; }
+
+    /* ── Scrollspy sticky sub-header ── */
+    [data-scrollspy] {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(10px);
+      transition: background-color .2s, border-color .2s, box-shadow .2s, padding .2s;
+      margin-left: -1rem;
+      margin-right: -1rem;
+      padding: .65rem 1rem;
+      background-color: rgba(10, 15, 26, 0);
+      border-bottom: 1px solid transparent;
+    }
+    @media (min-width: 640px) { [data-scrollspy] { margin-left: -1.5rem; margin-right: -1.5rem; padding-left: 1.5rem; padding-right: 1.5rem; } }
+    @media (min-width: 1024px) { [data-scrollspy] { margin-left: -2rem; margin-right: -2rem; padding-left: 2rem; padding-right: 2rem; } }
+    [data-scrollspy].pumbot-scrollspy-stuck {
+      background-color: rgba(10, 15, 26, 0.88);
+      border-bottom-color: rgba(255,255,255,.06);
+      box-shadow: 0 10px 30px -20px rgba(0,0,0,.6);
+    }
   </style>
 </head>
 
@@ -250,6 +271,81 @@
       }
       window.addEventListener("beforeunload", () => {
         if (main) window.sessionStorage.setItem(key, String(main.scrollTop || 0));
+      });
+    });
+
+    /* ─── Scrollspy navigation (sticky anchor sub-header) ─── */
+    document.addEventListener("DOMContentLoaded", () => {
+      const scroller = document.querySelector("main");
+      document.querySelectorAll("[data-scrollspy]").forEach((nav) => {
+        const links = Array.from(nav.querySelectorAll("[data-scrollspy-link]"));
+        if (!links.length || !scroller) return;
+        const sections = links
+          .map((a) => {
+            const id = (a.getAttribute("href") || "").replace(/^#/, "");
+            return id ? document.getElementById(id) : null;
+          })
+          .filter(Boolean);
+
+        const setActive = (id) => {
+          links.forEach((a) => {
+            const isActive = a.getAttribute("href") === "#" + id;
+            a.dataset.active = isActive ? "true" : "false";
+            if (isActive) {
+              a.className =
+                "inline-flex items-center gap-2 rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-3 py-1.5 text-xs font-semibold text-cyan-200 transition";
+            } else {
+              a.className =
+                "inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-slate-400 transition hover:border-white/20 hover:bg-white/[0.06] hover:text-white";
+            }
+          });
+        };
+
+        links.forEach((a) => {
+          a.addEventListener("click", (e) => {
+            const id = (a.getAttribute("href") || "").replace(/^#/, "");
+            const target = document.getElementById(id);
+            if (!target) return;
+            e.preventDefault();
+            const navHeight = nav.getBoundingClientRect().height || 0;
+            const top =
+              target.getBoundingClientRect().top -
+              scroller.getBoundingClientRect().top +
+              scroller.scrollTop -
+              navHeight -
+              16;
+            scroller.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+            setActive(id);
+          });
+        });
+
+        const stickyToggle = () => {
+          const placeholder = nav.previousElementSibling;
+          if (!placeholder) return;
+          const placeholderBottom =
+            placeholder.getBoundingClientRect().bottom -
+            scroller.getBoundingClientRect().top;
+          const stuck = placeholderBottom <= 0;
+          nav.classList.toggle("pumbot-scrollspy-stuck", stuck);
+        };
+
+        const onScroll = () => {
+          stickyToggle();
+          const navHeight = nav.getBoundingClientRect().height || 0;
+          const offset = navHeight + 24;
+          let current = sections[0]?.id;
+          for (const sec of sections) {
+            const top =
+              sec.getBoundingClientRect().top -
+              scroller.getBoundingClientRect().top;
+            if (top - offset <= 0) current = sec.id;
+          }
+          if (current) setActive(current);
+        };
+
+        scroller.addEventListener("scroll", onScroll, { passive: true });
+        window.addEventListener("resize", onScroll);
+        onScroll();
       });
     });
   </script>

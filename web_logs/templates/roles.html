@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import page_header, field, btn, stat, empty_state %}
+{% from "_macros.html" import page_header, field, btn, stat, empty_state, scrollspy_nav %}
 
 {# ──────────────────────────────────────────────────────────────────────────
    Helpers
@@ -60,6 +60,77 @@
 </div>
 {% endmacro %}
 
+{# Reusable Discord server role table with client-side pagination + search #}
+{% macro server_role_table(rows, table_id, search_placeholder="Rolle suchen \u2026") %}
+{% if rows %}
+<div data-roles-paginated="{{ table_id }}" data-page-size="10">
+  <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+    <div class="text-xs text-slate-500"><span data-roles-info>0</span></div>
+    <input type="search" data-roles-search placeholder="{{ search_placeholder }}"
+      class="w-56 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30">
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead>
+        <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+          <th class="px-3 py-2.5">Rolle</th>
+          <th class="px-3 py-2.5">Position</th>
+          <th class="px-3 py-2.5">Status</th>
+          <th class="px-3 py-2.5 text-right">ID</th>
+        </tr>
+      </thead>
+      <tbody data-roles-body>
+        {% for role in rows %}
+        {% set rcolor = role.color if (role.color and role.color != "#000000") else "#94a3b8" %}
+        <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.03]" data-roles-row data-roles-name="{{ role.name|lower }}">
+          <td class="px-3 py-2.5">
+            <span class="inline-flex items-center gap-2.5 rounded-md border px-2.5 py-1"
+                  style="border-color:{{ rcolor }}33; background-color:{{ rcolor }}11; color:{{ rcolor }}">
+              <span class="h-2 w-2 rounded-full" style="background-color:{{ rcolor }}"></span>
+              <span class="font-medium">{{ role.name }}</span>
+            </span>
+          </td>
+          <td class="px-3 py-2.5 text-slate-400 text-xs">#{{ role.position }}</td>
+          <td class="px-3 py-2.5">
+            {% if role.manageable %}
+            <span class="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10.5px] font-medium text-emerald-300">
+              <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>verwaltbar
+            </span>
+            {% else %}
+            <span class="inline-flex items-center gap-1 rounded-full border border-slate-500/25 bg-slate-500/10 px-2 py-0.5 text-[10.5px] font-medium text-slate-400" title="{{ role.blocked_reason }}">
+              <span class="h-1.5 w-1.5 rounded-full bg-slate-500"></span>{{ role.blocked_reason or "blockiert" }}
+            </span>
+            {% endif %}
+          </td>
+          <td class="px-3 py-2.5 text-right">
+            <button type="button" data-copy="{{ role.id }}"
+                    class="inline-flex items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[10.5px] text-slate-400 transition hover:bg-white/10 hover:text-white"
+                    title="ID kopieren">
+              <span class="truncate max-w-[12ch]">{{ role.id }}</span>
+              <svg class="h-3 w-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+        <tr data-roles-empty class="hidden"><td colspan="4" class="px-3 py-6 text-center text-sm text-slate-500">Keine Treffer.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
+    <label class="flex items-center gap-2 text-xs text-slate-500">
+      Pro Seite
+      <select data-roles-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white">
+        <option selected>10</option><option>25</option><option>50</option><option>100</option>
+      </select>
+    </label>
+    <div data-roles-pagination class="flex-1"></div>
+  </div>
+</div>
+{% else %}
+{{ empty_state("Keine Rollen", "Hier ist aktuell nichts zu sehen.") }}
+{% endif %}
+{% endmacro %}
+
 
 {% block content %}
 {{ page_header("Rollen", "Rollen & Berechtigungen", "Discord-Rollen mit Panel-Rechten verknüpfen, Mitglieder einsehen und Server-Rollen verwalten.") }}
@@ -68,20 +139,20 @@
 <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
   {{ stat("Web Rollen", roles|length) }}
   {{ stat("Mitglieder mit Web Rolle", total_members_with_web_role) }}
-  {{ stat("Vergebene Rechte", total_permissions_assigned) }}
-  {{ stat("Server Rollen", server_roles|length) }}
+  {{ stat("Server Rollen", regular_server_roles|length) }}
+  {{ stat("Self-Roles", selfrole_server_roles|length) }}
 </div>
 
-{# ── Tabs ── #}
-<div class="mb-6 flex flex-wrap gap-2 border-b border-white/[0.06] pb-3" data-tabs>
-  <button type="button" data-tab-target="web" class="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-300">Web Rollen</button>
-  <button type="button" data-tab-target="server" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300">Server Rollen</button>
-</div>
+{{ scrollspy_nav([
+  {"id": "web-roles", "label": "Web Rollen"},
+  {"id": "server-roles", "label": "Server Rollen"},
+  {"id": "selfroles", "label": "Self-Roles", "badge": selfrole_server_roles|length}
+]) }}
 
 {# ════════════════════════════════════════════════════════════════
    WEB ROLES
    ════════════════════════════════════════════════════════════════ #}
-<section data-tab-panel="web">
+<section id="web-roles" class="scroll-mt-24 mb-10">
   <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
     <div class="flex flex-1 items-center gap-3">
       <div class="relative max-w-xs flex-1">
@@ -163,7 +234,7 @@
 {# ════════════════════════════════════════════════════════════════
    SERVER ROLES
    ════════════════════════════════════════════════════════════════ #}
-<section data-tab-panel="server" class="hidden space-y-6">
+<section id="server-roles" class="scroll-mt-24 mb-10 space-y-6">
   <div class="grid gap-4 lg:grid-cols-2">
     <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
       <h2 class="mb-1 text-sm font-semibold text-white">Neue Discord-Rolle</h2>
@@ -202,66 +273,31 @@
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 class="text-sm font-semibold text-white">Server Rollen</h2>
-        <p class="mt-0.5 text-xs text-slate-500">Live aus Discord — sortiert nach Position.</p>
+        <p class="mt-0.5 text-xs text-slate-500">Live aus Discord — sortiert nach Position. Self-Roles werden im eigenen Tab gelistet.</p>
       </div>
       <div class="flex flex-wrap items-center gap-3">
-        {% set manageable_count = server_roles|selectattr("manageable")|list|length %}
+        {% set manageable_count = regular_server_roles|selectattr("manageable")|list|length %}
         <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs text-emerald-300">{{ manageable_count }} verwaltbar</span>
-        <span class="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs text-slate-400">{{ server_roles|length }} gesamt</span>
-        <input type="search" data-server-role-search placeholder="Rolle suchen …"
-          class="w-56 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30">
+        <span class="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs text-slate-400">{{ regular_server_roles|length }} gesamt</span>
       </div>
     </div>
-    {% if server_roles %}
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-sm">
-        <thead>
-          <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
-            <th class="px-3 py-2.5">Rolle</th>
-            <th class="px-3 py-2.5">Position</th>
-            <th class="px-3 py-2.5">Status</th>
-            <th class="px-3 py-2.5 text-right">ID</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for role in server_roles %}
-          {% set rcolor = role.color if (role.color and role.color != "#000000") else "#94a3b8" %}
-          <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.03]" data-server-role-row data-role-name="{{ role.name|lower }}">
-            <td class="px-3 py-2.5">
-              <span class="inline-flex items-center gap-2.5 rounded-md border px-2.5 py-1"
-                    style="border-color:{{ rcolor }}33; background-color:{{ rcolor }}11; color:{{ rcolor }}">
-                <span class="h-2 w-2 rounded-full" style="background-color:{{ rcolor }}"></span>
-                <span class="font-medium">{{ role.name }}</span>
-              </span>
-            </td>
-            <td class="px-3 py-2.5 text-slate-400 text-xs">#{{ role.position }}</td>
-            <td class="px-3 py-2.5">
-              {% if role.manageable %}
-              <span class="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10.5px] font-medium text-emerald-300">
-                <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>verwaltbar
-              </span>
-              {% else %}
-              <span class="inline-flex items-center gap-1 rounded-full border border-slate-500/25 bg-slate-500/10 px-2 py-0.5 text-[10.5px] font-medium text-slate-400" title="{{ role.blocked_reason }}">
-                <span class="h-1.5 w-1.5 rounded-full bg-slate-500"></span>{{ role.blocked_reason or "blockiert" }}
-              </span>
-              {% endif %}
-            </td>
-            <td class="px-3 py-2.5 text-right">
-              <button type="button" data-copy="{{ role.id }}"
-                      class="inline-flex items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[10.5px] text-slate-400 transition hover:bg-white/10 hover:text-white"
-                      title="ID kopieren">
-                <span class="truncate max-w-[12ch]">{{ role.id }}</span>
-                <svg class="h-3 w-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-              </button>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    {{ server_role_table(regular_server_roles, "server-regular") }}
+  </div>
+</section>
+
+{# ════════════════════════════════════════════════════════════════
+   SELFROLES
+   ════════════════════════════════════════════════════════════════ #}
+<section id="selfroles" class="scroll-mt-24 mb-10 space-y-6">
+  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="text-sm font-semibold text-white">Self-Roles</h2>
+        <p class="mt-0.5 text-xs text-slate-500">Discord-Rollen, die über ein Selfrole-Panel vergeben werden.</p>
+      </div>
+      <span class="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs text-slate-400">{{ selfrole_server_roles|length }} gesamt</span>
     </div>
-    {% else %}
-    {{ empty_state("Keine Server-Rollen geladen", "Der Bot muss verbunden sein, damit Live-Rollen angezeigt werden können.") }}
-    {% endif %}
+    {{ server_role_table(selfrole_server_roles, "server-selfroles", "Self-Role suchen \u2026") }}
   </div>
 </section>
 
@@ -392,20 +428,6 @@
 {% block scripts %}
 <script>
   document.addEventListener("DOMContentLoaded", () => {
-    /* ─── Outer tabs (Web/Server) ─── */
-    const tabButtons = Array.from(document.querySelectorAll("[data-tab-target]"));
-    const panels = Array.from(document.querySelectorAll("[data-tab-panel]"));
-    const storageKey = "pumbot:tab:roles";
-    const activeBtn = "rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-300";
-    const inactiveBtn = "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300";
-    const activateTab = (name) => {
-      tabButtons.forEach((b) => b.className = (b.dataset.tabTarget === name) ? activeBtn : inactiveBtn);
-      panels.forEach((p) => p.classList.toggle("hidden", p.dataset.tabPanel !== name));
-      sessionStorage.setItem(storageKey, name);
-    };
-    tabButtons.forEach((b) => b.addEventListener("click", () => activateTab(b.dataset.tabTarget)));
-    activateTab(sessionStorage.getItem(storageKey) || "web");
-
     /* ─── Modal helpers ─── */
     const showModal = (el) => {
       if (!el) return;
@@ -558,13 +580,59 @@
       if (gridEmpty) gridEmpty.classList.toggle("hidden", visible !== 0);
     });
 
-    /* ─── Server role search ─── */
-    const srvSearch = document.querySelector("[data-server-role-search]");
-    srvSearch?.addEventListener("input", () => {
-      const q = srvSearch.value.trim().toLowerCase();
-      document.querySelectorAll("[data-server-role-row]").forEach((row) => {
-        row.classList.toggle("hidden", q && !row.dataset.roleName.includes(q));
-      });
+    /* ─── Server role tables: search + client pagination ─── */
+    document.querySelectorAll("[data-roles-paginated]").forEach((root) => {
+      const search = root.querySelector("[data-roles-search]");
+      const rows = Array.from(root.querySelectorAll("[data-roles-row]"));
+      const emptyRow = root.querySelector("[data-roles-empty]");
+      const sizeSel = root.querySelector("[data-roles-page-size]");
+      const pager = root.querySelector("[data-roles-pagination]");
+      const info = root.querySelector("[data-roles-info]");
+      let page = 1;
+
+      const render = () => {
+        const q = (search?.value || "").trim().toLowerCase();
+        const filtered = rows.filter((r) => !q || r.dataset.rolesName.includes(q));
+        const size = Math.max(1, parseInt(sizeSel?.value || "10", 10));
+        const pages = Math.max(1, Math.ceil(filtered.length / size));
+        if (page > pages) page = pages;
+        if (page < 1) page = 1;
+        const start = (page - 1) * size;
+        const end = start + size;
+        rows.forEach((r) => r.classList.add("hidden"));
+        filtered.slice(start, end).forEach((r) => r.classList.remove("hidden"));
+        if (emptyRow) emptyRow.classList.toggle("hidden", filtered.length > 0);
+        if (info) info.textContent = `${filtered.length.toLocaleString("de-DE")} Einträge · Seite ${page} von ${pages}`;
+        if (pager) {
+          const mkBtn = (label, target, opts = {}) => {
+            const dis = opts.disabled ? "disabled" : "";
+            const cls = opts.active
+              ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-200"
+              : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.08] hover:text-white";
+            return `<button type="button" data-pg="${target}" ${dis} class="inline-flex h-8 min-w-[2rem] items-center justify-center rounded-md border px-2 text-xs font-medium transition disabled:opacity-30 ${cls}">${label}</button>`;
+          };
+          const nums = new Set([1, pages, page - 1, page, page + 1]);
+          const sorted = [...nums].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
+          let html = "";
+          let last = 0;
+          for (const n of sorted) {
+            if (n - last > 1) html += '<span class="px-1 text-slate-600">…</span>';
+            html += mkBtn(String(n), n, { active: n === page });
+            last = n;
+          }
+          pager.innerHTML = `<div class="flex flex-wrap items-center justify-end gap-1.5">${mkBtn("«", 1, { disabled: page <= 1 })}${mkBtn("‹", page - 1, { disabled: page <= 1 })}${html}${mkBtn("›", page + 1, { disabled: page >= pages })}${mkBtn("»", pages, { disabled: page >= pages })}</div>`;
+          pager.querySelectorAll("button[data-pg]").forEach((b) => {
+            b.addEventListener("click", () => {
+              const t = Number(b.dataset.pg);
+              if (Number.isFinite(t) && t >= 1) { page = t; render(); }
+            });
+          });
+        }
+      };
+
+      search?.addEventListener("input", () => { page = 1; render(); });
+      sizeSel?.addEventListener("change", () => { page = 1; render(); });
+      render();
     });
 
     /* ─── Permission picker behavior ─── */

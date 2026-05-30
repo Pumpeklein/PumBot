@@ -25,13 +25,14 @@
 </div>
 
 <div class="mb-6 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
-  <form id="users-filter" method="get" class="grid gap-3 md:grid-cols-[1fr_180px_auto] md:items-end">
+  <form id="users-filter" method="get" class="grid gap-3 md:grid-cols-2 lg:grid-cols-4 lg:items-end">
     <input type="hidden" name="guild_id" value="{{ guild_id }}">
-    <div>
+    <div class="relative lg:col-span-2" data-suggest-root>
       <label class="mb-1.5 block text-xs font-medium text-slate-400">Suche</label>
-      <input type="text" name="q" data-live-search value="{{ q }}"
+      <input type="text" name="q" data-live-search data-suggest-input value="{{ q }}" autocomplete="off"
              placeholder="Name, Username oder ID …"
              class="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30" />
+      <div data-suggest-list class="absolute left-0 right-0 top-full z-30 mt-1 hidden max-h-72 overflow-y-auto rounded-lg border border-white/10 bg-[#0d1320] shadow-2xl"></div>
     </div>
     <div>
       <label class="mb-1.5 block text-xs font-medium text-slate-400">Status</label>
@@ -42,7 +43,34 @@
         <option value="left" {% if status == "left" %}selected{% endif %}>Verlassen</option>
       </select>
     </div>
-    {{ btn("Suchen") }}
+    <div>
+      <label class="mb-1.5 block text-xs font-medium text-slate-400">Presence</label>
+      <select name="presence" data-live-search
+              class="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm text-white focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30">
+        <option value="">Alle</option>
+        <option value="online" {% if presence == "online" %}selected{% endif %}>Online</option>
+        <option value="idle" {% if presence == "idle" %}selected{% endif %}>Idle</option>
+        <option value="dnd" {% if presence == "dnd" %}selected{% endif %}>DND</option>
+        <option value="offline" {% if presence == "offline" %}selected{% endif %}>Offline</option>
+      </select>
+    </div>
+    <div class="lg:col-span-2">
+      <label class="mb-1.5 block text-xs font-medium text-slate-400">Rolle</label>
+      <select name="role_id" data-live-search
+              class="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm text-white focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30">
+        <option value="">Alle Rollen</option>
+        {% for role in server_roles %}
+        <option value="{{ role.id }}" {% if role_id == role.id|string %}selected{% endif %}>{{ role.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="flex items-center gap-2 lg:col-span-2">
+      {{ btn("Suchen") }}
+      <a href="{{ url_for('users_page') }}"
+         class="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/10">
+        Zurücksetzen
+      </a>
+    </div>
   </form>
 </div>
 
@@ -93,4 +121,64 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const root = document.querySelector("[data-suggest-root]");
+  if (!root) return;
+  const input = root.querySelector("[data-suggest-input]");
+  const list = root.querySelector("[data-suggest-list]");
+  let timer = null;
+  let lastQ = "";
+
+  const hide = () => { list.classList.add("hidden"); list.innerHTML = ""; };
+  const escapeHtml = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+  const render = (items) => {
+    if (!items.length) { hide(); return; }
+    list.innerHTML = items.map((u) => {
+      const avatar = u.avatar_url
+        ? `<img src="${escapeHtml(u.avatar_url)}" class="h-7 w-7 rounded-full" alt="">`
+        : `<span class="flex h-7 w-7 items-center justify-center rounded-full bg-slate-700 text-[10px] font-semibold text-white">${escapeHtml((u.display_name || "?").slice(0, 2).toUpperCase())}</span>`;
+      const dot = u.status === "left" ? "bg-slate-500" : "bg-emerald-400";
+      return `<button type="button" data-suggest-pick data-user-id="${escapeHtml(u.user_id)}" data-display="${escapeHtml(u.display_name || u.username || u.user_id)}"
+        class="flex w-full items-center gap-3 border-b border-white/[0.04] px-3 py-2 text-left text-sm transition last:border-b-0 hover:bg-white/[0.04]">
+        ${avatar}
+        <span class="min-w-0 flex-1">
+          <span class="flex items-center gap-2"><span class="truncate font-medium text-slate-100">${escapeHtml(u.display_name || u.username || "—")}</span><span class="h-1.5 w-1.5 rounded-full ${dot}"></span></span>
+          <span class="block truncate text-[11px] text-slate-500">${escapeHtml(u.username || "")} · ${escapeHtml(u.user_id)}</span>
+        </span>
+      </button>`;
+    }).join("");
+    list.classList.remove("hidden");
+    list.querySelectorAll("[data-suggest-pick]").forEach((btn) => {
+      btn.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        input.value = btn.dataset.userId;
+        hide();
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    });
+  };
+
+  const fetchSuggest = async () => {
+    const q = input.value.trim();
+    if (q.length < 2) { hide(); return; }
+    if (q === lastQ) return;
+    lastQ = q;
+    try {
+      const resp = await fetch(`/panel-api/users/suggest?q=${encodeURIComponent(q)}`, { credentials: "same-origin" });
+      if (!resp.ok) return;
+      render(await resp.json());
+    } catch (_) { /* noop */ }
+  };
+
+  input.addEventListener("input", () => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(fetchSuggest, 200);
+  });
+  input.addEventListener("focus", () => { if (input.value.trim().length >= 2) fetchSuggest(); });
+  document.addEventListener("click", (e) => { if (!root.contains(e.target)) hide(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") hide(); });
+});
+</script>
 {% endblock %}

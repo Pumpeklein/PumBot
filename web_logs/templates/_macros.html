@@ -59,6 +59,23 @@
 </div>
 {% endmacro %}
 
+{# Sticky anchor-nav (scrollspy). items = [{id, label, icon?}, ...] #}
+{% macro scrollspy_nav(items) %}
+<nav data-scrollspy class="mb-6">
+  <div class="flex flex-wrap items-center gap-2">
+    {% for it in items %}
+    <a href="#{{ it.id }}" data-scrollspy-link
+       class="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-slate-400 transition hover:border-white/20 hover:bg-white/[0.06] hover:text-white">
+      {% if it.icon %}<svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">{{ it.icon|safe }}</svg>{% endif %}
+      <span>{{ it.label }}</span>
+      {% set _badge = it.badge if it.badge is defined else None %}
+      {% if _badge is not none and _badge != "" %}<span class="ml-1 rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-400">{{ _badge }}</span>{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+</nav>
+{% endmacro %}
+
 {% macro card(title="", class="") %}
 <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 {{ class }}">
   {% if title %}

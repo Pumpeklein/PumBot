@@ -9,14 +9,19 @@
 
   const getValue = (row, key) => {
     if (!key) return "";
-    return key.split(".").reduce((value, part) => (value == null ? "" : value[part]), row);
+    return key
+      .split(".")
+      .reduce((value, part) => (value == null ? "" : value[part]), row);
   };
 
   const formatDate = (value) => {
     if (!value) return "-";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return escapeHtml(value);
-    return new Intl.DateTimeFormat("de-DE", { dateStyle: "short", timeStyle: "short" }).format(date);
+    return new Intl.DateTimeFormat("de-DE", {
+      dateStyle: "short",
+      timeStyle: "short",
+    }).format(date);
   };
 
   const initials = (value) => {
@@ -43,7 +48,11 @@
       const editedAt = getValue(row, column.editedAtKey);
       const deletedAt = getValue(row, column.deletedAtKey);
       const changed = original && original !== value;
-      const status = deletedAt ? "Gelöscht" : editedAt && changed ? "Bearbeitet" : "";
+      const status = deletedAt
+        ? "Gelöscht"
+        : editedAt && changed
+          ? "Bearbeitet"
+          : "";
       const statusClass = deletedAt
         ? "border-red-500/25 bg-red-500/10 text-red-300"
         : "border-amber-500/25 bg-amber-500/10 text-amber-300";
@@ -84,13 +93,19 @@
         ? `<img src="${escapeHtml(avatar)}" alt="" class="h-8 w-8 rounded-full">`
         : `<span class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-xs font-semibold text-white">${initials(name)}</span>`;
       const body = `<span class="flex items-center gap-3">${avatarHtml}<span><span class="block font-medium text-slate-200">${escapeHtml(name)}</span>${sub ? `<span class="block text-xs text-slate-500">${escapeHtml(sub)}</span>` : ""}</span></span>`;
-      return url ? `<a href="${escapeHtml(url)}" class="hover:text-white">${body}</a>` : body;
+      return url
+        ? `<a href="${escapeHtml(url)}" class="hover:text-white">${body}</a>`
+        : body;
     }
-    if (column.type === "badge") return renderBadge(value || column.fallback, column.variants);
-    if (column.type === "date") return `<span class="whitespace-nowrap text-slate-500">${formatDate(value)}</span>`;
+    if (column.type === "badge")
+      return renderBadge(value || column.fallback, column.variants);
+    if (column.type === "date")
+      return `<span class="whitespace-nowrap text-slate-500">${formatDate(value)}</span>`;
     if (column.type === "link") {
       const url = getValue(row, column.urlKey);
-      return url ? `<a href="${escapeHtml(url)}" class="font-semibold text-white hover:text-cyan-300">${escapeHtml(value || "-")}</a>` : escapeHtml(value || "-");
+      return url
+        ? `<a href="${escapeHtml(url)}" class="font-semibold text-white hover:text-cyan-300">${escapeHtml(value || "-")}</a>`
+        : escapeHtml(value || "-");
     }
     if (column.type === "delete") {
       const url = getValue(row, column.urlKey);
@@ -98,9 +113,12 @@
       return `<form method="post" action="${escapeHtml(url)}" class="text-right" onsubmit="return confirm('${escapeHtml(column.confirm || "Wirklich löschen?")}')"><button type="submit" class="rounded border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-400 transition hover:bg-red-500/20">${escapeHtml(column.label || "Löschen")}</button></form>`;
     }
     if (column.type === "rank") {
-      if (value === 1) return '<span class="font-bold text-yellow-400">#1</span>';
-      if (value === 2) return '<span class="font-bold text-slate-300">#2</span>';
-      if (value === 3) return '<span class="font-bold text-amber-600">#3</span>';
+      if (value === 1)
+        return '<span class="font-bold text-yellow-400">#1</span>';
+      if (value === 2)
+        return '<span class="font-bold text-slate-300">#2</span>';
+      if (value === 3)
+        return '<span class="font-bold text-amber-600">#3</span>';
       return `<span class="text-slate-500">#${escapeHtml(value || "-")}</span>`;
     }
     if (column.type === "percentage") {
@@ -110,23 +128,40 @@
       const base = column.includeNumerator === false ? den : total;
       if (!base) return '<span class="text-slate-600">—</span>';
       const pct = Math.round((num / base) * 100);
-      const tone = pct >= 90 ? "text-emerald-300" : pct >= 70 ? "text-cyan-300" : pct >= 50 ? "text-amber-300" : "text-red-300";
-      return `<div class="flex items-center gap-2"><span class="font-medium ${tone}">${pct}%</span><span class="h-1.5 w-14 overflow-hidden rounded-full bg-white/10"><span class="block h-full ${tone.replace('text-','bg-')}" style="width:${pct}%"></span></span></div>`;
+      const tone =
+        pct >= 90
+          ? "text-emerald-300"
+          : pct >= 70
+            ? "text-cyan-300"
+            : pct >= 50
+              ? "text-amber-300"
+              : "text-red-300";
+      return `<div class="flex items-center gap-2"><span class="font-medium ${tone}">${pct}%</span><span class="h-1.5 w-14 overflow-hidden rounded-full bg-white/10"><span class="block h-full ${tone.replace("text-", "bg-")}" style="width:${pct}%"></span></span></div>`;
     }
     if (column.type === "badges") {
       const items = getValue(row, column.key);
-      if (!Array.isArray(items) || items.length === 0) return '<span class="text-slate-600">—</span>';
+      if (!Array.isArray(items) || items.length === 0)
+        return '<span class="text-slate-600">—</span>';
       const max = column.max || 4;
       const visible = items.slice(0, max);
       const rest = items.length - visible.length;
-      const html = visible.map((it) => {
-        const label = typeof it === "string" ? it : (it.label || it.name || "");
-        const color = typeof it === "object" ? it.color : null;
-        const style = color ? ` style="background-color:${color}22;color:${color};border-color:${color}55"` : "";
-        const cls = color ? "border" : "border border-white/10 bg-white/5 text-slate-300";
-        return `<span class="inline-flex items-center rounded-full ${cls} px-2 py-0.5 text-[10.5px] font-medium"${style}>${escapeHtml(label)}</span>`;
-      }).join(" ");
-      const more = rest > 0 ? `<span class="text-[10.5px] text-slate-500">+${rest}</span>` : "";
+      const html = visible
+        .map((it) => {
+          const label = typeof it === "string" ? it : it.label || it.name || "";
+          const color = typeof it === "object" ? it.color : null;
+          const style = color
+            ? ` style="background-color:${color}22;color:${color};border-color:${color}55"`
+            : "";
+          const cls = color
+            ? "border"
+            : "border border-white/10 bg-white/5 text-slate-300";
+          return `<span class="inline-flex items-center rounded-full ${cls} px-2 py-0.5 text-[10.5px] font-medium"${style}>${escapeHtml(label)}</span>`;
+        })
+        .join(" ");
+      const more =
+        rest > 0
+          ? `<span class="text-[10.5px] text-slate-500">+${rest}</span>`
+          : "";
       return `<div class="flex flex-wrap items-center gap-1">${html}${more}</div>`;
     }
     return escapeHtml(value || column.fallback || "-");
@@ -155,14 +190,18 @@
       return `<button type="button" data-pg="${target}" ${disabled} class="inline-flex h-8 min-w-[2rem] items-center justify-center rounded-md border px-2 text-xs font-medium transition disabled:opacity-30 disabled:hover:bg-white/[0.03] ${active}">${label}</button>`;
     };
     const pageNumbers = [];
-    const add = (n) => { if (n >= 1 && n <= pages && !pageNumbers.includes(n)) pageNumbers.push(n); };
-    add(1); add(pages);
+    const add = (n) => {
+      if (n >= 1 && n <= pages && !pageNumbers.includes(n)) pageNumbers.push(n);
+    };
+    add(1);
+    add(pages);
     for (let i = page - 1; i <= page + 1; i++) add(i);
     pageNumbers.sort((a, b) => a - b);
     const numHtml = [];
     let last = 0;
     for (const n of pageNumbers) {
-      if (n - last > 1) numHtml.push('<span class="px-1 text-slate-600">…</span>');
+      if (n - last > 1)
+        numHtml.push('<span class="px-1 text-slate-600">…</span>');
       numHtml.push(btn(String(n), n, { active: n === page }));
       last = n;
     }
@@ -187,8 +226,12 @@
 
   const init = (root) => {
     const endpoint = root.dataset.endpoint;
-    const columns = JSON.parse(root.querySelector("script[type='application/json']").textContent);
-    const form = root.dataset.form ? document.querySelector(root.dataset.form) : null;
+    const columns = JSON.parse(
+      root.querySelector("script[type='application/json']").textContent,
+    );
+    const form = root.dataset.form
+      ? document.querySelector(root.dataset.form)
+      : null;
     const body = root.querySelector("[data-table-body]");
     const empty = root.querySelector("[data-table-empty]");
     const status = root.querySelector("[data-table-status]");
@@ -203,7 +246,10 @@
 
     const rowsHtmlFor = (items) =>
       items
-        .map((row) => `<tr class="border-b border-white/[0.04] transition ${escapeHtml(row._row_class || "hover:bg-white/[0.02]")}">${columns.map((column) => `<td class="${column.class || "px-3 py-2.5"}">${renderCell(row, column)}</td>`).join("")}</tr>`)
+        .map(
+          (row) =>
+            `<tr class="border-b border-white/[0.04] transition ${escapeHtml(row._row_class || "hover:bg-white/[0.02]")}">${columns.map((column) => `<td class="${column.class || "px-3 py-2.5"}">${renderCell(row, column)}</td>`).join("")}</tr>`,
+        )
         .join("");
 
     const load = async (quiet = false) => {
@@ -212,22 +258,39 @@
       try {
         const params = collectParams(form);
         params.set("page", page);
-        params.set("page_size", pageSize ? pageSize.value : root.dataset.pageSize || "10");
+        params.set(
+          "page_size",
+          pageSize ? pageSize.value : root.dataset.pageSize || "10",
+        );
         if (!quiet) {
           body.innerHTML = `<tr><td colspan="${columns.length}" class="px-3 py-8 text-center text-slate-500">Lädt...</td></tr>`;
         }
-        const response = await fetch(`${endpoint}?${params.toString()}`, { headers: { Accept: "application/json" } });
+        const response = await fetch(`${endpoint}?${params.toString()}`, {
+          headers: { Accept: "application/json" },
+        });
         const data = await response.json();
         const items = data.items || [];
-        const pagination = data.pagination || { page: 1, pages: 1, total: items.length };
-        const signature = JSON.stringify({ items, p: pagination.page, ps: pagination.pages });
-        if (quiet && signature === lastSignature) { loading = false; return; }
+        const pagination = data.pagination || {
+          page: 1,
+          pages: 1,
+          total: items.length,
+        };
+        const signature = JSON.stringify({
+          items,
+          p: pagination.page,
+          ps: pagination.pages,
+        });
+        if (quiet && signature === lastSignature) {
+          loading = false;
+          return;
+        }
         lastSignature = signature;
 
         const html = rowsHtmlFor(items);
         if (body.innerHTML !== html) body.innerHTML = html;
         if (empty) empty.classList.toggle("hidden", items.length > 0);
-        if (status) status.textContent = `${pagination.total} Einträge · Seite ${pagination.page} von ${pagination.pages || 1}`;
+        if (status)
+          status.textContent = `${pagination.total} Einträge · Seite ${pagination.page} von ${pagination.pages || 1}`;
         if (prev) prev.disabled = pagination.page <= 1;
         if (next) next.disabled = pagination.page >= (pagination.pages || 1);
         page = pagination.page;
@@ -241,23 +304,48 @@
     };
 
     if (form) {
-      form.addEventListener("submit", (event) => { event.preventDefault(); page = 1; load(); });
-      form.querySelectorAll("input[data-live-search], select[data-live-search]").forEach((input) => {
-        let timeoutId;
-        const handler = () => {
-          window.clearTimeout(timeoutId);
-          timeoutId = window.setTimeout(() => { page = 1; load(true); }, 250);
-        };
-        input.addEventListener("input", handler);
-        input.addEventListener("change", handler);
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        page = 1;
+        load();
       });
+      form
+        .querySelectorAll("input[data-live-search], select[data-live-search]")
+        .forEach((input) => {
+          let timeoutId;
+          const handler = () => {
+            window.clearTimeout(timeoutId);
+            timeoutId = window.setTimeout(() => {
+              page = 1;
+              load(true);
+            }, 250);
+          };
+          input.addEventListener("input", handler);
+          input.addEventListener("change", handler);
+        });
     }
-    if (pageSize) pageSize.addEventListener("change", () => { page = 1; load(); });
-    if (prev) prev.addEventListener("click", () => { if (page > 1) { page -= 1; load(); } });
-    if (next) next.addEventListener("click", () => { page += 1; load(); });
+    if (pageSize)
+      pageSize.addEventListener("change", () => {
+        page = 1;
+        load();
+      });
+    if (prev)
+      prev.addEventListener("click", () => {
+        if (page > 1) {
+          page -= 1;
+          load();
+        }
+      });
+    if (next)
+      next.addEventListener("click", () => {
+        page += 1;
+        load();
+      });
     load();
     if (refreshMs > 0) {
-      window.setInterval(() => { if (!document.hidden) load(true); }, refreshMs);
+      window.setInterval(() => {
+        if (!document.hidden) load(true);
+      }, refreshMs);
     }
   };
 
@@ -266,7 +354,8 @@
     if (modal) return modal;
     modal = document.createElement("div");
     modal.id = "pumbot-msg-modal";
-    modal.className = "fixed inset-0 z-[200] hidden items-center justify-center bg-black/70 p-4 backdrop-blur-sm";
+    modal.className =
+      "fixed inset-0 z-[200] hidden items-center justify-center bg-black/70 p-4 backdrop-blur-sm";
     modal.innerHTML = `
       <div class="max-h-[80vh] w-full max-w-2xl overflow-hidden rounded-xl border border-white/10 bg-[#0d1320] shadow-2xl">
         <div class="flex items-center justify-between border-b border-white/10 px-5 py-3">
@@ -287,7 +376,8 @@
     document.body.appendChild(modal);
     modal.addEventListener("click", (e) => {
       if (e.target === modal || e.target.closest("[data-modal-close]")) {
-        modal.classList.add("hidden"); modal.classList.remove("flex");
+        modal.classList.add("hidden");
+        modal.classList.remove("flex");
       }
     });
     return modal;
@@ -299,28 +389,40 @@
     try {
       const payload = JSON.parse(trigger.dataset.pumbotMessage);
       const modal = ensureModal();
-      modal.querySelector("[data-modal-title]").textContent = payload.title || "Nachricht";
-      modal.querySelector("[data-modal-body]").textContent = payload.content || "";
+      modal.querySelector("[data-modal-title]").textContent =
+        payload.title || "Nachricht";
+      modal.querySelector("[data-modal-body]").textContent =
+        payload.content || "";
       const statusEl = modal.querySelector("[data-modal-status]");
       if (payload.status) {
-        const tone = payload.status === "Gelöscht"
-          ? "border-red-500/25 bg-red-500/10 text-red-300"
-          : "border-amber-500/25 bg-amber-500/10 text-amber-300";
+        const tone =
+          payload.status === "Gelöscht"
+            ? "border-red-500/25 bg-red-500/10 text-red-300"
+            : "border-amber-500/25 bg-amber-500/10 text-amber-300";
         statusEl.innerHTML = `<span class="inline-flex rounded border px-2 py-0.5 text-[11px] ${tone}">${payload.status}</span>`;
-      } else { statusEl.innerHTML = ""; }
+      } else {
+        statusEl.innerHTML = "";
+      }
       const wrap = modal.querySelector("[data-modal-original-wrap]");
       if (payload.original) {
         wrap.classList.remove("hidden");
-        modal.querySelector("[data-modal-original]").textContent = payload.original;
-      } else { wrap.classList.add("hidden"); }
-      modal.classList.remove("hidden"); modal.classList.add("flex");
-    } catch (err) { /* ignore */ }
+        modal.querySelector("[data-modal-original]").textContent =
+          payload.original;
+      } else {
+        wrap.classList.add("hidden");
+      }
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+    } catch (err) {
+      /* ignore */
+    }
   });
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     const modal = document.getElementById("pumbot-msg-modal");
     if (modal && !modal.classList.contains("hidden")) {
-      modal.classList.add("hidden"); modal.classList.remove("flex");
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
     }
   });
 

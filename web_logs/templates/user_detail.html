@@ -187,7 +187,7 @@
     {% endif %}
   </div>
 
-  <div data-paginated-table data-endpoint="{{ url_for('panel_api_messages') }}" data-form="#messages-filter" data-page-size="10" data-auto-refresh-ms="5000" class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+  <div data-paginated-table data-endpoint="{{ url_for('panel_api_messages') }}" data-form="#messages-filter" data-page-size="10" class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
     <script type="application/json">
       [
         {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},
@@ -212,20 +212,19 @@
       </table>
     </div>
     <div data-table-empty class="hidden">{{ empty_state("Keine Nachrichten", "Der Message-Sync hat für diesen User noch nichts gespeichert.") }}</div>
-    <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400">
-      <span data-table-status></span>
-      <div class="flex items-center gap-2">
-        <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
-        <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button>
-        <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
-      </div>
-    </div>
+    <div class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
+    <label class="flex items-center gap-2 text-xs text-slate-500">
+      Pro Seite
+      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+    </label>
+    <div data-table-pagination class="flex-1"></div>
+  </div>
   </div>
 </section>
 
 <section data-tab-panel="history" class="hidden">
   <div class="mb-6 grid gap-6 lg:grid-cols-2">
-    <div data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#edited-history-filter" data-page-size="10" data-auto-refresh-ms="5000" class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+    <div data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#edited-history-filter" data-page-size="10" class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
       <script type="application/json">
         [
           {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},
@@ -238,10 +237,16 @@
       <h2 class="mb-4 text-sm font-semibold text-white">Bearbeitete Nachrichten</h2>
       <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Vorher</th><th class="px-3 py-2.5">Nachher</th><th class="px-3 py-2.5">Zeitpunkt</th></tr></thead><tbody data-table-body></tbody></table></div>
       <div data-table-empty class="hidden">{{ empty_state("Keine Edits", "Für diesen User wurden keine bearbeiteten Nachrichten gespeichert.") }}</div>
-      <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400"><span data-table-status></span><div class="flex items-center gap-2"><select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option></select><button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button><button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button></div></div>
+      <div class="flex flex-col gap-3 border-t border-white/[0.06] px-4 py-3 sm:flex-row sm:items-center">
+    <label class="flex items-center gap-2 text-xs text-slate-500">
+      Pro Seite
+      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+    </label>
+    <div data-table-pagination class="flex-1"></div>
+  </div>
     </div>
 
-    <div data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#deleted-history-filter" data-page-size="10" data-auto-refresh-ms="5000" class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+    <div data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#deleted-history-filter" data-page-size="10" class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
       <script type="application/json">
         [
           {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},
@@ -253,7 +258,13 @@
       <h2 class="mb-4 text-sm font-semibold text-white">Gelöschte Nachrichten</h2>
       <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Gelöschter Inhalt</th><th class="px-3 py-2.5">Zeitpunkt</th></tr></thead><tbody data-table-body></tbody></table></div>
       <div data-table-empty class="hidden">{{ empty_state("Keine gelöschten Nachrichten", "Für diesen User wurden keine Löschungen gespeichert.") }}</div>
-      <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400"><span data-table-status></span><div class="flex items-center gap-2"><select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option></select><button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button><button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button></div></div>
+      <div class="flex flex-col gap-3 border-t border-white/[0.06] px-4 py-3 sm:flex-row sm:items-center">
+    <label class="flex items-center gap-2 text-xs text-slate-500">
+      Pro Seite
+      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+    </label>
+    <div data-table-pagination class="flex-1"></div>
+  </div>
     </div>
   </div>
 
@@ -277,7 +288,7 @@
 </section>
 
 <section data-tab-panel="tickets" class="hidden">
-  <div data-paginated-table data-endpoint="{{ url_for('panel_api_user_tickets', user_id=member.user_id, guild_id=guild_id) }}" data-page-size="10" data-auto-refresh-ms="5000" class="overflow-hidden rounded-xl border border-white/[0.06]">
+  <div data-paginated-table data-endpoint="{{ url_for('panel_api_user_tickets', user_id=member.user_id, guild_id=guild_id) }}" data-page-size="10" class="overflow-hidden rounded-xl border border-white/[0.06]">
     <script type="application/json">
       [
         {"key":"ticket_id","type":"link","urlKey":"detail_url","class":"whitespace-nowrap px-4 py-3"},
@@ -290,7 +301,13 @@
     </script>
     <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-4 py-3 font-medium">Ticket</th><th class="px-4 py-3 font-medium">Betreff</th><th class="px-4 py-3 font-medium">Status</th><th class="px-4 py-3 font-medium">Kategorie</th><th class="px-4 py-3 font-medium">Erstellt</th><th class="px-4 py-3 font-medium">Aktualisiert</th></tr></thead><tbody data-table-body class="divide-y divide-white/[0.04]"></tbody></table></div>
     <div data-table-empty class="hidden">{{ empty_state("Keine Tickets", "Dieser User hat noch keine Tickets geöffnet.") }}</div>
-    <div class="flex items-center justify-between border-t border-white/[0.06] px-4 py-3 text-sm text-slate-400"><span data-table-status></span><div class="flex items-center gap-2"><select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select><button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button><button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button></div></div>
+    <div class="flex flex-col gap-3 border-t border-white/[0.06] px-4 py-3 sm:flex-row sm:items-center">
+    <label class="flex items-center gap-2 text-xs text-slate-500">
+      Pro Seite
+      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+    </label>
+    <div data-table-pagination class="flex-1"></div>
+  </div>
   </div>
 </section>
 {% endblock %}

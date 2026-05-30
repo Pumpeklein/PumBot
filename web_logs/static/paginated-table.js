@@ -16,10 +16,7 @@
     if (!value) return "-";
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return escapeHtml(value);
-    return new Intl.DateTimeFormat("de-DE", {
-      dateStyle: "short",
-      timeStyle: "short",
-    }).format(date);
+    return new Intl.DateTimeFormat("de-DE", { dateStyle: "short", timeStyle: "short" }).format(date);
   };
 
   const initials = (value) => {
@@ -47,15 +44,34 @@
       const deletedAt = getValue(row, column.deletedAtKey);
       const changed = original && original !== value;
       const status = deletedAt ? "Gelöscht" : editedAt && changed ? "Bearbeitet" : "";
-
       const statusClass = deletedAt
         ? "border-red-500/25 bg-red-500/10 text-red-300"
         : "border-amber-500/25 bg-amber-500/10 text-amber-300";
 
+      const fullText = String(value || column.fallback || "-");
+      const limit = column.previewLength || 140;
+      const truncated = fullText.length > limit;
+      const preview = truncated ? fullText.slice(0, limit) + "…" : fullText;
+      const interactive = truncated || changed;
+      const payload = {
+        title: column.modalTitle || "Nachricht",
+        content: fullText,
+        original: changed ? original : null,
+        status,
+      };
+      const dataAttr = interactive
+        ? ` data-pumbot-message='${escapeHtml(JSON.stringify(payload))}'`
+        : "";
+      const cls = interactive
+        ? "cursor-pointer text-slate-200 hover:text-white"
+        : "text-slate-200";
+
       return `<div class="max-w-xl">
-        <div class="whitespace-pre-wrap break-words text-slate-200">${escapeHtml(value || column.fallback || "-")}</div>
+        <div${dataAttr} class="${cls}">
+          <span class="whitespace-pre-wrap break-words">${escapeHtml(preview)}</span>
+          ${interactive ? '<span class="ml-1 text-[10.5px] uppercase tracking-wider text-cyan-400">mehr</span>' : ""}
+        </div>
         ${status ? `<div class="mt-1 inline-flex rounded border px-2 py-0.5 text-[11px] ${statusClass}">${status}</div>` : ""}
-        ${changed ? `<details class="mt-1 text-xs text-slate-500"><summary class="cursor-pointer text-slate-400 hover:text-white">Original anzeigen</summary><div class="mt-1 whitespace-pre-wrap break-words rounded border border-white/10 bg-black/20 p-2">${escapeHtml(original)}</div></details>` : ""}
       </div>`;
     }
 
@@ -64,13 +80,10 @@
       const sub = getValue(row, column.subKey);
       const avatar = getValue(row, column.avatarKey);
       const url = getValue(row, column.urlKey);
-
       const avatarHtml = avatar
         ? `<img src="${escapeHtml(avatar)}" alt="" class="h-8 w-8 rounded-full">`
         : `<span class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-xs font-semibold text-white">${initials(name)}</span>`;
-
       const body = `<span class="flex items-center gap-3">${avatarHtml}<span><span class="block font-medium text-slate-200">${escapeHtml(name)}</span>${sub ? `<span class="block text-xs text-slate-500">${escapeHtml(sub)}</span>` : ""}</span></span>`;
-
       return url ? `<a href="${escapeHtml(url)}" class="hover:text-white">${body}</a>` : body;
     }
     if (column.type === "badge") return renderBadge(value || column.fallback, column.variants);
@@ -129,6 +142,49 @@
     return params;
   };
 
+  const buildPagination = (container, pagination, onGoto) => {
+    if (!container) return;
+    const page = pagination.page || 1;
+    const pages = pagination.pages || 1;
+    const total = pagination.total || 0;
+    const btn = (label, target, opts = {}) => {
+      const disabled = opts.disabled ? "disabled" : "";
+      const active = opts.active
+        ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-200"
+        : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/[0.08] hover:text-white";
+      return `<button type="button" data-pg="${target}" ${disabled} class="inline-flex h-8 min-w-[2rem] items-center justify-center rounded-md border px-2 text-xs font-medium transition disabled:opacity-30 disabled:hover:bg-white/[0.03] ${active}">${label}</button>`;
+    };
+    const pageNumbers = [];
+    const add = (n) => { if (n >= 1 && n <= pages && !pageNumbers.includes(n)) pageNumbers.push(n); };
+    add(1); add(pages);
+    for (let i = page - 1; i <= page + 1; i++) add(i);
+    pageNumbers.sort((a, b) => a - b);
+    const numHtml = [];
+    let last = 0;
+    for (const n of pageNumbers) {
+      if (n - last > 1) numHtml.push('<span class="px-1 text-slate-600">…</span>');
+      numHtml.push(btn(String(n), n, { active: n === page }));
+      last = n;
+    }
+    container.innerHTML = `
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="text-xs text-slate-500">${total.toLocaleString("de-DE")} Einträge · Seite ${page} von ${pages}</div>
+        <div class="flex items-center gap-1.5">
+          ${btn("«", 1, { disabled: page <= 1 })}
+          ${btn("‹", page - 1, { disabled: page <= 1 })}
+          ${numHtml.join("")}
+          ${btn("›", page + 1, { disabled: page >= pages })}
+          ${btn("»", pages, { disabled: page >= pages })}
+        </div>
+      </div>`;
+    container.querySelectorAll("button[data-pg]").forEach((b) => {
+      b.addEventListener("click", () => {
+        const t = Number(b.dataset.pg);
+        if (Number.isFinite(t) && t >= 1) onGoto(t);
+      });
+    });
+  };
+
   const init = (root) => {
     const endpoint = root.dataset.endpoint;
     const columns = JSON.parse(root.querySelector("script[type='application/json']").textContent);
@@ -139,9 +195,16 @@
     const prev = root.querySelector("[data-page-prev]");
     const next = root.querySelector("[data-page-next]");
     const pageSize = root.querySelector("[data-page-size]");
+    const paginationEl = root.querySelector("[data-table-pagination]");
     const refreshMs = Number(root.dataset.autoRefreshMs || 0);
     let page = 1;
     let loading = false;
+    let lastSignature = null;
+
+    const rowsHtmlFor = (items) =>
+      items
+        .map((row) => `<tr class="border-b border-white/[0.04] transition ${escapeHtml(row._row_class || "hover:bg-white/[0.02]")}">${columns.map((column) => `<td class="${column.class || "px-3 py-2.5"}">${renderCell(row, column)}</td>`).join("")}</tr>`)
+        .join("");
 
     const load = async (quiet = false) => {
       if (loading) return;
@@ -156,46 +219,110 @@
         const response = await fetch(`${endpoint}?${params.toString()}`, { headers: { Accept: "application/json" } });
         const data = await response.json();
         const items = data.items || [];
-        const pagination = data.pagination || { page: 1, pages: 1, total: 0 };
-        body.innerHTML = items
-          .map((row) => `<tr class="border-b border-white/[0.04] transition ${escapeHtml(row._row_class || "hover:bg-white/[0.02]")}">${columns.map((column) => `<td class="${column.class || "px-3 py-2.5"}">${renderCell(row, column)}</td>`).join("")}</tr>`)
-          .join("");
-        empty.classList.toggle("hidden", items.length > 0);
-        status.textContent = `${pagination.total} Einträge - Seite ${pagination.page} von ${pagination.pages}`;
-        prev.disabled = pagination.page <= 1;
-        next.disabled = pagination.page >= pagination.pages;
+        const pagination = data.pagination || { page: 1, pages: 1, total: items.length };
+        const signature = JSON.stringify({ items, p: pagination.page, ps: pagination.pages });
+        if (quiet && signature === lastSignature) { loading = false; return; }
+        lastSignature = signature;
+
+        const html = rowsHtmlFor(items);
+        if (body.innerHTML !== html) body.innerHTML = html;
+        if (empty) empty.classList.toggle("hidden", items.length > 0);
+        if (status) status.textContent = `${pagination.total} Einträge · Seite ${pagination.page} von ${pagination.pages || 1}`;
+        if (prev) prev.disabled = pagination.page <= 1;
+        if (next) next.disabled = pagination.page >= (pagination.pages || 1);
+        page = pagination.page;
+        buildPagination(paginationEl, pagination, (target) => {
+          page = Math.max(1, Math.min(target, pagination.pages || 1));
+          load();
+        });
       } finally {
         loading = false;
       }
     };
 
     if (form) {
-      form.addEventListener("submit", (event) => {
-        event.preventDefault();
-        page = 1;
-        load();
-      });
-      form.querySelectorAll("input[data-live-search]").forEach((input) => {
+      form.addEventListener("submit", (event) => { event.preventDefault(); page = 1; load(); });
+      form.querySelectorAll("input[data-live-search], select[data-live-search]").forEach((input) => {
         let timeoutId;
-        input.addEventListener("input", () => {
+        const handler = () => {
           window.clearTimeout(timeoutId);
-          timeoutId = window.setTimeout(() => {
-            page = 1;
-            load(true);
-          }, 250);
-        });
+          timeoutId = window.setTimeout(() => { page = 1; load(true); }, 250);
+        };
+        input.addEventListener("input", handler);
+        input.addEventListener("change", handler);
       });
     }
     if (pageSize) pageSize.addEventListener("change", () => { page = 1; load(); });
-    prev.addEventListener("click", () => { if (page > 1) { page -= 1; load(); } });
-    next.addEventListener("click", () => { page += 1; load(); });
+    if (prev) prev.addEventListener("click", () => { if (page > 1) { page -= 1; load(); } });
+    if (next) next.addEventListener("click", () => { page += 1; load(); });
     load();
     if (refreshMs > 0) {
-      window.setInterval(() => {
-        if (!document.hidden) load(true);
-      }, refreshMs);
+      window.setInterval(() => { if (!document.hidden) load(true); }, refreshMs);
     }
   };
+
+  const ensureModal = () => {
+    let modal = document.getElementById("pumbot-msg-modal");
+    if (modal) return modal;
+    modal = document.createElement("div");
+    modal.id = "pumbot-msg-modal";
+    modal.className = "fixed inset-0 z-[200] hidden items-center justify-center bg-black/70 p-4 backdrop-blur-sm";
+    modal.innerHTML = `
+      <div class="max-h-[80vh] w-full max-w-2xl overflow-hidden rounded-xl border border-white/10 bg-[#0d1320] shadow-2xl">
+        <div class="flex items-center justify-between border-b border-white/10 px-5 py-3">
+          <h3 data-modal-title class="text-sm font-semibold text-white">Nachricht</h3>
+          <button type="button" data-modal-close class="rounded p-1 text-slate-400 hover:bg-white/10 hover:text-white">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="max-h-[60vh] overflow-y-auto px-5 py-4">
+          <div data-modal-status class="mb-2"></div>
+          <pre data-modal-body class="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-slate-200"></pre>
+          <details data-modal-original-wrap class="mt-4 hidden">
+            <summary class="cursor-pointer text-xs font-semibold uppercase tracking-wider text-slate-500 hover:text-white">Original anzeigen</summary>
+            <pre data-modal-original class="mt-2 whitespace-pre-wrap break-words rounded border border-white/10 bg-black/30 p-3 font-sans text-xs text-slate-400"></pre>
+          </details>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal || e.target.closest("[data-modal-close]")) {
+        modal.classList.add("hidden"); modal.classList.remove("flex");
+      }
+    });
+    return modal;
+  };
+
+  document.addEventListener("click", (e) => {
+    const trigger = e.target.closest("[data-pumbot-message]");
+    if (!trigger) return;
+    try {
+      const payload = JSON.parse(trigger.dataset.pumbotMessage);
+      const modal = ensureModal();
+      modal.querySelector("[data-modal-title]").textContent = payload.title || "Nachricht";
+      modal.querySelector("[data-modal-body]").textContent = payload.content || "";
+      const statusEl = modal.querySelector("[data-modal-status]");
+      if (payload.status) {
+        const tone = payload.status === "Gelöscht"
+          ? "border-red-500/25 bg-red-500/10 text-red-300"
+          : "border-amber-500/25 bg-amber-500/10 text-amber-300";
+        statusEl.innerHTML = `<span class="inline-flex rounded border px-2 py-0.5 text-[11px] ${tone}">${payload.status}</span>`;
+      } else { statusEl.innerHTML = ""; }
+      const wrap = modal.querySelector("[data-modal-original-wrap]");
+      if (payload.original) {
+        wrap.classList.remove("hidden");
+        modal.querySelector("[data-modal-original]").textContent = payload.original;
+      } else { wrap.classList.add("hidden"); }
+      modal.classList.remove("hidden"); modal.classList.add("flex");
+    } catch (err) { /* ignore */ }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const modal = document.getElementById("pumbot-msg-modal");
+    if (modal && !modal.classList.contains("hidden")) {
+      modal.classList.add("hidden"); modal.classList.remove("flex");
+    }
+  });
 
   document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll("[data-paginated-table]").forEach(init);

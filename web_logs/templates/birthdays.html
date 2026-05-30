@@ -96,9 +96,9 @@
 </div>
 
 {# ── Bot Messages ── #}
-<details class="mb-6 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5" {% if birthday_messages %}open{% endif %}>
-  <summary class="flex cursor-pointer items-center gap-2 text-sm font-semibold text-white">
-    <svg class="h-4 w-4 text-slate-400 transition group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+<details class="group mb-6 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+  <summary class="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden">
+    <svg class="h-4 w-4 text-slate-400 transition-transform duration-200 group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
     Listen-Nachrichten
     <span class="ml-auto rounded-full bg-white/5 px-2.5 py-0.5 text-xs text-slate-400">{{ birthday_messages|length }}</span>
   </summary>
@@ -126,7 +126,7 @@
 </details>
 
 {# ── All birthdays table ── #}
-<div data-paginated-table data-endpoint="{{ url_for('panel_api_birthdays') }}" data-form="#birthdays-filter" data-page-size="25" class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+<div data-paginated-table data-endpoint="{{ url_for('panel_api_birthdays') }}" data-form="#birthdays-filter" data-page-size="10" class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
   <script type="application/json">
     [
       {"type":"user","nameKey":"user_display_name","subKey":"user_username","avatarKey":"user_avatar_url","urlKey":"user_detail_url","class":"px-3 py-2.5"},
@@ -156,13 +156,12 @@
     </table>
   </div>
   <div data-table-empty class="hidden">{{ empty_state("Keine Geburtstage gespeichert", "Füge oben einen neuen Geburtstag hinzu.") }}</div>
-  <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400">
-    <span data-table-status></span>
-    <div class="flex items-center gap-2">
-      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option>10</option><option selected>25</option><option>50</option><option>100</option></select>
-      <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button>
-      <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
-    </div>
+  <div class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
+    <label class="flex items-center gap-2 text-xs text-slate-500">
+      Pro Seite
+      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+    </label>
+    <div data-table-pagination class="flex-1"></div>
   </div>
 </div>
 {% endblock %}

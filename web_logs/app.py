@@ -60,6 +60,7 @@ try:
         delete_role,
         delete_selfrole_panel,
         get_all_log_channels,
+        get_channel_names,
         get_all_selfrole_panels,
         get_auto_publisher_channels,
         get_birthday,
@@ -178,6 +179,7 @@ except ImportError:
         delete_role,
         delete_selfrole_panel,
         get_all_log_channels,
+        get_channel_names,
         get_all_selfrole_panels,
         get_auto_publisher_channels,
         get_birthday,
@@ -306,11 +308,12 @@ def _refresh_session_permissions():
 def _ctx() -> dict:
     u = current_user()
     if not u:
-        return {"username": None, "avatar": None, "permissions": set()}
+        return {"username": None, "avatar": None, "permissions": set(), "discord_id": None}
     return {
         "username": u["username"],
         "avatar": u.get("avatar"),
         "permissions": u["permissions"],
+        "discord_id": str(u.get("discord_id") or "") or None,
     }
 
 
@@ -1811,8 +1814,17 @@ def warnings_delete(warning_id: int):
 @permission_required("config.manage")
 def log_channels_page():
     ctx = _ctx()
-    channels = get_all_log_channels(DEFAULT_GUILD_ID)
+    raw = get_all_log_channels(DEFAULT_GUILD_ID)
     log_types = ["voice_log", "user_log", "server_log", "message_log", "welcome_log"]
+    names = get_channel_names(DEFAULT_GUILD_ID, list(raw.values()))
+    channels: dict[str, dict] = {}
+    for lt in log_types:
+        cid = raw.get(lt)
+        if cid:
+            channels[lt] = {
+                "channel_id": str(cid),
+                "channel_name": names.get(str(cid)),
+            }
     return render_template(
         "log_channels.html",
         channels=channels,
@@ -1866,7 +1878,12 @@ def log_channels_delete(log_type: str):
 @permission_required("config.manage")
 def auto_publisher_page():
     ctx = _ctx()
-    channels = get_auto_publisher_channels(DEFAULT_GUILD_ID)
+    raw = get_auto_publisher_channels(DEFAULT_GUILD_ID)
+    names = get_channel_names(DEFAULT_GUILD_ID, raw)
+    channels = [
+        {"channel_id": str(cid), "channel_name": names.get(str(cid))}
+        for cid in raw
+    ]
     return render_template(
         "auto_publisher.html",
         channels=channels,
@@ -1900,10 +1917,15 @@ def server_stats_page():
     ctx = _ctx()
     stats = get_server_stats(DEFAULT_GUILD_ID)
     stat_types = ["all", "members", "bots", "channels", "roles"]
+    ids = [stats.get(k) for k in stat_types if stats.get(k)]
+    if stats.get("category_id"):
+        ids.append(stats["category_id"])
+    channel_names = get_channel_names(DEFAULT_GUILD_ID, ids)
     return render_template(
         "server_stats.html",
         stats=stats,
         stat_types=stat_types,
+        channel_names=channel_names,
         active_page="server_stats",
         **ctx,
     )

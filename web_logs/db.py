@@ -2143,6 +2143,52 @@ def set_server_stats(
         conn.commit()
 
 
+# ══════════ Channel Name Lookup ══════════
+
+
+def get_channel_names(guild_id: str, channel_ids) -> dict[str, str]:
+    """Best-effort lookup of channel display names from cached message/log data."""
+    if not channel_ids:
+        return {}
+    ids = [str(c) for c in channel_ids if c]
+    if not ids:
+        return {}
+    placeholders = ",".join(["?"] * len(ids))
+    result: dict[str, str] = {}
+    with _connect() as conn:
+        rows = conn.execute(
+            f"""SELECT channel_id, MAX(channel_name) AS channel_name
+                FROM guild_messages
+                WHERE guild_id = ? AND channel_id IN ({placeholders})
+                  AND channel_name IS NOT NULL AND channel_name <> ''
+                GROUP BY channel_id""",
+            (guild_id, *ids),
+        ).fetchall()
+        for row in rows:
+            if row.get("channel_name"):
+                result[str(row["channel_id"])] = row["channel_name"]
+        missing = [i for i in ids if i not in result]
+        if missing:
+            ph2 = ",".join(["?"] * len(missing))
+            rows = conn.execute(
+                f"""SELECT channel_id, MAX(channel_name) AS channel_name
+                    FROM discord_log_entries
+                    WHERE guild_id = ? AND channel_id IN ({ph2})
+                      AND channel_name IS NOT NULL AND channel_name <> ''
+                    GROUP BY channel_id""",
+                (guild_id, *missing),
+            ).fetchall()
+            for row in rows:
+                if row.get("channel_name"):
+                    result[str(row["channel_id"])] = row["channel_name"]
+    return result
+
+
+def get_channel_name(guild_id: str, channel_id: str) -> str | None:
+    names = get_channel_names(guild_id, [channel_id])
+    return names.get(str(channel_id))
+
+
 # ══════════ Log Channels ══════════
 
 

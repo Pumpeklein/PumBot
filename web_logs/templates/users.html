@@ -46,7 +46,7 @@
   </form>
 </div>
 
-<div data-paginated-table data-endpoint="{{ url_for('panel_api_users') }}" data-form="#users-filter" data-page-size="25" class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+<div data-paginated-table data-endpoint="{{ url_for('panel_api_users') }}" data-form="#users-filter" data-page-size="10" class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
   <script type="application/json">
     [
       {"type":"user","nameKey":"display_name","subKey":"username","avatarKey":"avatar_url","urlKey":"detail_url","class":"px-3 py-3"},
@@ -81,13 +81,12 @@
     </table>
   </div>
   <div data-table-empty class="hidden">{{ empty_state("Keine User gefunden", "Der Bot-Sync hat noch keine passenden User in der Datenbank.") }}</div>
-  <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400">
-    <span data-table-status></span>
-    <div class="flex items-center gap-2">
-      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option>10</option><option selected>25</option><option>50</option><option>100</option></select>
-      <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button>
-      <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
-    </div>
+  <div class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
+    <label class="flex items-center gap-2 text-xs text-slate-500">
+      Pro Seite
+      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+    </label>
+    <div data-table-pagination class="flex-1"></div>
   </div>
 </div>
 {% endblock %}

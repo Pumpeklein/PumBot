@@ -113,11 +113,15 @@
     });
   }
 
-  form.addEventListener("submit", function() {
+  form.addEventListener("submit", function(event) {
     if (select && select.value !== "__custom__") {
       hidden.value = select.value;
     } else {
       hidden.value = customInput.value;
+    }
+    const reason = (hidden.value || "").trim() || "ohne Grund";
+    if (!confirm("Ticket wirklich schließen?\n\nGrund: " + reason)) {
+      event.preventDefault();
     }
   });
 })();

@@ -77,13 +77,19 @@ GUILD_ID: Optional[int] = GUILD_ID_ENV or (
 
 DEFAULT_PREFIX = getattr(config, "DEFAULT_PREFIX", "!")
 COMMAND_PREFIX = commands.when_mentioned_or(DEFAULT_PREFIX)
+ENABLE_PRESENCE_INTENT = os.getenv("ENABLE_PRESENCE_INTENT", "1").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 intents = discord.Intents.default()
 intents.guilds = True
 intents.members = True
 intents.messages = True
 intents.message_content = True
-intents.presences = True
+intents.presences = ENABLE_PRESENCE_INTENT
 
 EXTENSIONS: list[str] = [
     "src.pumbot.commands.announcmentCommand",

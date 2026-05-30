@@ -161,9 +161,13 @@ class PumpeBot(commands.Bot):
     def message_payload(
         message: discord.Message, original_content: str | None = None
     ) -> dict[str, object | None]:
+        channel = message.channel
+        parent = getattr(channel, "parent", None)
         return {
-            "channel_id": str(message.channel.id),
-            "channel_name": getattr(message.channel, "name", str(message.channel.id)),
+            "channel_id": str(channel.id),
+            "channel_name": getattr(channel, "name", str(channel.id)),
+            "channel_type": type(channel).__name__,
+            "parent_channel_id": str(parent.id) if parent else None,
             "message_id": str(message.id),
             "user_id": str(message.author.id),
             "original_content": original_content,

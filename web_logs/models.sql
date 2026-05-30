@@ -76,6 +76,8 @@ CREATE TABLE IF NOT EXISTS guild_messages (
   guild_id TEXT NOT NULL,
   channel_id TEXT NOT NULL,
   channel_name TEXT,
+  channel_type TEXT,
+  parent_channel_id TEXT,
   message_id TEXT NOT NULL,
   user_id TEXT NOT NULL,
   original_content TEXT,

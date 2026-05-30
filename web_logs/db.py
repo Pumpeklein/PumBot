@@ -124,6 +124,8 @@ def init_db() -> None:
         })
         _ensure_columns(conn, "guild_messages", {
             "original_content": "TEXT",
+            "channel_type": "VARCHAR(32)",
+            "parent_channel_id": "VARCHAR(32)",
         })
         conn.commit()
     _seed_default_roles()
@@ -761,11 +763,14 @@ def upsert_guild_message(guild_id: str, message: dict[str, Any]) -> dict:
             )
         conn.execute(
             """INSERT INTO guild_messages (
-                 guild_id, channel_id, channel_name, message_id, user_id, original_content, content,
+                 guild_id, channel_id, channel_name, channel_type, parent_channel_id,
+                 message_id, user_id, original_content, content,
                  attachment_count, jump_url, created_at, edited_at, deleted_at, synced_at
-               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
                ON DUPLICATE KEY UPDATE
                  channel_name = VALUES(channel_name),
+                 channel_type = COALESCE(VALUES(channel_type), channel_type),
+                 parent_channel_id = COALESCE(VALUES(parent_channel_id), parent_channel_id),
                  user_id = VALUES(user_id),
                  original_content = COALESCE(original_content, VALUES(original_content), content),
                  content = VALUES(content),
@@ -779,6 +784,8 @@ def upsert_guild_message(guild_id: str, message: dict[str, Any]) -> dict:
                 guild_id,
                 channel_id,
                 message.get("channel_name"),
+                message.get("channel_type"),
+                message.get("parent_channel_id"),
                 message_id,
                 user_id,
                 message.get("original_content") or message.get("content"),
@@ -799,8 +806,11 @@ def upsert_guild_message(guild_id: str, message: dict[str, Any]) -> dict:
         return dict(row)
 
 
-def upsert_guild_messages(guild_id: str, messages: list[dict[str, Any]]) -> dict:
+def upsert_guild_messages(
+    guild_id: str, messages: list[dict[str, Any]], *, insert_only: bool = False
+) -> dict:
     synced = 0
+    skipped = 0
     with _connect() as conn:
         for message in messages:
             if not message.get("channel_id") or not message.get("message_id") or not message.get("user_id"):
@@ -814,6 +824,9 @@ def upsert_guild_messages(guild_id: str, messages: list[dict[str, Any]]) -> dict
                    WHERE guild_id = ? AND channel_id = ? AND message_id = ?""",
                 (guild_id, channel_id, message_id),
             ).fetchone()
+            if insert_only and existing:
+                skipped += 1
+                continue
             new_content = message.get("content")
             old_content = existing.get("content") if existing else None
             if existing and (old_content or "") != (new_content or ""):
@@ -831,13 +844,12 @@ def upsert_guild_messages(guild_id: str, messages: list[dict[str, Any]]) -> dict
                     jump_url=message.get("jump_url") or existing.get("jump_url"),
                     event_at=message.get("edited_at"),
                 )
-            conn.execute(
-            """INSERT INTO guild_messages (
-                     guild_id, channel_id, channel_name, message_id, user_id, original_content, content,
-                     attachment_count, jump_url, created_at, edited_at, deleted_at, synced_at
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-                   ON DUPLICATE KEY UPDATE
-                     channel_name = VALUES(channel_name),
+            duplicate_update = (
+                "message_id = message_id"
+                if insert_only
+                else """channel_name = VALUES(channel_name),
+                     channel_type = COALESCE(VALUES(channel_type), channel_type),
+                     parent_channel_id = COALESCE(VALUES(parent_channel_id), parent_channel_id),
                      user_id = VALUES(user_id),
                      original_content = COALESCE(original_content, VALUES(original_content), content),
                      content = VALUES(content),
@@ -846,11 +858,21 @@ def upsert_guild_messages(guild_id: str, messages: list[dict[str, Any]]) -> dict
                      created_at = VALUES(created_at),
                      edited_at = VALUES(edited_at),
                      deleted_at = COALESCE(VALUES(deleted_at), deleted_at),
-                     synced_at = CURRENT_TIMESTAMP""",
+                     synced_at = CURRENT_TIMESTAMP"""
+            )
+            cursor = conn.execute(
+                f"""INSERT INTO guild_messages (
+                      guild_id, channel_id, channel_name, channel_type, parent_channel_id,
+                      message_id, user_id, original_content, content,
+                      attachment_count, jump_url, created_at, edited_at, deleted_at, synced_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                    ON DUPLICATE KEY UPDATE {duplicate_update}""",
                 (
                     guild_id,
                     str(message["channel_id"]),
                     message.get("channel_name"),
+                    message.get("channel_type"),
+                    message.get("parent_channel_id"),
                     str(message["message_id"]),
                     str(message["user_id"]),
                     message.get("original_content") or message.get("content"),
@@ -862,9 +884,9 @@ def upsert_guild_messages(guild_id: str, messages: list[dict[str, Any]]) -> dict
                     message.get("deleted_at"),
                 ),
             )
-            synced += 1
+            synced += 1 if not insert_only or cursor.rowcount > 0 else 0
         conn.commit()
-    return {"synced": synced}
+    return {"synced": synced, "skipped": skipped}
 
 
 def mark_guild_message_deleted(guild_id: str, channel_id: str, message_id: str) -> None:

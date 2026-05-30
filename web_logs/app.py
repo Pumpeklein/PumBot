@@ -1945,7 +1945,11 @@ def api_upsert_guild_messages(guild_id: str):
     messages = data.get("messages") or []
     if not isinstance(messages, list):
         return jsonify({"ok": False, "error": "messages_must_be_list"}), 400
-    result = upsert_guild_messages(guild_id, messages)
+    result = upsert_guild_messages(
+        guild_id,
+        messages,
+        insert_only=bool(data.get("insert_only")),
+    )
     return jsonify({"ok": True, **result})
 
 

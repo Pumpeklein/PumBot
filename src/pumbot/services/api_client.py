@@ -85,8 +85,13 @@ class ApiClient:
     async def upsert_guild_message(self, guild_id: str, data: dict) -> dict | None:
         return await self.post(f"/api/guild/{guild_id}/messages", data)
 
-    async def upsert_guild_messages(self, guild_id: str, messages: list[dict]) -> dict | None:
-        return await self.post(f"/api/guild/{guild_id}/messages/bulk", {"messages": messages})
+    async def upsert_guild_messages(
+        self, guild_id: str, messages: list[dict], *, insert_only: bool = False
+    ) -> dict | None:
+        return await self.post(
+            f"/api/guild/{guild_id}/messages/bulk",
+            {"messages": messages, "insert_only": insert_only},
+        )
 
     async def mark_guild_message_deleted(
         self, guild_id: str, channel_id: str, message_id: str

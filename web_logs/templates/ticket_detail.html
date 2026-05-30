@@ -1,58 +1,47 @@
 {% extends "base.html" %}
-{% from "_macros.html" import page_header, badge, stat, empty_state, btn %}
+{% from "_macros.html" import page_header, badge, stat, stat_tile, empty_state, btn, id_chip %}
 
 {% block content %}
-{{ page_header("Ticket Detail", "Ticket " ~ t.ticket_id, "Alle Kerninfos, Nachrichten, das Transkript und die letzten Log-Einträge auf einen Blick.") }}
+{{ page_header("Ticket Center", "Ticket " ~ t.ticket_id, t.subject or "Ohne Betreff") }}
 
-{# Stats row #}
-<div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-  {{ stat("Status", t.status or "-") }}
-  {{ stat("Ersteller", t.creator_display_name or t.creator_username or t.creator_user_id or "-") }}
-  {{ stat("Kategorie", t.category or t.subject or "-") }}
-  {{ stat("Nachrichten", messages|length) }}
+{# ── Hero ── #}
+<div class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+  {% set st = (t.status or "open")|lower %}
+  {{ stat_tile("Status", (t.status or "—")|capitalize, accent=("emerald" if st == "closed" else "amber")) }}
+  {{ stat_tile("Ersteller", t.creator_display_name or t.creator_username or t.creator_user_id or "—", accent="violet", sub=(t.creator_user_id or "")) }}
+  {{ stat_tile("Kategorie", t.category or "Allgemein", accent="cyan") }}
+  {{ stat_tile("Nachrichten", messages|length, accent="cyan", sub="im Transkript") }}
 </div>
 
-{# Overview #}
-<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-  <h2 class="mb-4 text-sm font-semibold text-white">Übersicht</h2>
-  <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-    <div class="rounded-lg border border-white/5 bg-white/[0.02] p-3">
-      <div class="text-xs uppercase tracking-wider text-slate-500">Betreff</div>
-      <div class="mt-1 text-sm text-white">{{ t.subject or "Ohne Betreff" }}</div>
-    </div>
-    <div class="rounded-lg border border-white/5 bg-white/[0.02] p-3">
-      <div class="text-xs uppercase tracking-wider text-slate-500">Status</div>
-      <div class="mt-1">{{ badge(t.status or "-", "success" if t.status == "closed" else "warning") }}</div>
-    </div>
-    <div class="rounded-lg border border-white/5 bg-white/[0.02] p-3">
-      <div class="text-xs uppercase tracking-wider text-slate-500">Ersteller</div>
-      <div class="mt-1 text-sm text-white">{{ t.creator_display_name or t.creator_username or "-" }}</div>
-    </div>
-    <div class="rounded-lg border border-white/5 bg-white/[0.02] p-3">
-      <div class="text-xs uppercase tracking-wider text-slate-500">Geschlossen am</div>
-      <div class="mt-1 text-sm text-white">{{ t.closed_at|datetime_de if t.closed_at else "-" }}</div>
-      {% if t.closed_by_name %}
-      <div class="mt-0.5 text-xs text-slate-500">von {{ t.closed_by_name }}</div>
-      {% endif %}
-    </div>
-  </div>
+{# ── Compact meta strip ── #}
+<div class="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-white/[0.06] bg-[#0d1320] px-5 py-3 text-xs text-slate-400">
+  <span class="text-slate-500">Ticket-ID:</span> {{ id_chip(t.ticket_id) }}
+  {% if t.channel_id %}<span class="text-slate-500">Channel:</span> {{ id_chip(t.channel_id) }}{% endif %}
+  {% if t.created_at %}<span class="ml-auto">Erstellt: <span class="text-slate-200">{{ t.created_at }}</span></span>{% endif %}
+  {% if t.closed_at %}<span>· Geschlossen: <span class="text-slate-200">{{ t.closed_at|datetime_de }}</span>{% if t.closed_by_name %} von <span class="text-slate-200">{{ t.closed_by_name }}</span>{% endif %}</span>{% endif %}
+</div>
+
+{# ── Extras row (twitch, close reason) ── #}
+{% if t.close_reason or t.twitch_name %}
+<div class="mb-6 grid gap-3 lg:grid-cols-2">
   {% if t.close_reason %}
-  <div class="mt-3 rounded-lg border border-white/5 bg-white/[0.02] p-3">
-    <div class="text-xs uppercase tracking-wider text-slate-500">Schließungsgrund</div>
-    <div class="mt-1 text-sm text-slate-300">{{ t.close_reason }}</div>
+  <div class="rounded-xl border border-amber-500/15 bg-amber-500/[0.04] p-4">
+    <div class="text-[11px] font-medium uppercase tracking-wider text-amber-300">Schließungsgrund</div>
+    <div class="mt-1 text-sm text-slate-200">{{ t.close_reason }}</div>
   </div>
   {% endif %}
   {% if t.twitch_name %}
-  <div class="mt-3 rounded-lg border border-purple-500/20 bg-purple-500/5 p-3">
-    <div class="text-xs uppercase tracking-wider text-slate-500">Twitch</div>
-    <div class="mt-1 flex items-center gap-2">
-      <svg class="h-4 w-4 text-purple-400" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>
-      <a href="https://twitch.tv/{{ t.twitch_name }}" target="_blank" rel="noopener"
-        class="text-sm font-medium text-purple-400 hover:text-purple-300 transition">{{ t.twitch_name }}</a>
-    </div>
+  <div class="rounded-xl border border-purple-500/20 bg-purple-500/[0.05] p-4">
+    <div class="text-[11px] font-medium uppercase tracking-wider text-purple-300">Twitch</div>
+    <a href="https://twitch.tv/{{ t.twitch_name }}" target="_blank" rel="noopener"
+       class="mt-1 inline-flex items-center gap-2 text-sm font-medium text-purple-300 hover:text-purple-200">
+      <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>
+      {{ t.twitch_name }}
+    </a>
   </div>
   {% endif %}
 </div>
+{% endif %}
 
 {# Messages #}
 <div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">

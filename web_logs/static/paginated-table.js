@@ -90,6 +90,32 @@
       if (value === 3) return '<span class="font-bold text-amber-600">#3</span>';
       return `<span class="text-slate-500">#${escapeHtml(value || "-")}</span>`;
     }
+    if (column.type === "percentage") {
+      const num = Number(getValue(row, column.numeratorKey) || 0);
+      const den = Number(getValue(row, column.denominatorKey) || 0);
+      const total = num + (column.includeNumerator === false ? 0 : den);
+      const base = column.includeNumerator === false ? den : total;
+      if (!base) return '<span class="text-slate-600">—</span>';
+      const pct = Math.round((num / base) * 100);
+      const tone = pct >= 90 ? "text-emerald-300" : pct >= 70 ? "text-cyan-300" : pct >= 50 ? "text-amber-300" : "text-red-300";
+      return `<div class="flex items-center gap-2"><span class="font-medium ${tone}">${pct}%</span><span class="h-1.5 w-14 overflow-hidden rounded-full bg-white/10"><span class="block h-full ${tone.replace('text-','bg-')}" style="width:${pct}%"></span></span></div>`;
+    }
+    if (column.type === "badges") {
+      const items = getValue(row, column.key);
+      if (!Array.isArray(items) || items.length === 0) return '<span class="text-slate-600">—</span>';
+      const max = column.max || 4;
+      const visible = items.slice(0, max);
+      const rest = items.length - visible.length;
+      const html = visible.map((it) => {
+        const label = typeof it === "string" ? it : (it.label || it.name || "");
+        const color = typeof it === "object" ? it.color : null;
+        const style = color ? ` style="background-color:${color}22;color:${color};border-color:${color}55"` : "";
+        const cls = color ? "border" : "border border-white/10 bg-white/5 text-slate-300";
+        return `<span class="inline-flex items-center rounded-full ${cls} px-2 py-0.5 text-[10.5px] font-medium"${style}>${escapeHtml(label)}</span>`;
+      }).join(" ");
+      const more = rest > 0 ? `<span class="text-[10.5px] text-slate-500">+${rest}</span>` : "";
+      return `<div class="flex flex-wrap items-center gap-1">${html}${more}</div>`;
+    }
     return escapeHtml(value || column.fallback || "-");
   };
 

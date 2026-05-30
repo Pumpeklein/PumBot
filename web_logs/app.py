@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import asyncio
 import json
@@ -41,6 +41,8 @@ try:
         add_ticket_message,
         add_warning,
         count_birthdays,
+        count_birthdays_in_month,
+        get_upcoming_birthdays,
         count_counting_leaderboard,
         count_guild_members,
         count_discord_log_entries,
@@ -157,6 +159,8 @@ except ImportError:
         add_ticket_message,
         add_warning,
         count_birthdays,
+        count_birthdays_in_month,
+        get_upcoming_birthdays,
         count_counting_leaderboard,
         count_guild_members,
         count_discord_log_entries,
@@ -639,9 +643,9 @@ def _role_blocked_reason(role, actor_member=None, bot_member=None) -> str:
     if getattr(role, "managed", False):
         return "Managed Rolle"
     if not _member_can_manage_role(actor_member, role):
-        return "Über deiner höchsten Rolle"
+        return "�ber deiner h�chsten Rolle"
     if not _member_can_manage_role(bot_member, role):
-        return "Über der Bot-Rolle"
+        return "�ber der Bot-Rolle"
     return "Nicht verwaltbar"
 
 
@@ -698,14 +702,14 @@ async def _discord_add_member_role(
         )
     if not _member_can_manage_role(actor, role):
         raise RuntimeError(
-            "Du kannst keine Rolle vergeben, die über deiner höchsten Rolle liegt."
+            "Du kannst keine Rolle vergeben, die �ber deiner h�chsten Rolle liegt."
         )
     if not _member_can_manage_role(guild.me, role):
         raise RuntimeError(
             "Der Bot kann diese Rolle wegen der Discord-Hierarchie nicht vergeben."
         )
     if getattr(role, "managed", False):
-        raise RuntimeError("Managed Rollen können nicht manuell vergeben werden.")
+        raise RuntimeError("Managed Rollen k�nnen nicht manuell vergeben werden.")
     await member.add_roles(role, reason="Web Panel")
     return [
         {"id": str(role.id), "name": role.name}
@@ -732,14 +736,14 @@ async def _discord_remove_member_role(
         )
     if not _member_can_manage_role(actor, role):
         raise RuntimeError(
-            "Du kannst keine Rolle entfernen, die über deiner höchsten Rolle liegt."
+            "Du kannst keine Rolle entfernen, die �ber deiner h�chsten Rolle liegt."
         )
     if not _member_can_manage_role(guild.me, role):
         raise RuntimeError(
             "Der Bot kann diese Rolle wegen der Discord-Hierarchie nicht entfernen."
         )
     if getattr(role, "managed", False):
-        raise RuntimeError("Managed Rollen können nicht manuell entfernt werden.")
+        raise RuntimeError("Managed Rollen k�nnen nicht manuell entfernt werden.")
     await member.remove_roles(role, reason="Web Panel")
     return [
         {"id": str(role.id), "name": role.name}
@@ -784,7 +788,7 @@ async def _discord_fetch_user_profile(user_id: str) -> dict:
     }
 
 
-# ════════════════ API KEY SECURITY ════════════════
+# ---------------- API KEY SECURITY ----------------
 
 
 def api_key_required(fn):
@@ -801,7 +805,7 @@ def api_key_required(fn):
     return wrapper
 
 
-# ════════════════ AUTH ROUTES ════════════════
+# ---------------- AUTH ROUTES ----------------
 
 
 @app.get("/login")
@@ -826,7 +830,7 @@ def auth_discord_callback():
         return render_template(
             "login.html",
             discord_url=discord_login_url(),
-            error="Login fehlgeschlagen. Stelle sicher, dass du eine verknüpfte Rolle auf dem Server hast.",
+            error="Login fehlgeschlagen. Stelle sicher, dass du eine verkn�pfte Rolle auf dem Server hast.",
         )
     return redirect(url_for("tickets_page"))
 
@@ -837,7 +841,7 @@ def logout():
     return redirect(url_for("login"))
 
 
-# ════════════════ WEB PAGES ════════════════
+# ---------------- WEB PAGES ----------------
 
 
 @app.get("/")
@@ -852,11 +856,18 @@ def home():
 def tickets_page():
     ctx = _ctx()
     q = request.args.get("q", "")
+    status_filter = request.args.get("status", "all")
+    if status_filter not in {"all", "open", "closed"}:
+        status_filter = "all"
     categories = _allowed_ticket_categories(set(ctx["permissions"]))
+    status_arg = status_filter if status_filter != "all" else None
     return render_template(
         "tickets.html",
         q=q,
-        total=count_tickets(q=q, categories=categories),
+        status=status_filter,
+        total=count_tickets(q=q, categories=categories, status=status_arg),
+        open_count=count_tickets(categories=categories, status="open"),
+        closed_count=count_tickets(categories=categories, status="closed"),
         active_page="tickets",
         **ctx,
     )
@@ -941,7 +952,7 @@ def public_transcript(ticket_id: str):
     )
 
 
-# ── Roles Management Page ──
+# -- Roles Management Page --
 
 
 @app.get("/roles")
@@ -1106,7 +1117,7 @@ def panel_api_role_members(role_id: int):
     )
 
 
-# ── Ticket Messages JSON (web session auth) ──
+# -- Ticket Messages JSON (web session auth) --
 
 
 @app.get("/tickets/<ticket_id>/messages.json")
@@ -1118,7 +1129,7 @@ def ticket_messages_json(ticket_id: str):
     return jsonify(_format_date_fields(messages, "created_at"))
 
 
-# ── Ticket Reply from Web ──
+# -- Ticket Reply from Web --
 
 
 @app.post("/tickets/<ticket_id>/reply")
@@ -1168,7 +1179,7 @@ async def _send_discord_reply(
     await channel.send(content=f"**{username}** (Web Panel):\n{content}")
 
 
-# ── Close Ticket from Web ──
+# -- Close Ticket from Web --
 
 
 @app.post("/tickets/<ticket_id>/close")
@@ -1180,7 +1191,7 @@ def ticket_close_web(ticket_id: str):
     if not t or not _can_access_ticket(t) or t.get("status") == "closed":
         return redirect(url_for("ticket_detail", ticket_id=ticket_id))
 
-    reason = (request.form.get("reason") or "").strip() or "Über Web Panel geschlossen."
+    reason = (request.form.get("reason") or "").strip() or "�ber Web Panel geschlossen."
     u = current_user()
 
     # Mark closed in DB immediately so the page reflects the new state
@@ -1240,7 +1251,7 @@ async def _close_discord_ticket(
 
         embed = _discord.Embed(
             title="Ticket geschlossen",
-            description=f"Dieses Ticket wurde über das Web Panel geschlossen.",
+            description=f"Dieses Ticket wurde �ber das Web Panel geschlossen.",
             color=_discord.Color.red(),
         )
         embed.add_field(name="Grund", value=reason, inline=False)
@@ -1251,7 +1262,7 @@ async def _close_discord_ticket(
             pass
 
 
-# ── Close Reasons Config Page ──
+# -- Close Reasons Config Page --
 
 
 @app.get("/close-reasons")
@@ -1302,7 +1313,7 @@ def close_reasons_delete(reason_id: int):
     return redirect(url_for("close_reasons_page"))
 
 
-# ── Counting Overview Page ──
+# -- Counting Overview Page --
 
 
 @app.get("/counting")
@@ -1611,7 +1622,7 @@ def panel_api_stats_overview():
     )
 
 
-# ── Birthdays Overview Page ──
+# -- Birthdays Overview Page --
 
 
 @app.get("/birthdays")
@@ -1631,12 +1642,39 @@ def birthdays_page():
         )
     birthday_channel = get_config(birthdays_guild_id, "birthday_channel_id")
     birthday_messages = list_bot_messages(birthdays_guild_id, "birthday_list")
+    from datetime import datetime
+    today = datetime.now()
+    today_list = get_birthdays_today(birthdays_guild_id)
+    cache: dict[str, str | None] = {}
+    today_list = [
+        {
+            **b,
+            "display_name": _resolve_display_name(
+                b.get("user_id"), cache, guild_id=birthdays_guild_id
+            ),
+        }
+        for b in today_list
+    ]
+    upcoming = get_upcoming_birthdays(birthdays_guild_id, days=30, limit=8)
+    upcoming = [
+        {
+            **u,
+            "display_name": _resolve_display_name(
+                u.get("user_id"), cache, guild_id=birthdays_guild_id
+            ),
+        }
+        for u in upcoming
+    ]
     return render_template(
         "birthdays.html",
         birthday_count=count_birthdays(birthdays_guild_id),
         birthday_channel=birthday_channel,
         birthday_messages=birthday_messages,
         birthdays_guild_id=birthdays_guild_id,
+        today_count=len(today_list),
+        today_list=today_list,
+        month_count=count_birthdays_in_month(birthdays_guild_id, today.month),
+        upcoming=upcoming,
         active_page="birthdays",
         **ctx,
     )
@@ -1735,7 +1773,7 @@ def birthdays_delete_message(message_id: str):
     return redirect(url_for("birthdays_page"))
 
 
-# ── Warnings Overview Page ──
+# -- Warnings Overview Page --
 
 
 @app.get("/warnings")
@@ -1766,7 +1804,7 @@ def warnings_delete(warning_id: int):
     return redirect(url_for("warnings_page"))
 
 
-# ── Log Channels Config Page ──
+# -- Log Channels Config Page --
 
 
 @app.get("/log-channels")
@@ -1821,7 +1859,7 @@ def log_channels_delete(log_type: str):
     return redirect(url_for("log_channels_page"))
 
 
-# ── Auto Publisher Config Page ──
+# -- Auto Publisher Config Page --
 
 
 @app.get("/auto-publisher")
@@ -1853,7 +1891,7 @@ def auto_publisher_delete(channel_id: str):
     return redirect(url_for("auto_publisher_page"))
 
 
-# ── Server Stats Config Page ──
+# -- Server Stats Config Page --
 
 
 @app.get("/server-stats")
@@ -1903,20 +1941,22 @@ def server_stats_save():
 @login_required
 def panel_api_tickets():
     q = request.args.get("q", "").strip()
+    status_filter = request.args.get("status", "all")
+    status_arg = status_filter if status_filter in {"open", "closed"} else None
     page, page_size, offset = _pagination_args()
     categories = _allowed_ticket_categories(
         set((current_user() or {}).get("permissions", set()))
     )
     rows = []
     for ticket in list_tickets(
-        q=q, limit=page_size, offset=offset, categories=categories
+        q=q, limit=page_size, offset=offset, categories=categories, status=status_arg
     ):
         guild_id = ticket.get("guild_id") or DEFAULT_GUILD_ID
         item = _attach_member_profile(ticket, guild_id, "creator_user_id", "creator")
         item["detail_url"] = url_for("ticket_detail", ticket_id=item["ticket_id"])
         rows.append(item)
     return _paginated_response(
-        rows, count_tickets(q=q, categories=categories), page, page_size
+        rows, count_tickets(q=q, categories=categories, status=status_arg), page, page_size
     )
 
 
@@ -1985,6 +2025,33 @@ def panel_api_users():
         if len(role_names) > 4:
             row["discord_roles_label"] += f" +{len(role_names) - 4}"
         row["roles_label"] = row["discord_roles_label"]
+
+        # ── Richer badge data for new UI ──
+        def _hex(c):
+            try:
+                n = int(c or 0)
+                if n <= 0:
+                    return None
+                return "#{:06x}".format(n & 0xFFFFFF)
+            except (TypeError, ValueError):
+                return None
+
+        row["discord_roles_badges"] = [
+            {"label": str(r.get("name") or r.get("id")), "color": _hex(r.get("color"))}
+            for r in roles
+            if isinstance(r, dict) and (r.get("name") or r.get("id"))
+        ][:6]
+        row["web_roles_badges"] = [
+            {"label": web_roles_by_discord_id[str(r.get("id"))], "color": "#22d3ee"}
+            for r in roles
+            if isinstance(r, dict) and str(r.get("id")) in web_roles_by_discord_id
+        ]
+        row["presence_label"] = {
+            "online": "Online",
+            "idle": "Idle",
+            "dnd": "DND",
+            "offline": "Offline",
+        }.get((row.get("presence_status") or "").lower(), "—")
     return _paginated_response(
         _format_date_fields(
             rows,
@@ -2027,7 +2094,7 @@ def panel_api_messages():
             (item.get("original_content") or "") != (item.get("content") or "")
         )
         if is_deleted:
-            item["message_status"] = "Gelöscht"
+            item["message_status"] = "Gel�scht"
             item["_row_class"] = "bg-red-500/10 hover:bg-red-500/15"
         elif is_edited:
             item["message_status"] = "Bearbeitet"
@@ -2075,7 +2142,7 @@ def panel_api_message_history():
     ):
         item = dict(event)
         item["event_label"] = (
-            "Bearbeitet" if item.get("event_type") == "edit" else "Gelöscht"
+            "Bearbeitet" if item.get("event_type") == "edit" else "Gel�scht"
         )
         item["message_status"] = item["event_label"]
         item["user_detail_url"] = (
@@ -2142,7 +2209,7 @@ def panel_api_birthdays():
     month_names = {
         1: "Januar",
         2: "Februar",
-        3: "März",
+        3: "M�rz",
         4: "April",
         5: "Mai",
         6: "Juni",
@@ -2163,7 +2230,7 @@ def panel_api_birthdays():
             day = 0
             month = 0
         item["date_label"] = (
-            f"{day:02d}.{month:02d}" if day and month else "Ungültiges Datum"
+            f"{day:02d}.{month:02d}" if day and month else "Ung�ltiges Datum"
         ) + (f".{item['year']}" if item.get("year") and day and month else "")
         item["month_name"] = month_names.get(month, "?")
         item["delete_url"] = url_for("birthdays_delete", user_id=item["user_id"])
@@ -2210,11 +2277,11 @@ def panel_api_counting_leaderboard():
     )
 
 
-# ════════════════════════════════════════════════════════
+# --------------------------------------------------------
 #  API ENDPOINTS (called by the bot via ApiClient)
-# ════════════════════════════════════════════════════════
+# --------------------------------------------------------
 
-# ── Guild Config ──
+# -- Guild Config --
 
 
 @app.get("/api/guild/<guild_id>/config/<key>")
@@ -2234,7 +2301,7 @@ def api_set_config(guild_id: str, key: str):
     return jsonify({"ok": True})
 
 
-# ── Birthdays ──
+# -- Birthdays --
 
 
 @app.get("/api/guild/<guild_id>/birthdays")
@@ -2393,7 +2460,7 @@ def api_delete_bot_message(guild_id: str, message_type: str, message_id: str):
     return jsonify({"ok": True})
 
 
-# ── Warnings ──
+# -- Warnings --
 
 
 @app.get("/api/guild/<guild_id>/warnings/<user_id>")
@@ -2426,7 +2493,7 @@ def api_clear_warnings(guild_id: str, user_id: str):
     return jsonify({"ok": True, "deleted": count})
 
 
-# ── Counting ──
+# -- Counting --
 
 
 @app.get("/api/guild/<guild_id>/counting")
@@ -2470,7 +2537,7 @@ def api_get_counting_leaderboard(guild_id: str):
     return jsonify(get_counting_leaderboard(guild_id, limit))
 
 
-# ── Auto Publisher ──
+# -- Auto Publisher --
 
 
 @app.get("/api/guild/<guild_id>/auto_publisher")
@@ -2494,7 +2561,7 @@ def api_remove_auto_publisher(guild_id: str, channel_id: str):
     return jsonify({"ok": True})
 
 
-# ── Selfroles ──
+# -- Selfroles --
 
 
 @app.get("/api/guild/<guild_id>/selfroles")
@@ -2549,7 +2616,7 @@ def api_delete_selfrole(guild_id: str, message_id: str):
     return jsonify({"ok": True})
 
 
-# ── Server Stats ──
+# -- Server Stats --
 
 
 @app.get("/api/guild/<guild_id>/server_stats")
@@ -2567,7 +2634,7 @@ def api_set_server_stats(guild_id: str):
     return jsonify({"ok": True})
 
 
-# ── Log Channels ──
+# -- Log Channels --
 
 
 @app.get("/api/guild/<guild_id>/log_channels")
@@ -2600,7 +2667,7 @@ def api_remove_log_channel(guild_id: str, log_type: str):
     return jsonify({"ok": True})
 
 
-# ── Twitch Config ──
+# -- Twitch Config --
 
 
 @app.get("/api/guild/<guild_id>/twitch_config")
@@ -2627,7 +2694,7 @@ def api_remove_twitch_config(guild_id: str):
     return jsonify({"ok": True})
 
 
-# ── Tickets API ──
+# -- Tickets API --
 
 
 @app.get("/api/tickets")
@@ -2700,7 +2767,7 @@ def api_ticket_close():
     )
 
 
-# ── Ticket Messages API ──
+# -- Ticket Messages API --
 
 
 @app.get("/api/tickets/<ticket_id>/messages")
@@ -2724,7 +2791,7 @@ def api_add_ticket_message(ticket_id: str):
     return jsonify(msg)
 
 
-# ── Ticket Logs API ──
+# -- Ticket Logs API --
 
 
 @app.post("/api/ticket_logs")
@@ -2748,7 +2815,7 @@ def api_logs_legacy():
     return jsonify({"ok": True})
 
 
-# ── Roles API (for external use) ──
+# -- Roles API (for external use) --
 
 
 @app.get("/api/guild/<guild_id>/roles")
@@ -2757,7 +2824,7 @@ def api_get_roles(guild_id: str):
     return jsonify(list_roles(guild_id))
 
 
-# ── Close Reasons API ──
+# -- Close Reasons API --
 
 
 @app.get("/api/guild/<guild_id>/close_reasons")
@@ -2784,7 +2851,7 @@ def api_delete_close_reason(guild_id: str, reason_id: int):
     return jsonify({"ok": True})
 
 
-# ════════════════ STARTUP ════════════════
+# ---------------- STARTUP ----------------
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=Config.PORT, debug=True)

@@ -1,59 +1,80 @@
 {% extends "base.html" %}
-{% from "_macros.html" import page_header, field, btn, stat, empty_state %}
+{% from "_macros.html" import page_header, stat_tile, field, btn, empty_state %}
 
 {% block content %}
-{{ page_header("User", "Userübersicht", "Aktive und ehemalige Discord-Servermitglieder aus der Datenbank.") }}
+{{ page_header("Community", "Mitglieder", "Aktive und ehemalige Discord-Server-Mitglieder. Klick einen User für Profil & Verlauf.") }}
 
-<div class="mb-6 grid gap-4 sm:grid-cols-3">
-  {{ stat("Aktiv", active_count) }}
-  {{ stat("Verlassen", left_count) }}
-  {{ stat("Gesamt", active_count + left_count) }}
+<div class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+  {{ stat_tile("Aktiv", active_count, accent="emerald", sub="Auf dem Server") }}
+  {{ stat_tile("Verlassen", left_count, accent="slate", sub="Datensatz erhalten") }}
+  {{ stat_tile("Gesamt", active_count + left_count, accent="cyan") }}
+  {{ stat_tile("Guild-ID", guild_id|truncate(14), accent="violet", sub="Aktive Panel-Guild") }}
 </div>
-<div class="mb-4 text-xs text-slate-500">Guild ID: {{ guild_id }}</div>
 
-<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-  <form id="users-filter" method="get" class="grid gap-4 md:grid-cols-[1fr_180px_auto] md:items-end">
+{# ── Quick status filters ── #}
+<div class="mb-4 flex flex-wrap items-center gap-2">
+  {% set base_url = url_for('users_page') %}
+  {% set sel = "border-cyan-500/40 bg-cyan-500/15 text-cyan-200" %}
+  {% set off = "border-white/10 bg-white/5 text-slate-400 hover:text-white" %}
+  <a href="{{ base_url }}?status=all{% if q %}&q={{ q }}{% endif %}"
+     class="rounded-full border px-3.5 py-1 text-xs font-medium transition {{ sel if status == 'all' else off }}">Alle · {{ active_count + left_count }}</a>
+  <a href="{{ base_url }}?status=active{% if q %}&q={{ q }}{% endif %}"
+     class="rounded-full border px-3.5 py-1 text-xs font-medium transition {{ sel if status == 'active' else off }}">Aktiv · {{ active_count }}</a>
+  <a href="{{ base_url }}?status=left{% if q %}&q={{ q }}{% endif %}"
+     class="rounded-full border px-3.5 py-1 text-xs font-medium transition {{ sel if status == 'left' else off }}">Verlassen · {{ left_count }}</a>
+</div>
+
+<div class="mb-6 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+  <form id="users-filter" method="get" class="grid gap-3 md:grid-cols-[1fr_180px_auto] md:items-end">
     <input type="hidden" name="guild_id" value="{{ guild_id }}">
-    {{ field("q", "Suche", placeholder="Name oder Username", required=false, value=q) }}
     <div>
-      <label for="status" class="mb-1.5 block text-sm font-medium text-slate-400">Status</label>
-      <select id="status" name="status"
-        class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
+      <label class="mb-1.5 block text-xs font-medium text-slate-400">Suche</label>
+      <input type="text" name="q" data-live-search value="{{ q }}"
+             placeholder="Name, Username oder ID …"
+             class="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30" />
+    </div>
+    <div>
+      <label class="mb-1.5 block text-xs font-medium text-slate-400">Status</label>
+      <select name="status"
+              class="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm text-white focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30">
         <option value="all" {% if status == "all" %}selected{% endif %}>Alle</option>
         <option value="active" {% if status == "active" %}selected{% endif %}>Aktiv</option>
         <option value="left" {% if status == "left" %}selected{% endif %}>Verlassen</option>
       </select>
     </div>
-    {{ btn("Filtern") }}
+    {{ btn("Suchen") }}
   </form>
 </div>
 
-<div data-paginated-table data-endpoint="{{ url_for('panel_api_users') }}" data-form="#users-filter" data-page-size="10" class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+<div data-paginated-table data-endpoint="{{ url_for('panel_api_users') }}" data-form="#users-filter" data-page-size="25" class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
   <script type="application/json">
     [
-      {"type":"user","nameKey":"display_name","subKey":"username","avatarKey":"avatar_url","urlKey":"detail_url","class":"px-3 py-2.5"},
-      {"key":"username","fallback":"-","class":"px-3 py-2.5 text-slate-300"},
-      {"key":"status","type":"badge","variants":{"active":"success","left":"default"},"class":"px-3 py-2.5"},
-      {"key":"web_roles_label","fallback":"-","class":"px-3 py-2.5 text-slate-300 max-w-xs truncate"},
-      {"key":"discord_roles_label","fallback":"-","class":"px-3 py-2.5 text-slate-300 max-w-xs truncate"},
-      {"key":"presence_status","type":"badge","fallback":"unknown","variants":{"online":"success","idle":"warning","dnd":"danger","offline":"default"},"class":"px-3 py-2.5"},
-      {"key":"message_count","class":"px-3 py-2.5 text-slate-300"},
-      {"key":"last_message_at","type":"date","class":"px-3 py-2.5 text-slate-400"}
+      {"type":"user","nameKey":"display_name","subKey":"username","avatarKey":"avatar_url","urlKey":"detail_url","class":"px-3 py-3"},
+      {"key":"status","type":"badge","variants":{"active":"success","left":"default"},"class":"px-3 py-3"},
+      {"key":"presence_label","type":"badge","variants":{"Online":"success","Idle":"warning","DND":"danger","Offline":"default"},"class":"px-3 py-3"},
+      {"key":"web_roles_badges","type":"badges","max":3,"class":"px-3 py-3"},
+      {"key":"discord_roles_badges","type":"badges","max":4,"class":"px-3 py-3"},
+      {"key":"message_count","class":"px-3 py-3 text-slate-200 font-medium text-right"},
+      {"key":"last_message_at","type":"date","class":"px-3 py-3 text-slate-400 text-xs"},
+      {"key":"joined_at","type":"date","class":"px-3 py-3 text-slate-500 text-xs"}
     ]
   </script>
-  <h2 class="mb-4 text-sm font-semibold text-white">Mitglieder</h2>
+  <div class="mb-4 flex items-center justify-between">
+    <h2 class="text-sm font-semibold text-white">Mitglieder</h2>
+    <span class="text-xs text-slate-500">Live-Suche aktiv</span>
+  </div>
   <div class="overflow-x-auto">
     <table class="w-full text-left text-sm">
       <thead>
         <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
           <th class="px-3 py-2.5">User</th>
-          <th class="px-3 py-2.5">Username</th>
           <th class="px-3 py-2.5">Status</th>
+          <th class="px-3 py-2.5">Presence</th>
           <th class="px-3 py-2.5">Web Rollen</th>
           <th class="px-3 py-2.5">Discord Rollen</th>
-          <th class="px-3 py-2.5">Online</th>
-          <th class="px-3 py-2.5">Nachrichten</th>
+          <th class="px-3 py-2.5 text-right">Nachrichten</th>
           <th class="px-3 py-2.5">Letzte Nachricht</th>
+          <th class="px-3 py-2.5">Beigetreten</th>
         </tr>
       </thead>
       <tbody data-table-body></tbody>
@@ -63,7 +84,7 @@
   <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400">
     <span data-table-status></span>
     <div class="flex items-center gap-2">
-      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option>10</option><option selected>25</option><option>50</option><option>100</option></select>
       <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button>
       <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
     </div>

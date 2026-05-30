@@ -37,7 +37,7 @@
         <img src="{{ url_for('static', filename='logo.png') }}" alt="PumBot" class="h-9 w-9 rounded-lg">
         <div>
           <div class="text-sm font-semibold text-white">PumBot</div>
-          <div class="text-[11px] text-slate-500">Übersichts-Panel yeah</div>
+          <div class="text-[11px] text-slate-500">Admin Panel</div>
         </div>
       </div>
 
@@ -260,6 +260,9 @@
     </div>
   </div>
 
+  {# ── Global toast container ── #}
+  <div id="pumbot-toast" class="pointer-events-none fixed bottom-6 right-6 z-[100] flex translate-y-2 flex-col gap-2 opacity-0 transition"></div>
+
   <script>
     function toggleSidebar() {
       const sb = document.getElementById("sidebar");
@@ -267,6 +270,40 @@
       sb.classList.toggle("-translate-x-full");
       ov.classList.toggle("hidden");
     }
+
+    window.pumbotToast = (msg, variant = "success") => {
+      const wrap = document.getElementById("pumbot-toast");
+      if (!wrap) return;
+      const tone = {
+        success: "border-emerald-500/30 bg-emerald-500/15 text-emerald-200",
+        error: "border-red-500/30 bg-red-500/15 text-red-200",
+        info: "border-cyan-500/30 bg-cyan-500/15 text-cyan-200",
+      }[variant] || "border-white/10 bg-white/10 text-slate-200";
+      const el = document.createElement("div");
+      el.className = `pointer-events-auto rounded-lg border ${tone} px-3 py-2 text-sm shadow-lg backdrop-blur`;
+      el.textContent = msg;
+      wrap.appendChild(el);
+      wrap.style.opacity = "1";
+      wrap.style.transform = "translateY(0)";
+      setTimeout(() => {
+        el.style.transition = "opacity .25s, transform .25s";
+        el.style.opacity = "0";
+        el.style.transform = "translateY(6px)";
+        setTimeout(() => el.remove(), 280);
+      }, 2200);
+    };
+
+    document.addEventListener("click", (e) => {
+      const target = e.target.closest("[data-copy], [data-copy-user-id]");
+      if (!target) return;
+      const value = target.dataset.copy || target.dataset.copyUserId;
+      if (!value) return;
+      navigator.clipboard?.writeText(value).then(
+        () => window.pumbotToast("Kopiert: " + value, "success"),
+        () => window.pumbotToast("Kopieren fehlgeschlagen", "error")
+      );
+    });
+
     document.addEventListener("DOMContentLoaded", () => {
       const main = document.querySelector("main");
       const key = `pumbot:scroll:${window.location.pathname}${window.location.search}`;

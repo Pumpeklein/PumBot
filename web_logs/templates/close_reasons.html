@@ -1,59 +1,69 @@
 {% extends "base.html" %}
-{% from "_macros.html" import page_header, field, btn, empty_state %}
-
+{% from "_macros.html" import page_header, stat_tile, btn, badge, empty_state %}
+{% block title %}Ticket-Schließgründe · PumBot{% endblock %}
 {% block content %}
-{{ page_header("Schließungsgründe", "Konfigurierbare Gründe für das Schließen von Tickets.", "Diese Gründe stehen als Dropdown im Web Panel und in Discord zur Verfügung.") }}
 
-{# Add new reason #}
-<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-  <h2 class="mb-3 text-sm font-semibold text-white">Neuen Grund hinzufügen</h2>
-  <form method="post" action="{{ url_for('close_reasons_create') }}" class="flex flex-wrap items-end gap-3">
-    <div class="min-w-0 flex-1">
-      {{ field("label", "Bezeichnung", placeholder="z.B. Problem gelöst", required=true) }}
-    </div>
-    <div class="w-24">
-      {{ field("sort_order", "Reihenfolge", type="number", value="0", min=0, required=false) }}
-    </div>
-    {{ btn("Hinzufügen") }}
-  </form>
+{{ page_header(
+  "Konfiguration",
+  "Ticket-Schließgründe",
+  "Vordefinierte Gründe, die beim Schließen eines Tickets im Dropdown erscheinen."
+) }}
+
+<div class="grid gap-3 sm:grid-cols-3 mb-6">
+  {{ stat_tile("Definierte Gründe", reasons|length, accent="cyan") }}
+  {{ stat_tile("Status", "Aktiv" if reasons else "Leer", accent=("emerald" if reasons else "amber"), sub=("Sortiert nach Reihenfolge" if reasons else "Mind. 1 Grund empfohlen")) }}
+  {{ stat_tile("Custom", "Immer verfügbar", accent="violet", sub='Freitext "Sonstiges"') }}
 </div>
 
-{# Existing reasons #}
-<div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-  <h2 class="mb-4 text-sm font-semibold text-white">Vorhandene Gründe</h2>
-  {% if reasons %}
-  <div class="space-y-3">
-    {% for r in reasons %}
-    <div class="rounded-lg border border-white/5 bg-white/[0.02] p-4">
-      <form method="post" action="{{ url_for('close_reasons_update', reason_id=r.id) }}" class="flex flex-wrap items-end gap-3">
-        <div class="min-w-0 flex-1">
-          <label class="mb-1 block text-xs uppercase tracking-wider text-slate-500">Bezeichnung</label>
-          <input type="text" name="label" value="{{ r.label }}" required
-            class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30">
-        </div>
-        <div class="w-24">
-          <label class="mb-1 block text-xs uppercase tracking-wider text-slate-500">Reihenfolge</label>
-          <input type="number" name="sort_order" value="{{ r.sort_order }}" min="0"
-            class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30">
-        </div>
-        <button type="submit"
-          class="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/10">
-          Speichern
-        </button>
-      </form>
-      <form method="post" action="{{ url_for('close_reasons_delete', reason_id=r.id) }}" class="mt-2">
-        <button type="submit"
-          class="inline-flex items-center gap-1.5 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-400 transition hover:bg-red-500/20"
-          onclick="return confirm('Wirklich löschen?')">
-          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-          Löschen
-        </button>
-      </form>
+<div class="grid gap-5 lg:grid-cols-[1fr_360px]">
+  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320]">
+    <div class="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
+      <h2 class="text-sm font-semibold text-white">Vorhandene Gründe</h2>
+      <span class="rounded-full bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-300">{{ reasons|length }}</span>
     </div>
-    {% endfor %}
+    {% if reasons %}
+    <ul class="divide-y divide-white/[0.04]">
+      {% for r in reasons %}
+      <li class="px-5 py-3">
+        <form method="POST" action="{{ url_for('close_reasons_update', reason_id=r.id) }}"
+              class="flex flex-wrap items-center gap-2">
+          <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/5 font-mono text-[11px] text-slate-400" title="Sortier-Reihenfolge">{{ r.sort_order or 0 }}</span>
+          <input type="number" name="sort_order" value="{{ r.sort_order or 0 }}"
+                 class="w-16 rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5 text-xs text-white focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30" />
+          <input type="text" name="label" value="{{ r.label }}" required
+                 class="min-w-0 flex-1 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-white focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30" />
+          <button class="rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-cyan-500">Speichern</button>
+          <button type="submit" form="del-reason-{{ r.id }}"
+                  class="rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-1.5 text-xs text-red-300 transition hover:bg-red-500/15">
+            Löschen
+          </button>
+        </form>
+        <form id="del-reason-{{ r.id }}" method="POST" action="{{ url_for('close_reasons_delete', reason_id=r.id) }}"
+              onsubmit="return confirm('Grund „{{ r.label|e }}“ löschen?');"></form>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="px-5 py-12">{{ empty_state("Noch keine Schließgründe", "Lege rechts deinen ersten Grund an.") }}</div>
+    {% endif %}
   </div>
-  {% else %}
-  {{ empty_state("Keine Gründe konfiguriert", "Füge oben einen neuen Schließungsgrund hinzu. Er wird dann im Dropdown angezeigt.") }}
-  {% endif %}
+
+  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5 h-fit">
+    <h2 class="text-sm font-semibold text-white">Neuen Grund hinzufügen</h2>
+    <form method="POST" action="{{ url_for('close_reasons_create') }}" class="mt-4 space-y-3">
+      <div>
+        <label class="mb-1.5 block text-xs font-medium text-slate-400">Bezeichnung</label>
+        <input type="text" name="label" required placeholder="z.B. Problem gelöst"
+               class="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30" />
+      </div>
+      <div>
+        <label class="mb-1.5 block text-xs font-medium text-slate-400">Sortier-Reihenfolge</label>
+        <input type="number" name="sort_order" value="0"
+               class="w-full rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30" />
+        <p class="mt-1 text-[11px] text-slate-500">Niedrigere Zahl = weiter oben im Dropdown.</p>
+      </div>
+      {{ btn("Hinzufügen", variant="primary", class="w-full") }}
+    </form>
+  </div>
 </div>
 {% endblock %}

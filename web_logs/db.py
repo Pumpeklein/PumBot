@@ -1707,6 +1707,44 @@ def mark_birthday_congrats(guild_id: str, user_id: str) -> None:
         conn.commit()
 
 
+def count_birthdays_in_month(guild_id: str, month: int) -> int:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS total FROM birthdays WHERE guild_id = ? AND month = ?",
+            (guild_id, int(month)),
+        ).fetchone()
+        return int(row["total"] if row else 0)
+
+
+def get_upcoming_birthdays(guild_id: str, days: int = 30, limit: int = 10) -> list[dict]:
+    """Return birthdays within the next `days` days (wraps year), ordered chronologically."""
+    today = berlin_today()
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT user_id, day, month, year FROM birthdays WHERE guild_id = ?",
+            (guild_id,),
+        ).fetchall()
+    entries: list[tuple[int, dict]] = []
+    for r in rows:
+        d = dict(r)
+        try:
+            this_year = today.replace(month=int(d["month"]), day=int(d["day"]))
+        except ValueError:
+            continue
+        delta = (this_year - today).days
+        if delta < 0:
+            try:
+                next_year = today.replace(year=today.year + 1, month=int(d["month"]), day=int(d["day"]))
+                delta = (next_year - today).days
+            except ValueError:
+                continue
+        if delta <= days:
+            d["days_until"] = delta
+            entries.append((delta, d))
+    entries.sort(key=lambda x: x[0])
+    return [e[1] for e in entries[:limit]]
+
+
 def list_bot_messages(guild_id: str, message_type: str | None = None) -> list[dict]:
     with _connect() as conn:
         if message_type is None:
@@ -2403,13 +2441,16 @@ def get_ticket(ticket_id: str) -> dict[str, Any] | None:
 
 
 def _ticket_filter_sql(
-    q: str = "", categories: set[str] | None = None
+    q: str = "", categories: set[str] | None = None, status: str | None = None
 ) -> tuple[str, list[Any]]:
     q_like = f"%{q}%"
     clauses = [
         "(ticket_id LIKE ? OR subject LIKE ? OR creator_user_id LIKE ? OR creator_username LIKE ?)"
     ]
     params: list[Any] = [q_like, q_like, q_like, q_like]
+    if status in {"open", "closed"}:
+        clauses.append("LOWER(COALESCE(status, 'open')) = ?")
+        params.append(status)
     if categories is not None:
         if not categories:
             clauses.append("1 = 0")
@@ -2434,8 +2475,9 @@ def list_tickets(
     limit: int = 200,
     offset: int = 0,
     categories: set[str] | None = None,
+    status: str | None = None,
 ) -> list[dict[str, Any]]:
-    where_sql, params = _ticket_filter_sql(q, categories)
+    where_sql, params = _ticket_filter_sql(q, categories, status)
     with _connect() as conn:
         rows = conn.execute(
             f"""SELECT * FROM tickets
@@ -2446,8 +2488,8 @@ def list_tickets(
         return [dict(r) for r in rows]
 
 
-def count_tickets(q: str = "", categories: set[str] | None = None) -> int:
-    where_sql, params = _ticket_filter_sql(q, categories)
+def count_tickets(q: str = "", categories: set[str] | None = None, status: str | None = None) -> int:
+    where_sql, params = _ticket_filter_sql(q, categories, status)
     with _connect() as conn:
         row = conn.execute(
             f"SELECT COUNT(*) AS total FROM tickets WHERE {where_sql}",

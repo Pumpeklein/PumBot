@@ -1,16 +1,16 @@
 {% extends "base.html" %}
-{% from "_macros.html" import page_header, stat, empty_state %}
+{% from "_macros.html" import page_header, stat, stat_tile, empty_state, id_chip %}
 
 {% block content %}
 {{ page_header("Statistiken", "Server-Übersicht", "Allgemeine Aktivitäts- und Nachrichtenstatistiken aus der Datenbank.") }}
 
-<div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-  {{ stat("Nachrichten", overview.totals.message_count or 0) }}
-  {{ stat("Schreibende User", overview.totals.active_writers or 0) }}
-  {{ stat("Aktive Channels", overview.totals.active_channels or 0) }}
-  {{ stat("Letzte Nachricht", overview.totals.last_message_at or "-") }}
+<div class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+  {{ stat_tile("Nachrichten gesamt", overview.totals.message_count or 0, accent="cyan", sub="Über alle Channels") }}
+  {{ stat_tile("Schreibende User", overview.totals.active_writers or 0, accent="emerald", sub="Mit ≥1 Nachricht") }}
+  {{ stat_tile("Aktive Channels", overview.totals.active_channels or 0, accent="violet", sub="Mit Aktivität") }}
+  {{ stat_tile("Letzte Nachricht", overview.totals.last_message_at or "—", accent="amber", sub="Zuletzt gesehen") }}
 </div>
-<div class="mb-4 text-xs text-slate-500">Guild ID: {{ guild_id }}</div>
+<div class="mb-4 flex items-center gap-2 text-xs text-slate-500">Guild: {{ id_chip(guild_id) }}</div>
 
 <div class="mb-6 flex flex-wrap gap-2 border-b border-white/[0.06] pb-3" data-tabs>
   <button type="button" data-tab-target="overview" class="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-300">Auswertung</button>

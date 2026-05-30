@@ -165,19 +165,21 @@
    ════════════════════════════════════════════════════════════════ #}
 <section data-tab-panel="server" class="hidden space-y-6">
   <div class="grid gap-4 lg:grid-cols-2">
-    <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-      <h2 class="mb-4 text-sm font-semibold text-white">Neue Discord Rolle erstellen</h2>
+    <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+      <h2 class="mb-1 text-sm font-semibold text-white">Neue Discord-Rolle</h2>
+      <p class="mb-4 text-xs text-slate-500">Erstellt eine Rolle direkt im Discord-Server.</p>
       <form method="post" action="{{ url_for('roles_discord_create') }}" class="grid gap-3 sm:grid-cols-[1fr_140px_auto] sm:items-end">
         {{ field("role_name", "Rollenname", placeholder="z.B. Event", required=true) }}
-        {{ field("color", "Farbe", placeholder="#5865F2", required=false) }}
+        {{ field("color", "Farbe (Hex)", placeholder="#5865F2", required=false) }}
         {{ btn("Erstellen") }}
       </form>
     </div>
 
-    <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-      <h2 class="mb-4 text-sm font-semibold text-white">Discord Rolle zuweisen</h2>
+    <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+      <h2 class="mb-1 text-sm font-semibold text-white">Rolle zuweisen</h2>
+      <p class="mb-4 text-xs text-slate-500">Vergibt eine verwaltbare Discord-Rolle an einen User.</p>
       <form method="post" action="{{ url_for('roles_discord_assign') }}" class="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-        {{ field("user_id", "User ID", placeholder="z.B. 123456789012345678", required=true) }}
+        {{ field("user_id", "User-ID", placeholder="z.B. 123456789012345678", required=true) }}
         <div>
           <label for="assign_role_id" class="mb-1.5 block text-sm font-medium text-slate-400">Rolle</label>
           <select id="assign_role_id" name="role_id" class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
@@ -196,11 +198,19 @@
     </div>
   </div>
 
-  <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-    <div class="mb-4 flex items-center justify-between gap-3">
-      <h2 class="text-sm font-semibold text-white">Server Rollen</h2>
-      <input type="search" data-server-role-search placeholder="Rolle suchen"
-        class="max-w-xs flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30">
+  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="text-sm font-semibold text-white">Server Rollen</h2>
+        <p class="mt-0.5 text-xs text-slate-500">Live aus Discord — sortiert nach Position.</p>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        {% set manageable_count = server_roles|selectattr("manageable")|list|length %}
+        <span class="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs text-emerald-300">{{ manageable_count }} verwaltbar</span>
+        <span class="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs text-slate-400">{{ server_roles|length }} gesamt</span>
+        <input type="search" data-server-role-search placeholder="Rolle suchen …"
+          class="w-56 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30">
+      </div>
     </div>
     {% if server_roles %}
     <div class="overflow-x-auto">
@@ -208,25 +218,41 @@
         <thead>
           <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
             <th class="px-3 py-2.5">Rolle</th>
-            <th class="px-3 py-2.5">ID</th>
             <th class="px-3 py-2.5">Position</th>
             <th class="px-3 py-2.5">Status</th>
+            <th class="px-3 py-2.5 text-right">ID</th>
           </tr>
         </thead>
         <tbody>
           {% for role in server_roles %}
-          <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]" data-server-role-row data-role-name="{{ role.name|lower }}">
-            <td class="px-3 py-2.5 text-white">
-              <span class="mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle" style="background-color: {{ role.color }}"></span>{{ role.name }}
+          {% set rcolor = role.color if (role.color and role.color != "#000000") else "#94a3b8" %}
+          <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.03]" data-server-role-row data-role-name="{{ role.name|lower }}">
+            <td class="px-3 py-2.5">
+              <span class="inline-flex items-center gap-2.5 rounded-md border px-2.5 py-1"
+                    style="border-color:{{ rcolor }}33; background-color:{{ rcolor }}11; color:{{ rcolor }}">
+                <span class="h-2 w-2 rounded-full" style="background-color:{{ rcolor }}"></span>
+                <span class="font-medium">{{ role.name }}</span>
+              </span>
             </td>
-            <td class="px-3 py-2.5 font-mono text-xs text-slate-500">{{ role.id }}</td>
-            <td class="px-3 py-2.5 text-slate-400">{{ role.position }}</td>
+            <td class="px-3 py-2.5 text-slate-400 text-xs">#{{ role.position }}</td>
             <td class="px-3 py-2.5">
               {% if role.manageable %}
-              <span class="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300">verwaltbar</span>
+              <span class="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-[10.5px] font-medium text-emerald-300">
+                <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>verwaltbar
+              </span>
               {% else %}
-              <span class="rounded border border-slate-500/20 bg-slate-500/10 px-2 py-0.5 text-xs text-slate-300">{{ role.blocked_reason }}</span>
+              <span class="inline-flex items-center gap-1 rounded-full border border-slate-500/25 bg-slate-500/10 px-2 py-0.5 text-[10.5px] font-medium text-slate-400" title="{{ role.blocked_reason }}">
+                <span class="h-1.5 w-1.5 rounded-full bg-slate-500"></span>{{ role.blocked_reason or "blockiert" }}
+              </span>
               {% endif %}
+            </td>
+            <td class="px-3 py-2.5 text-right">
+              <button type="button" data-copy="{{ role.id }}"
+                      class="inline-flex items-center gap-1 rounded border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[10.5px] text-slate-400 transition hover:bg-white/10 hover:text-white"
+                      title="ID kopieren">
+                <span class="truncate max-w-[12ch]">{{ role.id }}</span>
+                <svg class="h-3 w-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+              </button>
             </td>
           </tr>
           {% endfor %}

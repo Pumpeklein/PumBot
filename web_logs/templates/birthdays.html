@@ -1,80 +1,132 @@
 {% extends "base.html" %}
-{% from "_macros.html" import page_header, field, btn, stat, empty_state %}
+{% from "_macros.html" import page_header, stat_tile, field, btn, empty_state, id_chip, badge %}
 
 {% block content %}
-{{ page_header("Geburtstage", "Übersicht aller gespeicherten Geburtstage.", "Verwalte Geburtstage und den Gratulations-Channel.") }}
+{{ page_header("Geburtstage", "Geburtstags-Verwaltung", "Verwalte gespeicherte Geburtstage, den Gratulations-Channel und Listen-Nachrichten.") }}
 
-<div class="mb-6 grid gap-4 sm:grid-cols-2">
-  {{ stat("Gespeicherte Geburtstage", birthday_count) }}
-  {{ stat("Gratulations-Channel", birthday_channel or "Nicht gesetzt") }}
+{% set month_names = {1:"Jan",2:"Feb",3:"Mär",4:"Apr",5:"Mai",6:"Jun",7:"Jul",8:"Aug",9:"Sep",10:"Okt",11:"Nov",12:"Dez"} %}
+
+<div class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+  {{ stat_tile("Gespeichert", birthday_count, accent="cyan", sub="Insgesamt im Server") }}
+  {{ stat_tile("Heute", today_count, accent=("emerald" if today_count else "slate"), sub=("Glückwünsche fällig!" if today_count else "Keine heute")) }}
+  {{ stat_tile("Diesen Monat", month_count, accent="violet") }}
+  {{ stat_tile("Channel", "✓" if birthday_channel else "✗", accent=("emerald" if birthday_channel else "amber"), sub=(birthday_channel if birthday_channel else "Nicht gesetzt")) }}
 </div>
-<div class="mb-6 text-xs text-slate-500">Aktive Geburtstags-Guild: <span class="font-mono text-slate-300">{{ birthdays_guild_id }}</span></div>
 
-<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-  <h2 class="mb-4 text-sm font-semibold text-white">Einstellungen</h2>
-  <form method="post" action="{{ url_for('birthdays_set_channel') }}" class="flex items-end gap-3">
-    <div class="w-64">
-      {{ field("channel_id", "Gratulations Channel ID", placeholder="z.B. 123456789012345678", value=birthday_channel|default("")) }}
+{# ── Today + Upcoming side by side ── #}
+<div class="mb-6 grid gap-4 lg:grid-cols-2">
+  <div class="rounded-xl border border-emerald-500/15 bg-emerald-500/[0.04] p-5">
+    <div class="mb-4 flex items-center gap-2">
+      <span class="text-lg">🎉</span>
+      <h2 class="text-sm font-semibold text-white">Heute Geburtstag</h2>
+      <span class="ml-auto rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-semibold text-emerald-300">{{ today_count }}</span>
     </div>
-    {{ btn("Speichern") }}
-  </form>
-</div>
-
-<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-  <h2 class="mb-4 text-sm font-semibold text-white">Listen-Nachrichten</h2>
-  <form method="post" action="{{ url_for('birthdays_add_message') }}" class="mb-5 flex flex-wrap items-end gap-3">
-    <div class="w-64">{{ field("message_id", "Nachrichten-ID", placeholder="z.B. 1362697161598304439", required=true) }}</div>
-    <div class="w-64">{{ field("channel_id", "Channel-ID", placeholder="optional, sonst Fallback aus Config") }}</div>
-    {{ btn("Nachricht hinzufügen") }}
-  </form>
-
-  {% if birthday_messages %}
-  <div class="overflow-x-auto">
-    <table class="w-full text-left text-sm">
-      <thead>
-        <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
-          <th class="px-3 py-2.5">Nachrichten-ID</th>
-          <th class="px-3 py-2.5">Channel-ID</th>
-          <th class="px-3 py-2.5">Typ</th>
-          <th class="px-3 py-2.5">Meta</th>
-          <th class="px-3 py-2.5 text-right">Aktionen</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for msg in birthday_messages %}
-        <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]">
-          <td class="px-3 py-2.5 font-mono text-slate-200">{{ msg.message_id }}</td>
-          <td class="px-3 py-2.5 font-mono text-slate-400">{{ msg.channel_id or "Fallback aus Config" }}</td>
-          <td class="px-3 py-2.5 text-slate-300">{{ msg.message_type }}</td>
-          <td class="px-3 py-2.5 text-slate-500">{{ msg.meta_key or "-" }}</td>
-          <td class="px-3 py-2.5 text-right">
-            <form method="post" action="{{ url_for('birthdays_delete_message', message_id=msg.message_id) }}" class="inline"
-              onsubmit="return confirm('Nachrichten-Verknüpfung wirklich entfernen?')">
-              <button type="submit" class="rounded border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-400 transition hover:bg-red-500/20">Entfernen</button>
-            </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    {% if today_list %}
+    <ul class="space-y-2">
+      {% for b in today_list %}
+      <li class="flex items-center justify-between gap-3 rounded-lg bg-white/[0.03] px-3 py-2">
+        <a href="{{ url_for('user_detail_page', user_id=b.user_id) }}" class="text-sm font-medium text-white hover:text-emerald-300 truncate">{{ b.display_name or b.user_id }}</a>
+        <div class="flex items-center gap-2">
+          {% if b.year %}<span class="text-xs text-slate-400">wird {{ today.year - b.year }}</span>{% endif %}
+          {{ id_chip(b.user_id) }}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-slate-400">Heute hat niemand Geburtstag — schau morgen wieder rein.</p>
+    {% endif %}
   </div>
-  {% else %}
-  {{ empty_state("Keine Listen-Nachrichten hinterlegt", "Füge oben eine Bot-Nachricht hinzu, die aktualisiert werden soll.") }}
-  {% endif %}
+
+  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    <div class="mb-4 flex items-center gap-2">
+      <svg class="h-4 w-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+      <h2 class="text-sm font-semibold text-white">Demnächst (30 Tage)</h2>
+      <span class="ml-auto rounded-full bg-cyan-500/15 px-2.5 py-0.5 text-xs font-semibold text-cyan-300">{{ upcoming|length }}</span>
+    </div>
+    {% if upcoming %}
+    <ul class="space-y-1.5">
+      {% for u in upcoming %}
+      <li class="flex items-center justify-between gap-3 rounded-lg bg-white/[0.02] px-3 py-2 text-sm">
+        <a href="{{ url_for('user_detail_page', user_id=u.user_id) }}" class="font-medium text-white hover:text-cyan-300 truncate">{{ u.display_name or u.user_id }}</a>
+        <div class="flex items-center gap-2 text-xs">
+          <span class="text-slate-400">{{ "%02d"|format(u.day) }}. {{ month_names[u.month] }}</span>
+          {% if u.days_until == 0 %}{{ badge("Heute", "success") }}
+          {% elif u.days_until == 1 %}{{ badge("Morgen", "success") }}
+          {% else %}<span class="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-slate-400">in {{ u.days_until }} Tagen</span>{% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-slate-400">Keine Geburtstage in den nächsten 30 Tagen.</p>
+    {% endif %}
+  </div>
 </div>
 
-<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-  <h2 class="mb-4 text-sm font-semibold text-white">Geburtstag hinzufügen</h2>
-  <form method="post" action="{{ url_for('birthdays_add') }}" class="flex flex-wrap items-end gap-3">
-    <div class="w-52">{{ field("user_id", "User ID", placeholder="z.B. 123456789012345678", required=true) }}</div>
-    <div class="w-20">{{ field("day", "Tag", type="number", min=1, max=31, required=true) }}</div>
-    <div class="w-20">{{ field("month", "Monat", type="number", min=1, max=12, required=true) }}</div>
-    <div class="w-24">{{ field("year", "Jahr", type="number", required=false, placeholder="optional") }}</div>
-    {{ btn("Hinzufügen") }}
+{# ── Forms row ── #}
+<div class="mb-6 grid gap-4 lg:grid-cols-2">
+  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    <h2 class="mb-1 text-sm font-semibold text-white">Geburtstag hinzufügen</h2>
+    <p class="mb-4 text-xs text-slate-500">Trage eine Person manuell ein.</p>
+    <form method="post" action="{{ url_for('birthdays_add') }}" class="space-y-3">
+      <div>{{ field("user_id", "User-ID", placeholder="z.B. 123456789012345678", required=true) }}</div>
+      <div class="grid grid-cols-3 gap-3">
+        <div>{{ field("day", "Tag", type="number", min=1, max=31, required=true) }}</div>
+        <div>{{ field("month", "Monat", type="number", min=1, max=12, required=true) }}</div>
+        <div>{{ field("year", "Jahr", type="number", placeholder="optional") }}</div>
+      </div>
+      {{ btn("Hinzufügen", variant="primary", class="w-full") }}
+    </form>
+  </div>
+
+  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    <h2 class="mb-1 text-sm font-semibold text-white">Gratulations-Channel</h2>
+    <p class="mb-4 text-xs text-slate-500">Channel, in dem Glückwünsche gepostet werden.</p>
+    <form method="post" action="{{ url_for('birthdays_set_channel') }}" class="flex items-end gap-2">
+      <div class="flex-1">{{ field("channel_id", "Channel-ID", value=birthday_channel|default(""), placeholder="leer = deaktiviert") }}</div>
+      {{ btn("Speichern") }}
+    </form>
+    {% if birthday_channel %}
+    <div class="mt-3 flex items-center gap-2 rounded-lg border border-emerald-500/15 bg-emerald-500/[0.05] px-3 py-2 text-xs text-emerald-200">
+      <span>Aktuell gesetzt:</span> {{ id_chip(birthday_channel) }}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Bot Messages ── #}
+<details class="mb-6 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5" {% if birthday_messages %}open{% endif %}>
+  <summary class="flex cursor-pointer items-center gap-2 text-sm font-semibold text-white">
+    <svg class="h-4 w-4 text-slate-400 transition group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+    Listen-Nachrichten
+    <span class="ml-auto rounded-full bg-white/5 px-2.5 py-0.5 text-xs text-slate-400">{{ birthday_messages|length }}</span>
+  </summary>
+  <p class="mt-3 text-xs text-slate-500">Bot-Nachrichten, die automatisch mit der Geburtstagsliste aktualisiert werden.</p>
+  <form method="post" action="{{ url_for('birthdays_add_message') }}" class="mt-4 flex flex-wrap items-end gap-3">
+    <div class="w-64">{{ field("message_id", "Nachrichten-ID", required=true) }}</div>
+    <div class="w-64">{{ field("channel_id", "Channel-ID", placeholder="optional") }}</div>
+    {{ btn("Verknüpfen", variant="secondary") }}
   </form>
-</div>
+  {% if birthday_messages %}
+  <ul class="mt-4 divide-y divide-white/[0.04] rounded-lg border border-white/[0.06]">
+    {% for msg in birthday_messages %}
+    <li class="flex flex-wrap items-center gap-3 px-3 py-2.5 text-sm">
+      {{ id_chip(msg.message_id, "Message") }}
+      {{ id_chip(msg.channel_id or "Fallback", "Channel") }}
+      <span class="text-xs text-slate-500">{{ msg.meta_key or "-" }}</span>
+      <form method="post" action="{{ url_for('birthdays_delete_message', message_id=msg.message_id) }}" class="ml-auto"
+            onsubmit="return confirm('Verknüpfung entfernen?')">
+        <button class="rounded border border-red-500/20 bg-red-500/5 px-2.5 py-1 text-xs text-red-300 transition hover:bg-red-500/15">Entfernen</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</details>
 
-<div data-paginated-table data-endpoint="{{ url_for('panel_api_birthdays') }}" data-form="#birthdays-filter" data-page-size="25" class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+{# ── All birthdays table ── #}
+<div data-paginated-table data-endpoint="{{ url_for('panel_api_birthdays') }}" data-form="#birthdays-filter" data-page-size="25" class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
   <script type="application/json">
     [
       {"type":"user","nameKey":"user_display_name","subKey":"user_username","avatarKey":"user_avatar_url","urlKey":"user_detail_url","class":"px-3 py-2.5"},
@@ -85,7 +137,10 @@
     ]
   </script>
   <form id="birthdays-filter"><input type="hidden" name="guild_id" value="{{ birthdays_guild_id }}"></form>
-  <h2 class="mb-4 text-sm font-semibold text-white">Alle Geburtstage</h2>
+  <div class="mb-4 flex items-center justify-between">
+    <h2 class="text-sm font-semibold text-white">Alle Geburtstage</h2>
+    <span class="text-xs text-slate-500">Sortiert nach letzter Änderung</span>
+  </div>
   <div class="overflow-x-auto">
     <table class="w-full text-left text-sm">
       <thead>
@@ -104,7 +159,7 @@
   <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400">
     <span data-table-status></span>
     <div class="flex items-center gap-2">
-      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option>10</option><option selected>25</option><option>50</option><option>100</option></select>
       <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button>
       <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
     </div>

@@ -1,55 +1,60 @@
 {% extends "base.html" %}
-{% from "_macros.html" import page_header, field, btn, stat, empty_state %}
+{% from "_macros.html" import page_header, stat_tile, field, btn, empty_state, badge %}
 
 {% block content %}
-{{ page_header("Verwarnungen", "Übersicht aller Verwarnungen auf dem Server.", "Suche nach User ID oder zeige alle Verwarnungen an.") }}
+{{ page_header("Moderation", "Verwarnungen", "Alle aktiven Verwarnungen, filterbar nach User-ID.") }}
 
-<div class="mb-6 grid gap-4 sm:grid-cols-2">
-  {{ stat("Verwarnungen", warning_count) }}
-  {{ stat("Filter", q_user_display_name or "Alle User") }}
+<div class="mb-6 grid gap-3 sm:grid-cols-3">
+  {{ stat_tile("Gesamt", warning_count, accent=("amber" if warning_count else "slate"), sub=("Aktive Verwarnungen" if warning_count else "Keine Verwarnungen")) }}
+  {% if q_user %}
+  {{ stat_tile("Filter", q_user_display_name or "User", accent="violet", sub=q_user) }}
+  {% else %}
+  {{ stat_tile("Filter", "Alle User", accent="slate", sub="Kein Filter aktiv") }}
+  {% endif %}
+  {{ stat_tile("Sortierung", "Neueste zuerst", accent="cyan") }}
 </div>
 
-<div class="mb-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-  <h2 class="mb-3 text-sm font-semibold text-white">User suchen</h2>
-  <form id="warnings-filter" method="get" class="flex items-end gap-3">
+<div class="mb-6 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+  <form id="warnings-filter" method="get" class="flex flex-wrap items-end gap-3">
     <input type="hidden" name="guild_id" value="{{ guild_id }}">
-    <div class="w-64">
-      {{ field("user_id", "User ID", placeholder="z.B. 123456789012345678", required=false, value=q_user) }}
+    <div class="w-64 flex-1 min-w-[200px]">
+      {{ field("user_id", "User-ID filtern", placeholder="z.B. 123456789012345678", value=q_user) }}
     </div>
     {{ btn("Suchen") }}
     {% if q_user %}
     <a href="{{ url_for('warnings_page') }}"
-      class="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/10">
-      Alle anzeigen
+       class="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/10">
+      Filter zurücksetzen
     </a>
     {% endif %}
   </form>
 </div>
 
-<div data-paginated-table data-endpoint="{{ url_for('panel_api_warnings') }}" data-form="#warnings-filter" data-page-size="25" class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+<div data-paginated-table data-endpoint="{{ url_for('panel_api_warnings') }}" data-form="#warnings-filter" data-page-size="25" class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
   <script type="application/json">
     [
-      {"key":"id","class":"px-3 py-2.5 text-slate-500 text-xs"},
+      {"key":"created_at","type":"date","class":"px-3 py-2.5 text-slate-400 text-xs whitespace-nowrap w-32"},
       {"type":"user","nameKey":"user_display_name","subKey":"user_username","avatarKey":"user_avatar_url","urlKey":"user_detail_url","class":"px-3 py-2.5"},
+      {"key":"reason","fallback":"— Kein Grund angegeben —","class":"px-3 py-2.5 text-slate-100"},
       {"type":"user","nameKey":"moderator_display_name","subKey":"moderator_username","avatarKey":"moderator_avatar_url","urlKey":"moderator_detail_url","class":"px-3 py-2.5"},
-      {"key":"reason","fallback":"Kein Grund","class":"px-3 py-2.5 text-white max-w-xs truncate"},
-      {"key":"created_at","type":"date","class":"px-3 py-2.5 text-slate-500 text-xs whitespace-nowrap"},
-      {"type":"delete","urlKey":"delete_url","label":"Löschen","confirm":"Verwarnung wirklich löschen?","class":"px-3 py-2.5 text-right"}
+      {"type":"delete","urlKey":"delete_url","label":"Löschen","confirm":"Verwarnung wirklich entfernen?","class":"px-3 py-2.5 text-right w-24"}
     ]
   </script>
-  <h2 class="mb-4 text-sm font-semibold text-white">
-    {% if q_user %}Verwarnungen für {{ q_user_display_name or q_user }}{% else %}Alle Verwarnungen{% endif %}
-  </h2>
+  <div class="mb-4 flex items-center justify-between">
+    <h2 class="text-sm font-semibold text-white">
+      {% if q_user %}Verwarnungen für {{ q_user_display_name or q_user }}{% else %}Alle Verwarnungen{% endif %}
+    </h2>
+    <span class="text-xs text-slate-500">Sortiert nach Datum</span>
+  </div>
   <div class="overflow-x-auto">
     <table class="w-full text-left text-sm">
       <thead>
         <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
-          <th class="px-3 py-2.5">ID</th>
-          <th class="px-3 py-2.5">User</th>
-          <th class="px-3 py-2.5">Moderator</th>
-          <th class="px-3 py-2.5">Grund</th>
           <th class="px-3 py-2.5">Datum</th>
-          <th class="px-3 py-2.5 text-right">Aktionen</th>
+          <th class="px-3 py-2.5">User</th>
+          <th class="px-3 py-2.5">Grund</th>
+          <th class="px-3 py-2.5">Moderator</th>
+          <th class="px-3 py-2.5 text-right">Aktion</th>
         </tr>
       </thead>
       <tbody data-table-body></tbody>
@@ -59,7 +64,7 @@
   <div class="mt-4 flex items-center justify-between border-t border-white/[0.06] pt-3 text-sm text-slate-400">
     <span data-table-status></span>
     <div class="flex items-center gap-2">
-      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option>10</option><option selected>25</option><option>50</option><option>100</option></select>
       <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button>
       <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
     </div>

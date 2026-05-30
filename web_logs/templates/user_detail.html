@@ -1,14 +1,14 @@
 {% extends "base.html" %}
-{% from "_macros.html" import page_header, stat, badge, empty_state, field, btn %}
+{% from "_macros.html" import page_header, stat, stat_tile, badge, empty_state, field, btn %}
 
 {% block content %}
 {{ page_header("User", member.display_name or member.username, "Profil, Aktivität, Nachrichten, Tickets und Historie aus der Datenbank.") }}
 
-<div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-  {{ stat("Nachrichten", message_stats.message_count or 0) }}
-  {{ stat("Aktive Channels", message_stats.channel_count or 0) }}
-  {{ stat("Tickets", ticket_stats.ticket_count or 0) }}
-  {{ stat("Offene Tickets", ticket_stats.open_tickets or 0) }}
+<div class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+  {{ stat_tile("Nachrichten", message_stats.message_count or 0, accent="cyan", sub="Insgesamt geschrieben") }}
+  {{ stat_tile("Aktive Channels", message_stats.channel_count or 0, accent="violet", sub="Mit Nachrichten") }}
+  {{ stat_tile("Tickets gesamt", ticket_stats.ticket_count or 0, accent="emerald") }}
+  {{ stat_tile("Offene Tickets", ticket_stats.open_tickets or 0, accent=("amber" if (ticket_stats.open_tickets or 0) else "slate")) }}
 </div>
 
 <div class="mb-6 flex flex-wrap gap-2 border-b border-white/[0.06] pb-3" data-tabs>

@@ -1538,9 +1538,9 @@ def list_tickets_for_user(
     with _connect() as conn:
         rows = conn.execute(
             """SELECT * FROM tickets
-               WHERE creator_user_id = ? AND (guild_id = ? OR guild_id IS NULL)
+               WHERE creator_user_id = ?
                ORDER BY updated_at DESC LIMIT ? OFFSET ?""",
-            (str(user_id), str(guild_id), limit, offset),
+            (str(user_id), limit, offset),
         ).fetchall()
         return [dict(r) for r in rows]
 
@@ -1549,8 +1549,8 @@ def count_tickets_for_user(guild_id: str, user_id: str) -> int:
     with _connect() as conn:
         row = conn.execute(
             """SELECT COUNT(*) AS total FROM tickets
-               WHERE creator_user_id = ? AND (guild_id = ? OR guild_id IS NULL)""",
-            (str(user_id), str(guild_id)),
+               WHERE creator_user_id = ?""",
+            (str(user_id),),
         ).fetchone()
         return int(row["total"] if row else 0)
 
@@ -1559,12 +1559,12 @@ def get_ticket_stats_for_user(guild_id: str, user_id: str) -> dict:
     with _connect() as conn:
         row = conn.execute(
             """SELECT COUNT(*) AS ticket_count,
-                      SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) AS open_tickets,
-                      SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) AS closed_tickets,
+                      COALESCE(SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END), 0) AS open_tickets,
+                      COALESCE(SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END), 0) AS closed_tickets,
                       MAX(updated_at) AS last_ticket_at
                FROM tickets
-               WHERE creator_user_id = ? AND (guild_id = ? OR guild_id IS NULL)""",
-            (str(user_id), str(guild_id)),
+               WHERE creator_user_id = ?""",
+            (str(user_id),),
         ).fetchone()
         return dict(row) if row else {
             "ticket_count": 0,

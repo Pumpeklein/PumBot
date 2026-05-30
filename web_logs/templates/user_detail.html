@@ -48,6 +48,46 @@
   </dl>
 </div>
 
+<div class="mb-6">
+  <h2 class="mb-4 text-sm font-semibold text-white">Tickets</h2>
+  <div data-paginated-table data-endpoint="{{ url_for('panel_api_user_tickets', user_id=member.user_id, guild_id=guild_id) }}" data-page-size="10" class="overflow-hidden rounded-xl border border-white/[0.06]">
+    <script type="application/json">
+      [
+        {"key":"ticket_id","type":"link","urlKey":"detail_url","class":"whitespace-nowrap px-4 py-3"},
+        {"key":"subject","fallback":"Ohne Betreff","class":"px-4 py-3 text-slate-300"},
+        {"key":"status","type":"badge","variants":{"closed":"success","open":"warning"},"class":"px-4 py-3"},
+        {"key":"category","fallback":"-","class":"whitespace-nowrap px-4 py-3 text-slate-400"},
+        {"key":"created_at","type":"date","class":"whitespace-nowrap px-4 py-3 text-slate-500"},
+        {"key":"updated_at","type":"date","class":"whitespace-nowrap px-4 py-3 text-slate-500"}
+      ]
+    </script>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead>
+          <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+            <th class="px-4 py-3 font-medium">Ticket</th>
+            <th class="px-4 py-3 font-medium">Betreff</th>
+            <th class="px-4 py-3 font-medium">Status</th>
+            <th class="px-4 py-3 font-medium">Kategorie</th>
+            <th class="px-4 py-3 font-medium">Erstellt</th>
+            <th class="px-4 py-3 font-medium">Aktualisiert</th>
+          </tr>
+        </thead>
+        <tbody data-table-body class="divide-y divide-white/[0.04]"></tbody>
+      </table>
+    </div>
+    <div data-table-empty class="hidden">{{ empty_state("Keine Tickets", "Dieser User hat noch keine Tickets geöffnet.") }}</div>
+    <div class="flex items-center justify-between border-t border-white/[0.06] px-4 py-3 text-sm text-slate-400">
+      <span data-table-status></span>
+      <div class="flex items-center gap-2">
+        <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+        <button data-page-prev class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Zurück</button>
+        <button data-page-next class="rounded border border-white/10 px-3 py-1 disabled:opacity-40">Weiter</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
   <h2 class="mb-4 text-sm font-semibold text-white">Namenshistorie</h2>
   {% if history %}
@@ -76,7 +116,11 @@
     </table>
   </div>
   {% else %}
-  {{ empty_state("Keine Namensaenderungen", "Fuer diesen User wurde noch keine Namensaenderung gespeichert.") }}
+  {{ empty_state("Keine Namensänderungen", "Für diesen User wurde noch keine Namensänderung gespeichert.") }}
   {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
 {% endblock %}

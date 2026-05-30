@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from functools import wraps
 from html import escape
 from pathlib import Path
+from types import SimpleNamespace
 
 from dotenv import load_dotenv
 
@@ -434,28 +435,86 @@ def _run_bot_coro(coro):
         return None, str(exc)
 
 
-def _live_discord_roles(guild_id: str) -> list[dict]:
+def _role_dict(role, *, actor_member=None, bot_member=None) -> dict:
+    actor_can_manage = _member_can_manage_role(actor_member, role)
+    bot_can_manage = _member_can_manage_role(bot_member, role)
+    manageable = (
+        actor_can_manage
+        and bot_can_manage
+        and not getattr(role, "managed", False)
+        and not getattr(role, "is_default", lambda: False)()
+    )
+    return {
+        "id": str(role.id),
+        "name": role.name,
+        "position": role.position,
+        "managed": role.managed,
+        "color": str(role.color),
+        "manageable": manageable,
+        "blocked_reason": None if manageable else _role_blocked_reason(role, actor_member, bot_member),
+    }
+
+
+def _member_can_manage_role(member, role) -> bool:
+    if member is None or role is None:
+        return False
+    if getattr(role, "is_default", lambda: False)():
+        return False
+    guild = getattr(role, "guild", None) or getattr(member, "guild", None)
+    if guild and getattr(guild, "owner_id", None) == getattr(member, "id", None):
+        return True
+    top_role = getattr(member, "top_role", None)
+    return bool(top_role and getattr(top_role, "position", 0) > getattr(role, "position", 0))
+
+
+def _role_blocked_reason(role, actor_member=None, bot_member=None) -> str:
+    if getattr(role, "managed", False):
+        return "Managed Rolle"
+    if not _member_can_manage_role(actor_member, role):
+        return "Über deiner höchsten Rolle"
+    if not _member_can_manage_role(bot_member, role):
+        return "Über der Bot-Rolle"
+    return "Nicht verwaltbar"
+
+
+def _live_role_context(guild_id: str):
     bot = app.config.get("DISCORD_BOT")
     if not bot or not bot.is_ready():
-        return []
+        return None, None, None
     guild = bot.get_guild(int(guild_id))
     if not guild:
+        return None, None, None
+    user = current_user()
+    actor_member = None
+    if user and user.get("discord_id"):
+        actor_member = guild.get_member(int(user["discord_id"]))
+        if actor_member is None:
+            role_ids = {str(role_id) for role_id in session.get("discord_roles", [])}
+            actor_roles = [role for role in guild.roles if str(role.id) in role_ids]
+            if actor_roles:
+                actor_member = SimpleNamespace(
+                    id=int(user["discord_id"]),
+                    top_role=max(actor_roles, key=lambda role: role.position),
+                    guild=guild,
+                )
+    bot_member = guild.me
+    return guild, actor_member, bot_member
+
+
+def _live_discord_roles(guild_id: str) -> list[dict]:
+    guild, actor_member, bot_member = _live_role_context(guild_id)
+    if not guild:
         return []
-    roles = []
-    for role in sorted(guild.roles, key=lambda r: r.position, reverse=True):
-        if getattr(role, "is_default", lambda: False)():
-            continue
-        roles.append({
-            "id": str(role.id),
-            "name": role.name,
-            "position": role.position,
-            "managed": role.managed,
-            "color": str(role.color),
-        })
-    return roles
+    return [
+        _role_dict(role, actor_member=actor_member, bot_member=bot_member)
+        for role in sorted(guild.roles, key=lambda r: r.position, reverse=True)
+        if not getattr(role, "is_default", lambda: False)()
+    ]
 
 
-async def _discord_add_member_role(guild_id: str, user_id: str, role_id: str) -> list[dict]:
+async def _discord_add_member_role(
+    guild_id: str, user_id: str, role_id: str, actor_user_id: str | None
+) -> list[dict]:
     bot = app.config.get("DISCORD_BOT")
     guild = bot.get_guild(int(guild_id)) if bot else None
     if guild is None:
@@ -464,6 +523,15 @@ async def _discord_add_member_role(guild_id: str, user_id: str, role_id: str) ->
     role = guild.get_role(int(role_id))
     if role is None:
         raise RuntimeError("Rolle nicht gefunden.")
+    actor = None
+    if actor_user_id:
+        actor = guild.get_member(int(actor_user_id)) or await guild.fetch_member(int(actor_user_id))
+    if not _member_can_manage_role(actor, role):
+        raise RuntimeError("Du kannst keine Rolle vergeben, die über deiner höchsten Rolle liegt.")
+    if not _member_can_manage_role(guild.me, role):
+        raise RuntimeError("Der Bot kann diese Rolle wegen der Discord-Hierarchie nicht vergeben.")
+    if getattr(role, "managed", False):
+        raise RuntimeError("Managed Rollen können nicht manuell vergeben werden.")
     await member.add_roles(role, reason="Web Panel")
     return [
         {"id": str(role.id), "name": role.name}
@@ -472,7 +540,9 @@ async def _discord_add_member_role(guild_id: str, user_id: str, role_id: str) ->
     ]
 
 
-async def _discord_remove_member_role(guild_id: str, user_id: str, role_id: str) -> list[dict]:
+async def _discord_remove_member_role(
+    guild_id: str, user_id: str, role_id: str, actor_user_id: str | None
+) -> list[dict]:
     bot = app.config.get("DISCORD_BOT")
     guild = bot.get_guild(int(guild_id)) if bot else None
     if guild is None:
@@ -481,6 +551,15 @@ async def _discord_remove_member_role(guild_id: str, user_id: str, role_id: str)
     role = guild.get_role(int(role_id))
     if role is None:
         raise RuntimeError("Rolle nicht gefunden.")
+    actor = None
+    if actor_user_id:
+        actor = guild.get_member(int(actor_user_id)) or await guild.fetch_member(int(actor_user_id))
+    if not _member_can_manage_role(actor, role):
+        raise RuntimeError("Du kannst keine Rolle entfernen, die über deiner höchsten Rolle liegt.")
+    if not _member_can_manage_role(guild.me, role):
+        raise RuntimeError("Der Bot kann diese Rolle wegen der Discord-Hierarchie nicht entfernen.")
+    if getattr(role, "managed", False):
+        raise RuntimeError("Managed Rollen können nicht manuell entfernt werden.")
     await member.remove_roles(role, reason="Web Panel")
     return [
         {"id": str(role.id), "name": role.name}
@@ -685,9 +764,11 @@ def public_transcript(ticket_id: str):
 def roles_page():
     ctx = _ctx()
     roles = list_roles(DEFAULT_GUILD_ID)
+    server_roles = _live_discord_roles(DEFAULT_GUILD_ID)
     return render_template(
         "roles.html",
         roles=roles,
+        server_roles=server_roles,
         all_permissions=ALL_PERMISSIONS,
         active_page="roles",
         **ctx,
@@ -702,6 +783,15 @@ def roles_create():
     perms = request.form.getlist("permissions")
     if not discord_role_id or not role_name:
         return redirect(url_for("roles_page"))
+    guild, actor_member, bot_member = _live_role_context(DEFAULT_GUILD_ID)
+    if guild:
+        try:
+            role = guild.get_role(int(discord_role_id))
+        except ValueError:
+            role = None
+        if role is None or not _role_dict(role, actor_member=actor_member, bot_member=bot_member)["manageable"]:
+            app.logger.warning("Web role create blocked for unmanaged Discord role: %s", discord_role_id)
+            return redirect(url_for("roles_page"))
     create_role(DEFAULT_GUILD_ID, discord_role_id, role_name, perms)
     return redirect(url_for("roles_page"))
 
@@ -719,6 +809,37 @@ def roles_update(role_id: int):
 @permission_required("roles.manage")
 def roles_delete(role_id: int):
     delete_role(role_id)
+    return redirect(url_for("roles_page"))
+
+
+@app.post("/roles/discord/create")
+@permission_required("roles.manage")
+def roles_discord_create():
+    guild_id = DEFAULT_GUILD_ID
+    role_name = (request.form.get("role_name") or "").strip()
+    color_hex = (request.form.get("color") or "").strip() or None
+    if role_name:
+        role, error = _run_bot_coro(_discord_create_role(guild_id, role_name, color_hex))
+        if error:
+            app.logger.warning("Discord role create failed: %s", error)
+    return redirect(url_for("roles_page"))
+
+
+@app.post("/roles/discord/assign")
+@permission_required("roles.manage")
+def roles_discord_assign():
+    guild_id = DEFAULT_GUILD_ID
+    user_id = (request.form.get("user_id") or "").strip()
+    role_id = (request.form.get("role_id") or "").strip()
+    actor_user_id = (current_user() or {}).get("discord_id")
+    if user_id and role_id:
+        roles, error = _run_bot_coro(
+            _discord_add_member_role(guild_id, user_id, role_id, actor_user_id)
+        )
+        if roles is not None:
+            update_guild_member_roles(guild_id, user_id, roles)
+        elif error:
+            app.logger.warning("Discord role assign failed: %s", error)
     return redirect(url_for("roles_page"))
 
 
@@ -1036,6 +1157,7 @@ def user_detail_page(user_id: str):
     ]
     web_role_ids = set(web_roles_by_discord_id)
     discord_roles = _live_discord_roles(guild_id)
+    discord_roles_by_id = {str(role["id"]): role for role in discord_roles}
     current_role_ids = {str(role.get("id")) for role in member_roles}
     message_stats = get_user_message_stats(guild_id, user_id)
     channel_stats = get_user_channel_message_stats(guild_id, user_id)
@@ -1056,11 +1178,15 @@ def user_detail_page(user_id: str):
         member_web_roles=member_web_roles,
         discord_roles=discord_roles,
         discord_member_roles=[
-            {**role, "is_web_role": str(role.get("id")) in web_role_ids}
+            {
+                **role,
+                **discord_roles_by_id.get(str(role.get("id")), {}),
+                "is_web_role": str(role.get("id")) in web_role_ids,
+            }
             for role in member_roles
         ],
         assignable_discord_roles=[
-            role for role in discord_roles if role["id"] not in current_role_ids
+            role for role in discord_roles if role["id"] not in current_role_ids and role.get("manageable")
         ],
         connections=list_user_connections(user_id),
         message_stats=_format_date_fields([message_stats], "last_message_at")[0],
@@ -1077,8 +1203,11 @@ def user_detail_page(user_id: str):
 def user_discord_role_add(user_id: str):
     guild_id = _active_panel_guild_id()
     role_id = (request.form.get("role_id") or "").strip()
+    actor_user_id = (current_user() or {}).get("discord_id")
     if role_id:
-        roles, error = _run_bot_coro(_discord_add_member_role(guild_id, user_id, role_id))
+        roles, error = _run_bot_coro(
+            _discord_add_member_role(guild_id, user_id, role_id, actor_user_id)
+        )
         if roles is not None:
             update_guild_member_roles(guild_id, user_id, roles)
         elif error:
@@ -1090,7 +1219,10 @@ def user_discord_role_add(user_id: str):
 @permission_required("roles.manage")
 def user_discord_role_remove(user_id: str, role_id: str):
     guild_id = _active_panel_guild_id()
-    roles, error = _run_bot_coro(_discord_remove_member_role(guild_id, user_id, role_id))
+    actor_user_id = (current_user() or {}).get("discord_id")
+    roles, error = _run_bot_coro(
+        _discord_remove_member_role(guild_id, user_id, role_id, actor_user_id)
+    )
     if roles is not None:
         update_guild_member_roles(guild_id, user_id, roles)
     elif error:
@@ -1109,8 +1241,9 @@ def user_discord_role_create(user_id: str):
         if error:
             app.logger.warning("Discord role create failed: %s", error)
         elif role and request.form.get("assign_created") == "1":
+            actor_user_id = (current_user() or {}).get("discord_id")
             roles, assign_error = _run_bot_coro(
-                _discord_add_member_role(guild_id, user_id, role["id"])
+                _discord_add_member_role(guild_id, user_id, role["id"], actor_user_id)
             )
             if roles is not None:
                 update_guild_member_roles(guild_id, user_id, roles)
@@ -1633,10 +1766,16 @@ def panel_api_birthdays():
     rows = []
     for row in get_birthdays(guild_id, limit=page_size, offset=offset):
         item = _attach_member_profile(row, guild_id, "user_id", "user")
-        item["date_label"] = f"{int(item['day']):02d}.{int(item['month']):02d}" + (
-            f".{item['year']}" if item.get("year") else ""
-        )
-        item["month_name"] = month_names.get(item.get("month"), "?")
+        try:
+            day = int(item.get("day") or 0)
+            month = int(item.get("month") or 0)
+        except (TypeError, ValueError):
+            day = 0
+            month = 0
+        item["date_label"] = (
+            f"{day:02d}.{month:02d}" if day and month else "Ungültiges Datum"
+        ) + (f".{item['year']}" if item.get("year") and day and month else "")
+        item["month_name"] = month_names.get(month, "?")
         item["delete_url"] = url_for("birthdays_delete", user_id=item["user_id"])
         rows.append(item)
     return _paginated_response(rows, count_birthdays(guild_id), page, page_size)

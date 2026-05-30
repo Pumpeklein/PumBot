@@ -114,7 +114,8 @@
       <div class="mb-4 flex flex-wrap gap-2">
         {% for role in discord_member_roles %}
         <form method="post" action="{{ url_for('user_discord_role_remove', user_id=member.user_id, role_id=role.id, guild_id=guild_id) }}" onsubmit="return confirm('Discord Rolle wirklich entfernen?')">
-          <button type="submit" class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-200 transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300">
+          <button type="submit" {% if not role.manageable %}disabled title="{{ role.blocked_reason }}"{% endif %}
+            class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-200 transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-white/10 disabled:hover:bg-white/5 disabled:hover:text-slate-200">
             {{ role.name or role.id }}{% if role.is_web_role %}<span class="text-slate-500">Web</span>{% endif %}
           </button>
         </form>
@@ -127,12 +128,16 @@
         <div>
           <label for="role_id" class="mb-1.5 block text-sm font-medium text-slate-400">Rolle hinzufügen</label>
           <select id="role_id" name="role_id" class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
+            {% if not assignable_discord_roles %}
+            <option value="">Keine verwaltbaren Rollen verfuegbar</option>
+            {% endif %}
             {% for role in assignable_discord_roles %}
             <option value="{{ role.id }}">{{ role.name }}</option>
             {% endfor %}
           </select>
         </div>
-        {{ btn("Hinzufügen") }}
+        <button type="submit" {% if not assignable_discord_roles %}disabled{% endif %}
+          class="rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-45">Hinzufügen</button>
       </form>
       <form method="post" action="{{ url_for('user_discord_role_create', user_id=member.user_id, guild_id=guild_id) }}" class="grid gap-3 sm:grid-cols-[1fr_120px_auto_auto] sm:items-end">
         {{ field("role_name", "Neue Discord Rolle", placeholder="Rollenname", required=false) }}

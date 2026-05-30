@@ -1,147 +1,170 @@
 {% extends "base.html" %}
-{% from "_macros.html" import page_header, field, btn, empty_state %} 
+{% from "_macros.html" import page_header, field, btn, stat, empty_state %}
 
-{% macro permission_group(group, selected) %}
-<section class="rounded-lg border border-white/[0.06] bg-black/10 p-4">
-  <h3 class="mb-3 text-sm font-semibold text-white">{{ group.label }}</h3>
-  <div class="grid gap-2 sm:grid-cols-2">
-    {% for perm, label in group.permissions %}
-    <label class="flex cursor-pointer items-center gap-2 rounded border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-300 transition hover:bg-white/10">
-      <input type="checkbox" name="permissions" value="{{ perm }}" {{ "checked" if perm in selected else "" }}
-        class="rounded border-white/20 bg-white/5 text-cyan-500 focus:ring-cyan-500/30">
-      <span>
-        <span class="block text-slate-200">{{ label }}</span>
-        <span class="block font-mono text-[11px] text-slate-500">{{ perm }}</span>
-      </span>
-    </label>
+{# ──────────────────────────────────────────────────────────────────────────
+   Helpers
+   ────────────────────────────────────────────────────────────────────────── #}
+{% macro perm_picker(input_name, selected, id_prefix="") %}
+<div class="space-y-3" data-perm-picker>
+  <div class="flex flex-wrap items-center gap-2 text-xs">
+    <input type="search" data-perm-search placeholder="Recht suchen..."
+      class="min-w-[180px] flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white placeholder-slate-500 outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30">
+    <button type="button" data-perm-select-all
+      class="rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-slate-300 transition hover:bg-white/10">Alle wählen</button>
+    <button type="button" data-perm-clear
+      class="rounded-md border border-white/10 bg-white/5 px-2.5 py-1 text-slate-300 transition hover:bg-white/10">Alles leeren</button>
+    <span class="ml-auto text-slate-500"><span data-perm-count>0</span> ausgewählt</span>
+  </div>
+
+  {% set _admin_selected = "admin" in selected %}
+  <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2.5 text-sm text-amber-200 transition hover:bg-amber-500/10"
+         data-perm-admin-toggle>
+    <input type="checkbox" name="{{ input_name }}" value="admin" {{ "checked" if _admin_selected else "" }}
+      class="mt-0.5 rounded border-amber-500/30 bg-white/5 text-amber-500 focus:ring-amber-500/30" data-perm-input data-perm-admin>
+    <span>
+      <span class="block font-semibold text-amber-100">Vollzugriff (admin)</span>
+      <span class="block text-[11px] text-amber-300/80">Aktiviert alle anderen Rechte automatisch.</span>
+    </span>
+  </label>
+
+  <div class="space-y-3" data-perm-groups>
+    {% for group in (permission_groups + command_permission_groups) %}
+    <details class="group rounded-lg border border-white/[0.06] bg-black/10 open:bg-black/20" data-perm-group {% if loop.first %}open{% endif %}>
+      <summary class="flex cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white hover:bg-white/5">
+        <span class="flex items-center gap-2">
+          <svg class="h-4 w-4 text-slate-500 transition group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+          {{ group.label }}
+        </span>
+        <span class="flex items-center gap-2 text-xs text-slate-400">
+          <span data-perm-group-count>0</span>/<span>{{ group.permissions|length }}</span>
+          <button type="button" data-perm-group-toggle
+            class="rounded border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-slate-300 hover:bg-white/10">alle</button>
+        </span>
+      </summary>
+      <div class="grid gap-1.5 px-3 pb-3 sm:grid-cols-2" data-perm-group-body>
+        {% for perm, label in group.permissions %}
+        <label class="group/perm flex cursor-pointer items-start gap-2.5 rounded-md border border-transparent bg-white/[0.02] px-2.5 py-2 text-sm text-slate-300 transition hover:border-white/10 hover:bg-white/[0.05]"
+               data-perm-item data-perm-haystack="{{ label|lower }} {{ perm|lower }}">
+          <input type="checkbox" name="{{ input_name }}" value="{{ perm }}" {{ "checked" if perm in selected else "" }}
+            class="mt-0.5 rounded border-white/20 bg-white/5 text-cyan-500 focus:ring-cyan-500/30" data-perm-input>
+          <span class="min-w-0 flex-1">
+            <span class="block leading-snug text-slate-200">{{ label }}</span>
+            <span class="block truncate font-mono text-[10.5px] text-slate-500">{{ perm }}</span>
+          </span>
+        </label>
+        {% endfor %}
+      </div>
+    </details>
     {% endfor %}
   </div>
-</section>
+</div>
 {% endmacro %}
 
-{% block content %}
-{{ page_header("Rollen", "Web-Rollen verwalten", "Discord-Rollen mit Panel-Rechten und Command-Zugriffen verknuepfen.") }}
 
+{% block content %}
+{{ page_header("Rollen", "Rollen & Berechtigungen", "Discord-Rollen mit Panel-Rechten verknüpfen, Mitglieder einsehen und Server-Rollen verwalten.") }}
+
+{# ── Top stats ── #}
+<div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  {{ stat("Web Rollen", roles|length) }}
+  {{ stat("Mitglieder mit Web Rolle", total_members_with_web_role) }}
+  {{ stat("Vergebene Rechte", total_permissions_assigned) }}
+  {{ stat("Server Rollen", server_roles|length) }}
+</div>
+
+{# ── Tabs ── #}
 <div class="mb-6 flex flex-wrap gap-2 border-b border-white/[0.06] pb-3" data-tabs>
   <button type="button" data-tab-target="web" class="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-300">Web Rollen</button>
   <button type="button" data-tab-target="server" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300">Server Rollen</button>
 </div>
 
+{# ════════════════════════════════════════════════════════════════
+   WEB ROLES
+   ════════════════════════════════════════════════════════════════ #}
 <section data-tab-panel="web">
-  <div class="grid gap-6 xl:grid-cols-[360px_1fr]">
-    <aside class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-      <h2 class="mb-4 text-sm font-semibold text-white">Neue Web Rolle</h2>
-      <form method="post" action="{{ url_for('roles_create') }}" class="space-y-4">
-        <div>
-          <label for="discord_role_id" class="mb-1.5 block text-sm font-medium text-slate-400">Discord Rolle</label>
-          {% if server_roles %}
-          <select id="discord_role_id" name="discord_role_id" class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
-            {% for role in server_roles %}
-            <option value="{{ role.id }}" data-role-name="{{ role.name }}" {% if not role.manageable %}disabled{% endif %}>
-              {{ role.name }} ({{ role.id }}){% if not role.manageable %} - {{ role.blocked_reason }}{% endif %}
-            </option>
-            {% endfor %}
-          </select>
-          {% else %}
-          {{ field("discord_role_id", "Discord Rollen-ID", placeholder="z.B. 1441253029432262787", required=true) }}
-          {% endif %}
-        </div>
-        {{ field("role_name", "Anzeigename", placeholder="z.B. Discord Mod", required=true) }}
-        <details class="rounded-lg border border-white/[0.06] bg-black/10 p-3">
-          <summary class="cursor-pointer text-sm font-medium text-slate-200">Startrechte auswaehlen</summary>
-          <div class="mt-3 space-y-3">
-            {% for group in permission_groups %}
-              {{ permission_group(group, []) }}
-            {% endfor %}
-            {% for group in command_permission_groups %}
-              {{ permission_group(group, []) }}
-            {% endfor %}
-          </div>
-        </details>
-        {{ btn("Erstellen") }}
-      </form>
-    </aside>
-
-    <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-      <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 class="text-sm font-semibold text-white">Web Rollen</h2>
-        <input type="search" data-role-search placeholder="Rolle suchen" class="w-full max-w-xs rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30">
+  <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <div class="flex flex-1 items-center gap-3">
+      <div class="relative max-w-xs flex-1">
+        <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"/></svg>
+        <input type="search" data-role-search placeholder="Rolle suchen"
+          class="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-9 pr-3 text-sm text-white placeholder-slate-500 outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30">
       </div>
-      {% if roles|length == 0 %}
-      {{ empty_state("Keine Web Rollen", "Erstelle links eine Rolle, um Panel-Zugriffe zu vergeben.") }}
-      {% else %}
-      <div class="overflow-x-auto">
-        <table class="w-full text-left text-sm">
-          <thead>
-            <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
-              <th class="px-3 py-2.5">Rolle</th>
-              <th class="px-3 py-2.5">Discord ID</th>
-              <th class="px-3 py-2.5">Rechte</th>
-              <th class="px-3 py-2.5 text-right">Aktion</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for role in roles %}
-            <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]" data-role-row data-role-name="{{ role.role_name|lower }}">
-              <td class="px-3 py-2.5 font-medium text-white">{{ role.role_name }}</td>
-              <td class="px-3 py-2.5 font-mono text-xs text-slate-500">{{ role.discord_role_id }}</td>
-              <td class="px-3 py-2.5 text-slate-400">
-                {{ role.permissions|length }} Rechte
-              </td>
-              <td class="px-3 py-2.5 text-right">
-                <button type="button" data-open-role-modal="{{ role.id }}" class="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-1.5 text-xs font-medium text-cyan-300 transition hover:bg-cyan-500/20">Bearbeiten</button>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% endif %}
     </div>
+    <button type="button" data-open-create-modal
+      class="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-cyan-600/20 transition hover:bg-cyan-500">
+      <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+      Neue Web Rolle
+    </button>
   </div>
 
-  {% for role in roles %}
-  <div data-role-modal="{{ role.id }}" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 p-4">
-    <div class="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-xl border border-white/[0.08] bg-[#0d1320] shadow-2xl">
-      <form method="post" action="{{ url_for('roles_update', role_id=role.id) }}">
-        <div class="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] bg-[#0d1320] px-5 py-4">
-          <div>
-            <h2 class="text-base font-semibold text-white">{{ role.role_name }}</h2>
-            <p class="mt-0.5 font-mono text-xs text-slate-500">{{ role.discord_role_id }}</p>
-          </div>
-          <button type="button" data-close-role-modal class="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-300 transition hover:bg-white/10">Schliessen</button>
-        </div>
-        <div class="space-y-5 p-5">
-          <div class="max-w-md">
-            {{ field("role_name", "Anzeigename", value=role.role_name, required=true) }}
-          </div>
-          <div class="grid gap-4 lg:grid-cols-2">
-            {% for group in permission_groups %}
-              {{ permission_group(group, role.permissions) }}
-            {% endfor %}
-          </div>
-          <div>
-            <h3 class="mb-3 text-sm font-semibold text-white">Command Zugriff</h3>
-            {% for group in command_permission_groups %}
-              {{ permission_group(group, role.permissions) }}
-            {% endfor %}
-          </div>
-        </div>
-        <div class="flex items-center justify-between border-t border-white/[0.06] px-5 py-4">
-          <span class="text-xs text-slate-500">Aenderungen gelten nach dem naechsten Login der betroffenen User.</span>
-          <button type="submit" class="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-cyan-500">Speichern</button>
-        </div>
-      </form>
-      <form method="post" action="{{ url_for('roles_delete', role_id=role.id) }}" class="px-5 pb-5 text-right" onsubmit="return confirm('Rolle wirklich loeschen?')">
-        <button type="submit" class="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-400 transition hover:bg-red-500/20">Loeschen</button>
-      </form>
+  {% if roles|length == 0 %}
+    <div class="rounded-xl border border-white/[0.06] bg-white/[0.02]">
+      {{ empty_state("Noch keine Web Rollen", "Erstelle deine erste Rolle, um Discord-Rollen mit Panel-Rechten zu verknüpfen.") }}
     </div>
+  {% else %}
+  <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" data-role-grid>
+    {% for role in roles %}
+    <article data-role-card data-role-name="{{ role.role_name|lower }}"
+      class="group flex flex-col rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 transition hover:border-cyan-500/30 hover:bg-white/[0.04]">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex items-center gap-3 min-w-0">
+          <span class="h-3 w-3 shrink-0 rounded-full ring-2 ring-white/10" style="background-color: {{ role.color }}"></span>
+          <div class="min-w-0">
+            <h3 class="truncate text-base font-semibold text-white">{{ role.role_name }}</h3>
+            {% if role.discord_role %}
+            <p class="truncate text-xs text-slate-500">Discord: <span class="text-slate-400">{{ role.discord_role.name }}</span></p>
+            {% else %}
+            <p class="truncate text-xs text-amber-400/80">Discord-Rolle nicht gefunden</p>
+            {% endif %}
+          </div>
+        </div>
+        {% if "admin" in role.permissions %}
+        <span class="shrink-0 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">Admin</span>
+        {% endif %}
+      </div>
+
+      <div class="mt-4 grid grid-cols-2 gap-2 text-center">
+        <div class="rounded-lg border border-white/[0.06] bg-black/20 px-2 py-2">
+          <div class="text-lg font-bold text-white">{{ role.member_count }}</div>
+          <div class="text-[10px] uppercase tracking-wider text-slate-500">Mitglieder</div>
+        </div>
+        <div class="rounded-lg border border-white/[0.06] bg-black/20 px-2 py-2">
+          <div class="text-lg font-bold text-white">{{ role.permissions|length }}</div>
+          <div class="text-[10px] uppercase tracking-wider text-slate-500">Rechte</div>
+        </div>
+      </div>
+
+      <div class="mt-3 flex flex-wrap gap-1.5">
+        {% for perm in role.permissions[:4] %}
+        <span class="rounded border border-cyan-500/20 bg-cyan-500/10 px-1.5 py-0.5 text-[10.5px] text-cyan-300">{{ perm|permission_label }}</span>
+        {% endfor %}
+        {% if role.permissions|length > 4 %}
+        <span class="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10.5px] text-slate-400">+{{ role.permissions|length - 4 }}</span>
+        {% endif %}
+      </div>
+
+      <div class="mt-4 flex items-center justify-between border-t border-white/[0.04] pt-3 text-xs">
+        <span class="font-mono text-slate-500" title="{{ role.discord_role_id }}">{{ role.discord_role_id[:6] }}…{{ role.discord_role_id[-4:] }}</span>
+        <button type="button" data-open-role-modal="{{ role.id }}"
+          class="inline-flex items-center gap-1 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-1 text-cyan-300 transition hover:bg-cyan-500/20">
+          Bearbeiten
+          <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </article>
+    {% endfor %}
   </div>
-  {% endfor %}
+  <div data-role-empty class="hidden rounded-xl border border-white/[0.06] bg-white/[0.02] mt-4">
+    {{ empty_state("Keine Treffer", "Keine Web Rolle entspricht deiner Suche.") }}
+  </div>
+  {% endif %}
 </section>
 
-<section data-tab-panel="server" class="hidden">
-  <div class="grid gap-6 lg:grid-cols-2">
+{# ════════════════════════════════════════════════════════════════
+   SERVER ROLES
+   ════════════════════════════════════════════════════════════════ #}
+<section data-tab-panel="server" class="hidden space-y-6">
+  <div class="grid gap-4 lg:grid-cols-2">
     <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
       <h2 class="mb-4 text-sm font-semibold text-white">Neue Discord Rolle erstellen</h2>
       <form method="post" action="{{ url_for('roles_discord_create') }}" class="grid gap-3 sm:grid-cols-[1fr_140px_auto] sm:items-end">
@@ -160,7 +183,7 @@
           <select id="assign_role_id" name="role_id" class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
             {% set assignable_roles = server_roles|selectattr("manageable")|list %}
             {% if not assignable_roles %}
-            <option value="">Keine verwaltbaren Rollen verfuegbar</option>
+            <option value="">Keine verwaltbaren Rollen verfügbar</option>
             {% endif %}
             {% for role in assignable_roles %}
             <option value="{{ role.id }}">{{ role.name }}</option>
@@ -173,80 +196,426 @@
     </div>
   </div>
 
-  <div class="mt-6 rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-    <h2 class="mb-4 text-sm font-semibold text-white">Server Rollen</h2>
+  <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+    <div class="mb-4 flex items-center justify-between gap-3">
+      <h2 class="text-sm font-semibold text-white">Server Rollen</h2>
+      <input type="search" data-server-role-search placeholder="Rolle suchen"
+        class="max-w-xs flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30">
+    </div>
     {% if server_roles %}
     <div class="overflow-x-auto">
       <table class="w-full text-left text-sm">
-        <thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Rolle</th><th class="px-3 py-2.5">ID</th><th class="px-3 py-2.5">Position</th><th class="px-3 py-2.5">Status</th></tr></thead>
+        <thead>
+          <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+            <th class="px-3 py-2.5">Rolle</th>
+            <th class="px-3 py-2.5">ID</th>
+            <th class="px-3 py-2.5">Position</th>
+            <th class="px-3 py-2.5">Status</th>
+          </tr>
+        </thead>
         <tbody>
           {% for role in server_roles %}
-          <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]">
-            <td class="px-3 py-2.5 text-white"><span class="mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle" style="background-color: {{ role.color }}"></span>{{ role.name }}</td>
+          <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]" data-server-role-row data-role-name="{{ role.name|lower }}">
+            <td class="px-3 py-2.5 text-white">
+              <span class="mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle" style="background-color: {{ role.color }}"></span>{{ role.name }}
+            </td>
             <td class="px-3 py-2.5 font-mono text-xs text-slate-500">{{ role.id }}</td>
             <td class="px-3 py-2.5 text-slate-400">{{ role.position }}</td>
-            <td class="px-3 py-2.5">{% if role.manageable %}<span class="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300">verwaltbar</span>{% else %}<span class="rounded border border-slate-500/20 bg-slate-500/10 px-2 py-0.5 text-xs text-slate-300">{{ role.blocked_reason }}</span>{% endif %}</td>
+            <td class="px-3 py-2.5">
+              {% if role.manageable %}
+              <span class="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300">verwaltbar</span>
+              {% else %}
+              <span class="rounded border border-slate-500/20 bg-slate-500/10 px-2 py-0.5 text-xs text-slate-300">{{ role.blocked_reason }}</span>
+              {% endif %}
+            </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
     {% else %}
-    {{ empty_state("Keine Serverrollen geladen", "Der Bot muss verbunden sein, damit Live-Rollen angezeigt werden koennen.") }}
+    {{ empty_state("Keine Server-Rollen geladen", "Der Bot muss verbunden sein, damit Live-Rollen angezeigt werden können.") }}
     {% endif %}
   </div>
 </section>
+
+{# ════════════════════════════════════════════════════════════════
+   CREATE MODAL
+   ════════════════════════════════════════════════════════════════ #}
+<div data-create-modal class="fixed inset-0 z-50 hidden items-start justify-center bg-black/70 p-4 backdrop-blur-sm overflow-y-auto">
+  <div class="my-8 w-full max-w-3xl rounded-xl border border-white/[0.08] bg-[#0d1320] shadow-2xl">
+    <form method="post" action="{{ url_for('roles_create') }}">
+      <div class="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
+        <div>
+          <h2 class="text-base font-semibold text-white">Neue Web Rolle erstellen</h2>
+          <p class="mt-0.5 text-xs text-slate-500">Verknüpfe eine Discord-Rolle mit Panel-Berechtigungen.</p>
+        </div>
+        <button type="button" data-close-create-modal class="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-300 transition hover:bg-white/10">Schließen</button>
+      </div>
+      <div class="space-y-5 p-5">
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label for="discord_role_id" class="mb-1.5 block text-sm font-medium text-slate-400">Discord Rolle</label>
+            {% if server_roles %}
+            <select id="discord_role_id" name="discord_role_id" data-create-role-select
+              class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
+              {% for role in server_roles %}
+              <option value="{{ role.id }}" data-role-name="{{ role.name }}" {% if not role.manageable %}disabled{% endif %}>
+                {{ role.name }}{% if not role.manageable %} — {{ role.blocked_reason }}{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+            {% else %}
+            <input id="discord_role_id" name="discord_role_id" type="text" required placeholder="z.B. 1441253029432262787"
+              class="w-full rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-white placeholder-slate-500 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
+            {% endif %}
+          </div>
+          <div>
+            <label for="create_role_name" class="mb-1.5 block text-sm font-medium text-slate-400">Anzeigename</label>
+            <input id="create_role_name" name="role_name" type="text" required placeholder="z.B. Discord Mod" data-create-role-name
+              class="w-full rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-white placeholder-slate-500 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-2 text-sm font-semibold text-white">Rechte</h3>
+          {{ perm_picker("permissions", []) }}
+        </div>
+      </div>
+      <div class="flex items-center justify-end gap-2 border-t border-white/[0.06] px-5 py-4">
+        <button type="button" data-close-create-modal class="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300 transition hover:bg-white/10">Abbrechen</button>
+        <button type="submit" class="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-cyan-500">Rolle erstellen</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ════════════════════════════════════════════════════════════════
+   EDIT MODALS (one per role)
+   ════════════════════════════════════════════════════════════════ #}
+{% for role in roles %}
+<div data-role-modal="{{ role.id }}" class="fixed inset-0 z-50 hidden items-start justify-center bg-black/70 p-4 backdrop-blur-sm overflow-y-auto">
+  <div class="my-8 w-full max-w-4xl rounded-xl border border-white/[0.08] bg-[#0d1320] shadow-2xl">
+    <div class="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
+      <div class="flex items-center gap-3 min-w-0">
+        <span class="h-3 w-3 shrink-0 rounded-full ring-2 ring-white/10" style="background-color: {{ role.color }}"></span>
+        <div class="min-w-0">
+          <h2 class="truncate text-base font-semibold text-white">{{ role.role_name }}</h2>
+          <p class="mt-0.5 truncate font-mono text-xs text-slate-500">{{ role.discord_role_id }}</p>
+        </div>
+      </div>
+      <button type="button" data-close-role-modal class="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-slate-300 transition hover:bg-white/10">Schließen</button>
+    </div>
+
+    {# Inner tabs #}
+    <div class="flex gap-1 border-b border-white/[0.06] px-5 pt-3" data-modal-tabs>
+      <button type="button" data-modal-tab="permissions" class="rounded-t-lg border border-b-0 border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-300">Rechte & Name</button>
+      <button type="button" data-modal-tab="members" class="rounded-t-lg border border-b-0 border-transparent px-3 py-2 text-sm font-medium text-slate-400 hover:text-slate-200">
+        Mitglieder <span class="ml-1 rounded-full bg-white/5 px-1.5 py-0.5 text-[10px] text-slate-400">{{ role.member_count }}</span>
+      </button>
+    </div>
+
+    <form method="post" action="{{ url_for('roles_update', role_id=role.id) }}" data-modal-panel="permissions">
+      <div class="space-y-5 p-5">
+        <div>
+          <label for="role_name_{{ role.id }}" class="mb-1.5 block text-sm font-medium text-slate-400">Anzeigename</label>
+          <input id="role_name_{{ role.id }}" name="role_name" type="text" required value="{{ role.role_name }}"
+            class="w-full max-w-md rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-white placeholder-slate-500 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
+        </div>
+        <div>
+          <h3 class="mb-2 text-sm font-semibold text-white">Rechte</h3>
+          {{ perm_picker("permissions", role.permissions) }}
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] px-5 py-4">
+        <span class="text-xs text-slate-500">Änderungen gelten nach dem nächsten Login der betroffenen User.</span>
+        <div class="flex items-center gap-2">
+          <button type="button" data-close-role-modal class="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300 transition hover:bg-white/10">Abbrechen</button>
+          <button type="submit" class="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-cyan-500">Speichern</button>
+        </div>
+      </div>
+    </form>
+
+    <div data-modal-panel="members" class="hidden p-5">
+      <div class="mb-3 flex items-center justify-between gap-3">
+        <div class="text-sm text-slate-400">
+          Mitglieder, die diese Rolle aktuell tragen
+          (<span data-members-count>{{ role.member_count }}</span>).
+        </div>
+        <input type="search" data-members-search placeholder="Mitglied suchen"
+          class="max-w-xs flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white placeholder-slate-500 outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30">
+      </div>
+      <div data-members-loading class="py-10 text-center text-sm text-slate-500">Lade Mitglieder…</div>
+      <div data-members-empty class="hidden">
+        {{ empty_state("Keine Mitglieder", "Aktuell trägt niemand diese Discord-Rolle (laut DB-Sync).") }}
+      </div>
+      <div data-members-list class="hidden grid gap-2 sm:grid-cols-2 lg:grid-cols-3"></div>
+      <div data-members-load-url="{{ url_for('panel_api_role_members', role_id=role.id) }}" class="hidden"></div>
+
+      <form method="post" action="{{ url_for('roles_delete', role_id=role.id) }}" class="mt-6 flex items-center justify-between border-t border-white/[0.06] pt-4" onsubmit="return confirm('Web Rolle wirklich löschen? Discord-Rolle bleibt unberührt.')">
+        <span class="text-xs text-slate-500">Discord-Rolle bleibt unberührt — nur die Web-Verknüpfung wird entfernt.</span>
+        <button type="submit" class="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-1.5 text-xs font-medium text-red-400 transition hover:bg-red-500/20">Web Rolle löschen</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
 {% endblock %}
 
 {% block scripts %}
 <script>
   document.addEventListener("DOMContentLoaded", () => {
+    /* ─── Outer tabs (Web/Server) ─── */
     const tabButtons = Array.from(document.querySelectorAll("[data-tab-target]"));
     const panels = Array.from(document.querySelectorAll("[data-tab-panel]"));
     const storageKey = "pumbot:tab:roles";
+    const activeBtn = "rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-300";
+    const inactiveBtn = "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300";
     const activateTab = (name) => {
-      tabButtons.forEach((button) => {
-        const active = button.dataset.tabTarget === name;
-        button.className = active
-          ? "rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-300"
-          : "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300";
-      });
-      panels.forEach((panel) => panel.classList.toggle("hidden", panel.dataset.tabPanel !== name));
-      window.sessionStorage.setItem(storageKey, name);
+      tabButtons.forEach((b) => b.className = (b.dataset.tabTarget === name) ? activeBtn : inactiveBtn);
+      panels.forEach((p) => p.classList.toggle("hidden", p.dataset.tabPanel !== name));
+      sessionStorage.setItem(storageKey, name);
     };
-    tabButtons.forEach((button) => button.addEventListener("click", () => activateTab(button.dataset.tabTarget)));
-    activateTab(window.sessionStorage.getItem(storageKey) || "web");
+    tabButtons.forEach((b) => b.addEventListener("click", () => activateTab(b.dataset.tabTarget)));
+    activateTab(sessionStorage.getItem(storageKey) || "web");
 
-    document.querySelectorAll("[data-open-role-modal]").forEach((button) => {
-      button.addEventListener("click", () => {
-        document.querySelector(`[data-role-modal="${button.dataset.openRoleModal}"]`)?.classList.remove("hidden");
-        document.querySelector(`[data-role-modal="${button.dataset.openRoleModal}"]`)?.classList.add("flex");
+    /* ─── Modal helpers ─── */
+    const showModal = (el) => {
+      if (!el) return;
+      el.classList.remove("hidden");
+      el.classList.add("flex");
+      document.body.style.overflow = "hidden";
+    };
+    const hideModal = (el) => {
+      if (!el) return;
+      el.classList.add("hidden");
+      el.classList.remove("flex");
+      document.body.style.overflow = "";
+    };
+
+    /* ─── Create modal ─── */
+    const createModal = document.querySelector("[data-create-modal]");
+    document.querySelectorAll("[data-open-create-modal]").forEach((b) =>
+      b.addEventListener("click", () => showModal(createModal)));
+    document.querySelectorAll("[data-close-create-modal]").forEach((b) =>
+      b.addEventListener("click", () => hideModal(createModal)));
+    createModal?.addEventListener("click", (e) => { if (e.target === createModal) hideModal(createModal); });
+
+    const createSelect = createModal?.querySelector("[data-create-role-select]");
+    const createNameInput = createModal?.querySelector("[data-create-role-name]");
+    const syncCreateName = () => {
+      const opt = createSelect?.selectedOptions?.[0];
+      if (opt && createNameInput && !createNameInput.value) createNameInput.value = opt.dataset.roleName || "";
+    };
+    createSelect?.addEventListener("change", syncCreateName);
+
+    /* ─── Edit modals ─── */
+    document.querySelectorAll("[data-open-role-modal]").forEach((b) => {
+      b.addEventListener("click", () => {
+        const modal = document.querySelector(`[data-role-modal="${b.dataset.openRoleModal}"]`);
+        showModal(modal);
       });
     });
-    document.querySelectorAll("[data-close-role-modal]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const modal = button.closest("[data-role-modal]");
-        modal?.classList.add("hidden");
-        modal?.classList.remove("flex");
+    document.querySelectorAll("[data-close-role-modal]").forEach((b) =>
+      b.addEventListener("click", () => hideModal(b.closest("[data-role-modal], [data-create-modal]"))));
+    document.querySelectorAll("[data-role-modal]").forEach((m) =>
+      m.addEventListener("click", (e) => { if (e.target === m) hideModal(m); }));
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      document.querySelectorAll("[data-role-modal], [data-create-modal]").forEach((m) => {
+        if (!m.classList.contains("hidden")) hideModal(m);
       });
     });
 
-    const search = document.querySelector("[data-role-search]");
-    search?.addEventListener("input", () => {
-      const q = search.value.trim().toLowerCase();
-      document.querySelectorAll("[data-role-row]").forEach((row) => {
+    /* ─── Modal inner tabs + member loading ─── */
+    document.querySelectorAll("[data-role-modal]").forEach((modal) => {
+      const tabBtns = modal.querySelectorAll("[data-modal-tab]");
+      const tabPanels = modal.querySelectorAll("[data-modal-panel]");
+      const activeInner = "rounded-t-lg border border-b-0 border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-sm font-medium text-cyan-300";
+      const inactiveInner = "rounded-t-lg border border-b-0 border-transparent px-3 py-2 text-sm font-medium text-slate-400 hover:text-slate-200";
+      const switchTab = (name) => {
+        tabBtns.forEach((b) => {
+          const isActive = b.dataset.modalTab === name;
+          if (b.dataset.modalTab === "members") {
+            const badge = b.querySelector("span");
+            b.className = isActive ? activeInner : inactiveInner;
+            if (badge) b.appendChild(badge);
+          } else {
+            b.className = isActive ? activeInner : inactiveInner;
+          }
+        });
+        tabPanels.forEach((p) => p.classList.toggle("hidden", p.dataset.modalPanel !== name));
+        if (name === "members") loadMembers(modal);
+      };
+      tabBtns.forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.modalTab)));
+    });
+
+    const membersCache = new Map();
+    async function loadMembers(modal) {
+      const list = modal.querySelector("[data-members-list]");
+      const empty = modal.querySelector("[data-members-empty]");
+      const loading = modal.querySelector("[data-members-loading]");
+      const countEl = modal.querySelector("[data-members-count]");
+      const urlEl = modal.querySelector("[data-members-load-url]");
+      if (!list || !urlEl) return;
+      const url = urlEl.dataset.membersLoadUrl;
+      if (membersCache.has(url)) return renderMembers(modal, membersCache.get(url));
+      loading?.classList.remove("hidden");
+      list.classList.add("hidden");
+      empty?.classList.add("hidden");
+      try {
+        const resp = await fetch(url, { credentials: "same-origin" });
+        const data = await resp.json();
+        if (!data.ok) throw new Error(data.error || "request_failed");
+        membersCache.set(url, data);
+        if (countEl) countEl.textContent = data.total;
+        renderMembers(modal, data);
+      } catch (err) {
+        if (loading) loading.textContent = "Mitglieder konnten nicht geladen werden.";
+      }
+    }
+
+    function renderMembers(modal, data) {
+      const list = modal.querySelector("[data-members-list]");
+      const empty = modal.querySelector("[data-members-empty]");
+      const loading = modal.querySelector("[data-members-loading]");
+      loading?.classList.add("hidden");
+      if (!data.members.length) {
+        list.classList.add("hidden");
+        empty?.classList.remove("hidden");
+        return;
+      }
+      empty?.classList.add("hidden");
+      list.classList.remove("hidden");
+      list.innerHTML = data.members.map((m) => `
+        <a href="${m.detail_url}" class="flex items-center gap-3 rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2 transition hover:border-cyan-500/30 hover:bg-white/[0.04]">
+          ${m.avatar_url ? `<img src="${m.avatar_url}" alt="" class="h-9 w-9 shrink-0 rounded-full">` : `<div class="h-9 w-9 shrink-0 rounded-full bg-white/10"></div>`}
+          <div class="min-w-0 flex-1">
+            <div class="truncate text-sm font-medium text-white">${escapeHtml(m.display_name)}</div>
+            <div class="truncate text-[11px] text-slate-500">${escapeHtml(m.username || m.user_id)}</div>
+          </div>
+          <span class="shrink-0 text-[10px] uppercase tracking-wide ${m.status === 'active' ? 'text-emerald-400' : 'text-slate-500'}">${m.status === 'active' ? 'aktiv' : (m.status === 'left' ? 'left' : '—')}</span>
+        </a>
+      `).join("");
+
+      // wire search
+      const search = modal.querySelector("[data-members-search]");
+      if (search && !search.dataset.bound) {
+        search.dataset.bound = "1";
+        search.addEventListener("input", () => {
+          const q = search.value.trim().toLowerCase();
+          list.querySelectorAll("a").forEach((a) => {
+            a.classList.toggle("hidden", q && !a.textContent.toLowerCase().includes(q));
+          });
+        });
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? "").replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+    }
+
+    /* ─── Role grid search ─── */
+    const roleSearch = document.querySelector("[data-role-search]");
+    const grid = document.querySelector("[data-role-grid]");
+    const gridEmpty = document.querySelector("[data-role-empty]");
+    roleSearch?.addEventListener("input", () => {
+      const q = roleSearch.value.trim().toLowerCase();
+      let visible = 0;
+      document.querySelectorAll("[data-role-card]").forEach((card) => {
+        const match = !q || card.dataset.roleName.includes(q);
+        card.classList.toggle("hidden", !match);
+        if (match) visible++;
+      });
+      if (gridEmpty) gridEmpty.classList.toggle("hidden", visible !== 0);
+    });
+
+    /* ─── Server role search ─── */
+    const srvSearch = document.querySelector("[data-server-role-search]");
+    srvSearch?.addEventListener("input", () => {
+      const q = srvSearch.value.trim().toLowerCase();
+      document.querySelectorAll("[data-server-role-row]").forEach((row) => {
         row.classList.toggle("hidden", q && !row.dataset.roleName.includes(q));
       });
     });
 
-    const roleSelect = document.querySelector("#discord_role_id");
-    const roleNameInput = document.querySelector('aside input[name="role_name"]');
-    const syncRoleName = () => {
-      const selected = roleSelect?.selectedOptions?.[0];
-      if (selected && roleNameInput && !roleNameInput.value) roleNameInput.value = selected.dataset.roleName || "";
-    };
-    roleSelect?.addEventListener("change", syncRoleName);
-    syncRoleName();
+    /* ─── Permission picker behavior ─── */
+    document.querySelectorAll("[data-perm-picker]").forEach((picker) => {
+      const inputs = () => Array.from(picker.querySelectorAll("[data-perm-input]"));
+      const adminInput = picker.querySelector("[data-perm-admin]");
+      const countEl = picker.querySelector("[data-perm-count]");
+      const search = picker.querySelector("[data-perm-search]");
+
+      const updateCounts = () => {
+        const all = inputs();
+        const checked = all.filter((i) => i.checked).length;
+        if (countEl) countEl.textContent = checked;
+        picker.querySelectorAll("[data-perm-group]").forEach((g) => {
+          const items = Array.from(g.querySelectorAll("[data-perm-input]"));
+          const c = items.filter((i) => i.checked).length;
+          const counter = g.querySelector("[data-perm-group-count]");
+          if (counter) counter.textContent = c;
+        });
+      };
+
+      const applyAdminState = () => {
+        if (!adminInput) return;
+        if (adminInput.checked) {
+          picker.querySelectorAll("[data-perm-group] [data-perm-input]").forEach((i) => {
+            i.checked = true;
+            i.disabled = true;
+          });
+        } else {
+          picker.querySelectorAll("[data-perm-group] [data-perm-input]").forEach((i) => { i.disabled = false; });
+        }
+        updateCounts();
+      };
+
+      picker.addEventListener("change", (e) => {
+        if (e.target.matches("[data-perm-input]")) {
+          if (e.target.matches("[data-perm-admin]")) applyAdminState();
+          else updateCounts();
+        }
+      });
+
+      picker.querySelector("[data-perm-select-all]")?.addEventListener("click", () => {
+        inputs().forEach((i) => { if (!i.disabled) i.checked = true; });
+        updateCounts();
+      });
+      picker.querySelector("[data-perm-clear]")?.addEventListener("click", () => {
+        inputs().forEach((i) => { i.checked = false; i.disabled = false; });
+        updateCounts();
+      });
+      picker.querySelectorAll("[data-perm-group-toggle]").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const group = btn.closest("[data-perm-group]");
+          const items = Array.from(group.querySelectorAll("[data-perm-input]"));
+          const allChecked = items.every((i) => i.checked);
+          items.forEach((i) => { if (!i.disabled) i.checked = !allChecked; });
+          updateCounts();
+        });
+      });
+      search?.addEventListener("input", () => {
+        const q = search.value.trim().toLowerCase();
+        picker.querySelectorAll("[data-perm-group]").forEach((g) => {
+          let anyMatch = false;
+          g.querySelectorAll("[data-perm-item]").forEach((it) => {
+            const match = !q || it.dataset.permHaystack.includes(q);
+            it.classList.toggle("hidden", !match);
+            if (match) anyMatch = true;
+          });
+          g.classList.toggle("hidden", !anyMatch);
+          if (q && anyMatch) g.setAttribute("open", "");
+        });
+      });
+
+      applyAdminState();
+      updateCounts();
+    });
   });
 </script>
 {% endblock %}

@@ -30,6 +30,11 @@ try:
         ALL_PERMISSIONS,
         COMMAND_PERMISSION_GROUPS,
         PERMISSION_GROUPS,
+        PERMISSION_LABELS,
+        permission_label,
+        list_role_members,
+        count_role_members,
+        get_role,
         add_auto_publisher_channel,
         add_close_reason,
         add_selfrole_mapping,
@@ -141,6 +146,11 @@ except ImportError:
         ALL_PERMISSIONS,
         COMMAND_PERMISSION_GROUPS,
         PERMISSION_GROUPS,
+        PERMISSION_LABELS,
+        permission_label,
+        list_role_members,
+        count_role_members,
+        get_role,
         add_auto_publisher_channel,
         add_close_reason,
         add_selfrole_mapping,
@@ -253,6 +263,8 @@ app = Flask(__name__)
 app.secret_key = Config.FLASK_SECRET_KEY
 app.jinja_env.filters["date_de"] = format_berlin_date
 app.jinja_env.filters["datetime_de"] = format_berlin_datetime
+app.jinja_env.filters["permission_label"] = permission_label
+app.jinja_env.globals["PERMISSION_LABELS"] = PERMISSION_LABELS
 
 init_db()
 
@@ -263,7 +275,13 @@ def create_app() -> Flask:
 
 @app.before_request
 def _refresh_session_permissions():
-    if request.endpoint in {"static", "login", "auth_discord", "auth_discord_callback", "logout"}:
+    if request.endpoint in {
+        "static",
+        "login",
+        "auth_discord",
+        "auth_discord_callback",
+        "logout",
+    }:
         return None
     if "discord_id" not in session:
         return None
@@ -343,10 +361,16 @@ def _ticket_category_key(ticket: dict | None) -> str:
     return value or "general"
 
 
-def _can_access_ticket(ticket: dict | None, permissions: set[str] | None = None) -> bool:
+def _can_access_ticket(
+    ticket: dict | None, permissions: set[str] | None = None
+) -> bool:
     if not ticket:
         return False
-    perms = permissions if permissions is not None else (current_user() or {}).get("permissions", set())
+    perms = (
+        permissions
+        if permissions is not None
+        else (current_user() or {}).get("permissions", set())
+    )
     allowed = _allowed_ticket_categories(set(perms))
     if allowed is None:
         return True
@@ -418,7 +442,12 @@ def _resolve_display_name(
 
 def _member_profile(guild_id: str, user_id: str | int | None) -> dict:
     if user_id in (None, ""):
-        return {"display_name": None, "avatar_url": None, "username": None, "status": None}
+        return {
+            "display_name": None,
+            "avatar_url": None,
+            "username": None,
+            "status": None,
+        }
     member = get_guild_member(guild_id, str(user_id))
     if not member:
         return {
@@ -428,7 +457,9 @@ def _member_profile(guild_id: str, user_id: str | int | None) -> dict:
             "status": None,
         }
     return {
-        "display_name": member.get("display_name") or member.get("username") or str(user_id),
+        "display_name": member.get("display_name")
+        or member.get("username")
+        or str(user_id),
         "avatar_url": member.get("avatar_url"),
         "username": member.get("username"),
         "status": member.get("status"),
@@ -480,7 +511,9 @@ def _active_panel_guild_id() -> str:
         return requested_guild_id
 
     stored_guild_id = get_guild_members_panel_guild_id(DEFAULT_GUILD_ID)
-    if stored_guild_id != DEFAULT_GUILD_ID or list_guild_members(stored_guild_id, limit=1):
+    if stored_guild_id != DEFAULT_GUILD_ID or list_guild_members(
+        stored_guild_id, limit=1
+    ):
         return stored_guild_id
 
     bot = app.config.get("DISCORD_BOT")
@@ -494,7 +527,9 @@ def _active_panel_guild_id() -> str:
 
 def _pagination_args(default_page_size: int = 10) -> tuple[int, int, int]:
     page = request.args.get("page", 1, type=int) or 1
-    page_size = request.args.get("page_size", default_page_size, type=int) or default_page_size
+    page_size = (
+        request.args.get("page_size", default_page_size, type=int) or default_page_size
+    )
     page = max(1, page)
     page_size = max(1, min(100, page_size))
     offset = (page - 1) * page_size
@@ -580,7 +615,9 @@ def _role_dict(role, *, actor_member=None, bot_member=None) -> dict:
         "managed": role.managed,
         "color": str(role.color),
         "manageable": manageable,
-        "blocked_reason": None if manageable else _role_blocked_reason(role, actor_member, bot_member),
+        "blocked_reason": None
+        if manageable
+        else _role_blocked_reason(role, actor_member, bot_member),
     }
 
 
@@ -593,7 +630,9 @@ def _member_can_manage_role(member, role) -> bool:
     if guild and getattr(guild, "owner_id", None) == getattr(member, "id", None):
         return True
     top_role = getattr(member, "top_role", None)
-    return bool(top_role and getattr(top_role, "position", 0) > getattr(role, "position", 0))
+    return bool(
+        top_role and getattr(top_role, "position", 0) > getattr(role, "position", 0)
+    )
 
 
 def _role_blocked_reason(role, actor_member=None, bot_member=None) -> str:
@@ -654,11 +693,17 @@ async def _discord_add_member_role(
         raise RuntimeError("Rolle nicht gefunden.")
     actor = None
     if actor_user_id:
-        actor = guild.get_member(int(actor_user_id)) or await guild.fetch_member(int(actor_user_id))
+        actor = guild.get_member(int(actor_user_id)) or await guild.fetch_member(
+            int(actor_user_id)
+        )
     if not _member_can_manage_role(actor, role):
-        raise RuntimeError("Du kannst keine Rolle vergeben, die über deiner höchsten Rolle liegt.")
+        raise RuntimeError(
+            "Du kannst keine Rolle vergeben, die über deiner höchsten Rolle liegt."
+        )
     if not _member_can_manage_role(guild.me, role):
-        raise RuntimeError("Der Bot kann diese Rolle wegen der Discord-Hierarchie nicht vergeben.")
+        raise RuntimeError(
+            "Der Bot kann diese Rolle wegen der Discord-Hierarchie nicht vergeben."
+        )
     if getattr(role, "managed", False):
         raise RuntimeError("Managed Rollen können nicht manuell vergeben werden.")
     await member.add_roles(role, reason="Web Panel")
@@ -682,11 +727,17 @@ async def _discord_remove_member_role(
         raise RuntimeError("Rolle nicht gefunden.")
     actor = None
     if actor_user_id:
-        actor = guild.get_member(int(actor_user_id)) or await guild.fetch_member(int(actor_user_id))
+        actor = guild.get_member(int(actor_user_id)) or await guild.fetch_member(
+            int(actor_user_id)
+        )
     if not _member_can_manage_role(actor, role):
-        raise RuntimeError("Du kannst keine Rolle entfernen, die über deiner höchsten Rolle liegt.")
+        raise RuntimeError(
+            "Du kannst keine Rolle entfernen, die über deiner höchsten Rolle liegt."
+        )
     if not _member_can_manage_role(guild.me, role):
-        raise RuntimeError("Der Bot kann diese Rolle wegen der Discord-Hierarchie nicht entfernen.")
+        raise RuntimeError(
+            "Der Bot kann diese Rolle wegen der Discord-Hierarchie nicht entfernen."
+        )
     if getattr(role, "managed", False):
         raise RuntimeError("Managed Rollen können nicht manuell entfernt werden.")
     await member.remove_roles(role, reason="Web Panel")
@@ -697,7 +748,9 @@ async def _discord_remove_member_role(
     ]
 
 
-async def _discord_create_role(guild_id: str, name: str, color_hex: str | None = None) -> dict:
+async def _discord_create_role(
+    guild_id: str, name: str, color_hex: str | None = None
+) -> dict:
     import discord
 
     bot = app.config.get("DISCORD_BOT")
@@ -725,7 +778,9 @@ async def _discord_fetch_user_profile(user_id: str) -> dict:
     return {
         "banner_url": str(banner.url) if banner else None,
         "accent_color": int(accent_color.value) if accent_color else None,
-        "locale": str(getattr(user, "locale", "")) if getattr(user, "locale", None) else None,
+        "locale": str(getattr(user, "locale", ""))
+        if getattr(user, "locale", None)
+        else None,
     }
 
 
@@ -895,6 +950,20 @@ def roles_page():
     ctx = _ctx()
     roles = list_roles(DEFAULT_GUILD_ID)
     server_roles = _live_discord_roles(DEFAULT_GUILD_ID)
+    server_roles_by_id = {str(role["id"]): role for role in server_roles}
+    total_members_with_web_role = 0
+    for role in roles:
+        count = count_role_members(
+            DEFAULT_GUILD_ID, str(role.get("discord_role_id") or "")
+        )
+        role["member_count"] = count
+        total_members_with_web_role += count
+        live = server_roles_by_id.get(str(role.get("discord_role_id") or ""))
+        role["discord_role"] = live
+        role["color"] = (live or {}).get("color") or "#5865F2"
+    total_permissions_assigned = sum(
+        len(role.get("permissions") or []) for role in roles
+    )
     return render_template(
         "roles.html",
         roles=roles,
@@ -902,6 +971,9 @@ def roles_page():
         all_permissions=ALL_PERMISSIONS,
         permission_groups=PERMISSION_GROUPS,
         command_permission_groups=COMMAND_PERMISSION_GROUPS,
+        permission_labels=PERMISSION_LABELS,
+        total_members_with_web_role=total_members_with_web_role,
+        total_permissions_assigned=total_permissions_assigned,
         active_page="roles",
         **ctx,
     )
@@ -912,7 +984,9 @@ def roles_page():
 def roles_create():
     discord_role_id = (request.form.get("discord_role_id") or "").strip()
     role_name = (request.form.get("role_name") or "").strip()
-    perms = [perm for perm in request.form.getlist("permissions") if perm in ALL_PERMISSIONS]
+    perms = [
+        perm for perm in request.form.getlist("permissions") if perm in ALL_PERMISSIONS
+    ]
     if not discord_role_id or not role_name:
         return redirect(url_for("roles_page"))
     guild, actor_member, bot_member = _live_role_context(DEFAULT_GUILD_ID)
@@ -921,8 +995,16 @@ def roles_create():
             role = guild.get_role(int(discord_role_id))
         except ValueError:
             role = None
-        if role is None or not _role_dict(role, actor_member=actor_member, bot_member=bot_member)["manageable"]:
-            app.logger.warning("Web role create blocked for unmanaged Discord role: %s", discord_role_id)
+        if (
+            role is None
+            or not _role_dict(role, actor_member=actor_member, bot_member=bot_member)[
+                "manageable"
+            ]
+        ):
+            app.logger.warning(
+                "Web role create blocked for unmanaged Discord role: %s",
+                discord_role_id,
+            )
             return redirect(url_for("roles_page"))
     create_role(DEFAULT_GUILD_ID, discord_role_id, role_name, perms)
     return redirect(url_for("roles_page"))
@@ -932,7 +1014,9 @@ def roles_create():
 @permission_required("roles.manage")
 def roles_update(role_id: int):
     role_name = (request.form.get("role_name") or "").strip()
-    perms = [perm for perm in request.form.getlist("permissions") if perm in ALL_PERMISSIONS]
+    perms = [
+        perm for perm in request.form.getlist("permissions") if perm in ALL_PERMISSIONS
+    ]
     update_role(role_id, role_name=role_name or None, permissions=perms)
     return redirect(url_for("roles_page"))
 
@@ -951,7 +1035,9 @@ def roles_discord_create():
     role_name = (request.form.get("role_name") or "").strip()
     color_hex = (request.form.get("color") or "").strip() or None
     if role_name:
-        role, error = _run_bot_coro(_discord_create_role(guild_id, role_name, color_hex))
+        role, error = _run_bot_coro(
+            _discord_create_role(guild_id, role_name, color_hex)
+        )
         if error:
             app.logger.warning("Discord role create failed: %s", error)
     return redirect(url_for("roles_page"))
@@ -973,6 +1059,51 @@ def roles_discord_assign():
         elif error:
             app.logger.warning("Discord role assign failed: %s", error)
     return redirect(url_for("roles_page"))
+
+
+@app.get("/panel-api/roles/<int:role_id>/members")
+@permission_required("roles.manage")
+def panel_api_role_members(role_id: int):
+    role = get_role(role_id)
+    if not role:
+        return jsonify({"ok": False, "error": "not_found"}), 404
+    guild_id = role.get("guild_id") or DEFAULT_GUILD_ID
+    discord_role_id = str(role.get("discord_role_id") or "")
+    members = list_role_members(guild_id, discord_role_id, limit=1000)
+    items = []
+    for m in members:
+        items.append(
+            {
+                "user_id": m["user_id"],
+                "display_name": m.get("display_name")
+                or m.get("global_name")
+                or m.get("username")
+                or m["user_id"],
+                "username": m.get("username") or "",
+                "avatar_url": m.get("avatar_url") or "",
+                "status": m.get("status") or "unknown",
+                "presence_status": m.get("presence_status") or "",
+                "joined_at": format_berlin_date(m.get("joined_at"))
+                if m.get("joined_at")
+                else "",
+                "detail_url": url_for(
+                    "user_detail_page", user_id=m["user_id"], guild_id=guild_id
+                ),
+            }
+        )
+    return jsonify(
+        {
+            "ok": True,
+            "role": {
+                "id": role["id"],
+                "role_name": role["role_name"],
+                "discord_role_id": discord_role_id,
+                "permissions": role.get("permissions") or [],
+            },
+            "total": len(items),
+            "members": items,
+        }
+    )
 
 
 # ── Ticket Messages JSON (web session auth) ──
@@ -1266,25 +1397,27 @@ def user_detail_page(user_id: str):
     history = get_guild_member_name_history(guild_id, user_id)
     oauth_user = get_user_by_discord_id(user_id) or {}
     if oauth_user:
-        member["banner_url"] = member.get("banner_url") or oauth_user.get("discord_banner")
-        member["accent_color"] = member.get("accent_color") or oauth_user.get("accent_color")
+        member["banner_url"] = member.get("banner_url") or oauth_user.get(
+            "discord_banner"
+        )
+        member["accent_color"] = member.get("accent_color") or oauth_user.get(
+            "accent_color"
+        )
         member["locale"] = member.get("locale") or oauth_user.get("locale")
-    if not any(
-        member.get(field)
-        for field in ("banner_url", "accent_color", "locale")
-    ):
+    if not any(member.get(field) for field in ("banner_url", "accent_color", "locale")):
         profile, error = _run_bot_coro(_discord_fetch_user_profile(user_id))
         if profile:
             update_guild_member_profile_fields(guild_id, user_id, **profile)
             member["banner_url"] = member.get("banner_url") or profile.get("banner_url")
-            member["accent_color"] = member.get("accent_color") or profile.get("accent_color")
+            member["accent_color"] = member.get("accent_color") or profile.get(
+                "accent_color"
+            )
             member["locale"] = member.get("locale") or profile.get("locale")
         elif error and error != "Bot ist nicht verbunden.":
             app.logger.warning("Discord profile fetch failed: %s", error)
     member_roles = parse_member_roles(member)
     web_roles_by_discord_id = {
-        str(role["discord_role_id"]): role
-        for role in list_roles(guild_id)
+        str(role["discord_role_id"]): role for role in list_roles(guild_id)
     }
     member_web_roles = [
         web_roles_by_discord_id[str(role.get("id"))]
@@ -1323,7 +1456,9 @@ def user_detail_page(user_id: str):
             for role in member_roles
         ],
         assignable_discord_roles=[
-            role for role in discord_roles if role["id"] not in current_role_ids and role.get("manageable")
+            role
+            for role in discord_roles
+            if role["id"] not in current_role_ids and role.get("manageable")
         ],
         connections=list_user_connections(user_id),
         birthday=birthday,
@@ -1376,7 +1511,9 @@ def user_discord_role_create(user_id: str):
     role_name = (request.form.get("role_name") or "").strip()
     color_hex = (request.form.get("color") or "").strip() or None
     if role_name:
-        role, error = _run_bot_coro(_discord_create_role(guild_id, role_name, color_hex))
+        role, error = _run_bot_coro(
+            _discord_create_role(guild_id, role_name, color_hex)
+        )
         if error:
             app.logger.warning("Discord role create failed: %s", error)
         elif role and request.form.get("assign_created") == "1":
@@ -1387,7 +1524,9 @@ def user_discord_role_create(user_id: str):
             if roles is not None:
                 update_guild_member_roles(guild_id, user_id, roles)
             elif assign_error:
-                app.logger.warning("Discord created role assign failed: %s", assign_error)
+                app.logger.warning(
+                    "Discord created role assign failed: %s", assign_error
+                )
     return redirect(url_for("user_detail_page", user_id=user_id, guild_id=guild_id))
 
 
@@ -1401,7 +1540,9 @@ def stats_page():
     channel_id = request.args.get("channel_id", "").strip()
     overview = get_guild_message_overview(guild_id)
     totals = _format_date_fields([overview.get("totals") or {}], "last_message_at")[0]
-    top_channels = _format_date_fields(overview.get("top_channels") or [], "last_message_at")
+    top_channels = _format_date_fields(
+        overview.get("top_channels") or [], "last_message_at"
+    )
     filter_users = list_message_filter_users(guild_id)
     filter_channels = list_message_filter_channels(guild_id)
     evaluated_stats = [
@@ -1409,7 +1550,10 @@ def stats_page():
         {"label": "Schreibende User", "value": totals.get("active_writers") or 0},
         {"label": "Aktive Channels", "value": totals.get("active_channels") or 0},
         {"label": "Letzte Nachricht", "value": totals.get("last_message_at") or "-"},
-        {"label": "Top-User ausgewertet", "value": len(overview.get("top_users") or [])},
+        {
+            "label": "Top-User ausgewertet",
+            "value": len(overview.get("top_users") or []),
+        },
         {"label": "Top-Channels ausgewertet", "value": len(top_channels)},
         {"label": "Nachrichtenfilter User", "value": len(filter_users)},
         {"label": "Nachrichtenfilter Channels", "value": len(filter_channels)},
@@ -1440,7 +1584,9 @@ def panel_api_stats_overview():
     guild_id = request.args.get("guild_id") or _active_panel_guild_id()
     overview = get_guild_message_overview(guild_id)
     totals = _format_date_fields([overview.get("totals") or {}], "last_message_at")[0]
-    top_channels = _format_date_fields(overview.get("top_channels") or [], "last_message_at")
+    top_channels = _format_date_fields(
+        overview.get("top_channels") or [], "last_message_at"
+    )
     filter_users = list_message_filter_users(guild_id)
     filter_channels = list_message_filter_channels(guild_id)
     evaluated_stats = [
@@ -1448,7 +1594,10 @@ def panel_api_stats_overview():
         {"label": "Schreibende User", "value": totals.get("active_writers") or 0},
         {"label": "Aktive Channels", "value": totals.get("active_channels") or 0},
         {"label": "Letzte Nachricht", "value": totals.get("last_message_at") or "-"},
-        {"label": "Top-User ausgewertet", "value": len(overview.get("top_users") or [])},
+        {
+            "label": "Top-User ausgewertet",
+            "value": len(overview.get("top_users") or []),
+        },
         {"label": "Top-Channels ausgewertet", "value": len(top_channels)},
         {"label": "Nachrichtenfilter User", "value": len(filter_users)},
         {"label": "Nachrichtenfilter Channels", "value": len(filter_channels)},
@@ -1599,7 +1748,11 @@ def warnings_page():
         "warnings.html",
         warning_count=count_warnings(DEFAULT_GUILD_ID, q_user or None),
         q_user=q_user,
-        q_user_display_name=_resolve_display_name(q_user, cache, guild_id=DEFAULT_GUILD_ID) if q_user else None,
+        q_user_display_name=_resolve_display_name(
+            q_user, cache, guild_id=DEFAULT_GUILD_ID
+        )
+        if q_user
+        else None,
         guild_id=DEFAULT_GUILD_ID,
         active_page="warnings",
         **ctx,
@@ -1643,7 +1796,9 @@ def discord_logs_page():
         "discord_logs.html",
         guild_id=guild_id,
         channels=channels,
-        overview=_format_date_fields([overview], "latest_created_at", "latest_synced_at")[0],
+        overview=_format_date_fields(
+            [overview], "latest_created_at", "latest_synced_at"
+        )[0],
         active_page="discord_logs",
         **ctx,
     )
@@ -1749,14 +1904,20 @@ def server_stats_save():
 def panel_api_tickets():
     q = request.args.get("q", "").strip()
     page, page_size, offset = _pagination_args()
-    categories = _allowed_ticket_categories(set((current_user() or {}).get("permissions", set())))
+    categories = _allowed_ticket_categories(
+        set((current_user() or {}).get("permissions", set()))
+    )
     rows = []
-    for ticket in list_tickets(q=q, limit=page_size, offset=offset, categories=categories):
+    for ticket in list_tickets(
+        q=q, limit=page_size, offset=offset, categories=categories
+    ):
         guild_id = ticket.get("guild_id") or DEFAULT_GUILD_ID
         item = _attach_member_profile(ticket, guild_id, "creator_user_id", "creator")
         item["detail_url"] = url_for("ticket_detail", ticket_id=item["ticket_id"])
         rows.append(item)
-    return _paginated_response(rows, count_tickets(q=q, categories=categories), page, page_size)
+    return _paginated_response(
+        rows, count_tickets(q=q, categories=categories), page, page_size
+    )
 
 
 @app.get("/panel-api/users/<user_id>/tickets")
@@ -1764,7 +1925,9 @@ def panel_api_tickets():
 def panel_api_user_tickets(user_id: str):
     guild_id = _active_panel_guild_id()
     page, page_size, offset = _pagination_args()
-    categories = _allowed_ticket_categories(set((current_user() or {}).get("permissions", set())))
+    categories = _allowed_ticket_categories(
+        set((current_user() or {}).get("permissions", set()))
+    )
     rows = []
     for ticket in list_tickets_for_user(
         guild_id, user_id, limit=page_size, offset=offset, categories=categories
@@ -1773,7 +1936,10 @@ def panel_api_user_tickets(user_id: str):
         item["detail_url"] = url_for("ticket_detail", ticket_id=item["ticket_id"])
         rows.append(item)
     return _paginated_response(
-        rows, count_tickets_for_user(guild_id, user_id, categories=categories), page, page_size
+        rows,
+        count_tickets_for_user(guild_id, user_id, categories=categories),
+        page,
+        page_size,
     )
 
 
@@ -1790,8 +1956,7 @@ def panel_api_users():
         guild_id, q=q, status=status, limit=page_size, offset=offset
     )
     web_roles_by_discord_id = {
-        str(role["discord_role_id"]): role["role_name"]
-        for role in list_roles(guild_id)
+        str(role["discord_role_id"]): role["role_name"] for role in list_roles(guild_id)
     }
     for row in rows:
         row["detail_url"] = url_for(
@@ -1811,7 +1976,9 @@ def panel_api_users():
             for role in roles
             if isinstance(role, dict) and str(role.get("id")) in web_roles_by_discord_id
         ]
-        row["web_roles_label"] = ", ".join(web_role_names[:3]) if web_role_names else "-"
+        row["web_roles_label"] = (
+            ", ".join(web_role_names[:3]) if web_role_names else "-"
+        )
         if len(web_role_names) > 3:
             row["web_roles_label"] += f" +{len(web_role_names) - 3}"
         row["discord_roles_label"] = ", ".join(role_names[:4]) if role_names else "-"
@@ -1819,7 +1986,16 @@ def panel_api_users():
             row["discord_roles_label"] += f" +{len(role_names) - 4}"
         row["roles_label"] = row["discord_roles_label"]
     return _paginated_response(
-        _format_date_fields(rows, "joined_at", "left_at", "first_seen_at", "last_seen_at", "updated_at", "last_message_at", "status_updated_at"),
+        _format_date_fields(
+            rows,
+            "joined_at",
+            "left_at",
+            "first_seen_at",
+            "last_seen_at",
+            "updated_at",
+            "last_message_at",
+            "status_updated_at",
+        ),
         count_guild_members(guild_id, q=q, status=status),
         page,
         page_size,
@@ -1859,7 +2035,9 @@ def panel_api_messages():
         else:
             item["message_status"] = "Original"
             item["_row_class"] = ""
-        item["message_status_variant"] = "danger" if is_deleted else "warning" if is_edited else "default"
+        item["message_status_variant"] = (
+            "danger" if is_deleted else "warning" if is_edited else "default"
+        )
         item["user_detail_url"] = url_for(
             "user_detail_page", user_id=item["user_id"], guild_id=guild_id
         )
@@ -1896,7 +2074,9 @@ def panel_api_message_history():
         offset=offset,
     ):
         item = dict(event)
-        item["event_label"] = "Bearbeitet" if item.get("event_type") == "edit" else "Gelöscht"
+        item["event_label"] = (
+            "Bearbeitet" if item.get("event_type") == "edit" else "Gelöscht"
+        )
         item["message_status"] = item["event_label"]
         item["user_detail_url"] = (
             url_for("user_detail_page", user_id=item["user_id"], guild_id=guild_id)
@@ -1945,7 +2125,9 @@ def panel_api_discord_logs():
 def panel_api_discord_logs_overview():
     guild_id = request.args.get("guild_id") or _active_panel_guild_id()
     overview = get_discord_log_overview(guild_id)
-    overview = _format_date_fields([overview], "latest_created_at", "latest_synced_at")[0]
+    overview = _format_date_fields([overview], "latest_created_at", "latest_synced_at")[
+        0
+    ]
     overview["channel_count"] = len(get_all_log_channels(guild_id))
     return jsonify(overview)
 
@@ -1953,12 +2135,23 @@ def panel_api_discord_logs_overview():
 @app.get("/panel-api/birthdays")
 @permission_required("config.manage")
 def panel_api_birthdays():
-    guild_id = request.args.get("guild_id") or get_birthdays_panel_guild_id(DEFAULT_GUILD_ID)
+    guild_id = request.args.get("guild_id") or get_birthdays_panel_guild_id(
+        DEFAULT_GUILD_ID
+    )
     page, page_size, offset = _pagination_args()
     month_names = {
-        1: "Januar", 2: "Februar", 3: "März", 4: "April",
-        5: "Mai", 6: "Juni", 7: "Juli", 8: "August",
-        9: "September", 10: "Oktober", 11: "November", 12: "Dezember",
+        1: "Januar",
+        2: "Februar",
+        3: "März",
+        4: "April",
+        5: "Mai",
+        6: "Juni",
+        7: "Juli",
+        8: "August",
+        9: "September",
+        10: "Oktober",
+        11: "November",
+        12: "Dezember",
     }
     rows = []
     for row in get_birthdays(guild_id, limit=page_size, offset=offset):

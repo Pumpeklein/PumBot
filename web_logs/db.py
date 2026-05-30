@@ -8,10 +8,22 @@ import pymysql
 from pymysql.cursors import DictCursor
 
 try:
-    from .config import BASE_DIR, Config, ensure_dirs, DEFAULT_GUILD_ID, DEFAULT_ADMIN_ROLE_ID
+    from .config import (
+        BASE_DIR,
+        Config,
+        ensure_dirs,
+        DEFAULT_GUILD_ID,
+        DEFAULT_ADMIN_ROLE_ID,
+    )
     from .datetime_format import berlin_today
 except ImportError:
-    from config import BASE_DIR, Config, ensure_dirs, DEFAULT_GUILD_ID, DEFAULT_ADMIN_ROLE_ID
+    from config import (
+        BASE_DIR,
+        Config,
+        ensure_dirs,
+        DEFAULT_GUILD_ID,
+        DEFAULT_ADMIN_ROLE_ID,
+    )
     from datetime_format import berlin_today
 
 
@@ -107,36 +119,52 @@ def init_db() -> None:
     sql = schema_path.read_text(encoding="utf-8")
     with _connect() as conn:
         conn.executescript(sql)
-        _ensure_columns(conn, "guild_members", {
-            "roles_json": "TEXT",
-            "banner_url": "TEXT",
-            "accent_color": "INT",
-            "locale": "VARCHAR(32)",
-            "presence_status": "TEXT",
-            "activity_name": "TEXT",
-            "activity_type": "TEXT",
-            "status_updated_at": "TEXT",
-        })
-        _ensure_columns(conn, "users", {
-            "discord_banner": "TEXT",
-            "accent_color": "INT",
-            "locale": "VARCHAR(32)",
-        })
-        _ensure_columns(conn, "guild_messages", {
-            "original_content": "TEXT",
-            "channel_type": "VARCHAR(32)",
-            "parent_channel_id": "VARCHAR(32)",
-        })
-        _ensure_columns(conn, "discord_log_entries", {
-            "channel_name": "VARCHAR(255)",
-            "author_id": "VARCHAR(32)",
-            "author_name": "VARCHAR(255)",
-            "content": "LONGTEXT",
-            "embed_count": "INT NOT NULL DEFAULT 0",
-            "attachment_count": "INT NOT NULL DEFAULT 0",
-            "jump_url": "TEXT",
-            "edited_at": "DATETIME NULL",
-        })
+        _ensure_columns(
+            conn,
+            "guild_members",
+            {
+                "roles_json": "TEXT",
+                "banner_url": "TEXT",
+                "accent_color": "INT",
+                "locale": "VARCHAR(32)",
+                "presence_status": "TEXT",
+                "activity_name": "TEXT",
+                "activity_type": "TEXT",
+                "status_updated_at": "TEXT",
+            },
+        )
+        _ensure_columns(
+            conn,
+            "users",
+            {
+                "discord_banner": "TEXT",
+                "accent_color": "INT",
+                "locale": "VARCHAR(32)",
+            },
+        )
+        _ensure_columns(
+            conn,
+            "guild_messages",
+            {
+                "original_content": "TEXT",
+                "channel_type": "VARCHAR(32)",
+                "parent_channel_id": "VARCHAR(32)",
+            },
+        )
+        _ensure_columns(
+            conn,
+            "discord_log_entries",
+            {
+                "channel_name": "VARCHAR(255)",
+                "author_id": "VARCHAR(32)",
+                "author_name": "VARCHAR(255)",
+                "content": "LONGTEXT",
+                "embed_count": "INT NOT NULL DEFAULT 0",
+                "attachment_count": "INT NOT NULL DEFAULT 0",
+                "jump_url": "TEXT",
+                "edited_at": "DATETIME NULL",
+            },
+        )
         conn.commit()
     _seed_default_roles()
     _seed_default_bot_messages()
@@ -152,7 +180,9 @@ def _table_columns(conn: DatabaseConnection, table: str) -> set[str]:
     return {row["COLUMN_NAME"] for row in rows}
 
 
-def _ensure_columns(conn: DatabaseConnection, table: str, columns: dict[str, str]) -> None:
+def _ensure_columns(
+    conn: DatabaseConnection, table: str, columns: dict[str, str]
+) -> None:
     existing = _table_columns(conn, table)
     for name, definition in columns.items():
         if name not in existing:
@@ -291,6 +321,7 @@ def get_guild_members_panel_guild_id(default_guild_id: str) -> str:
 
 # ══════════ Users (Discord OAuth2) ══════════
 
+
 def upsert_user(
     discord_id: str,
     discord_username: str,
@@ -322,13 +353,17 @@ def upsert_user(
             ),
         )
         conn.commit()
-        row = conn.execute("SELECT * FROM users WHERE discord_id = ?", (discord_id,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM users WHERE discord_id = ?", (discord_id,)
+        ).fetchone()
         return dict(row)
 
 
 def get_user_by_discord_id(discord_id: str) -> dict | None:
     with _connect() as conn:
-        row = conn.execute("SELECT * FROM users WHERE discord_id = ?", (discord_id,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM users WHERE discord_id = ?", (discord_id,)
+        ).fetchone()
         return dict(row) if row else None
 
 
@@ -338,7 +373,9 @@ def list_users() -> list[dict]:
         return [dict(r) for r in rows]
 
 
-def replace_user_connections(discord_id: str, connections: list[dict[str, Any]]) -> None:
+def replace_user_connections(
+    discord_id: str, connections: list[dict[str, Any]]
+) -> None:
     with _connect() as conn:
         conn.execute("DELETE FROM user_connections WHERE discord_id = ?", (discord_id,))
         for item in connections:
@@ -391,7 +428,9 @@ def _member_name_changed(existing: dict[str, Any], member: dict[str, Any]) -> bo
 def upsert_guild_member(guild_id: str, member: dict[str, Any]) -> dict:
     user_id = str(member["user_id"])
     username = str(member.get("username") or user_id)
-    display_name = str(member.get("display_name") or member.get("global_name") or username)
+    display_name = str(
+        member.get("display_name") or member.get("global_name") or username
+    )
     global_name = member.get("global_name")
     discriminator = member.get("discriminator")
     avatar_url = member.get("avatar_url")
@@ -506,7 +545,9 @@ def sync_guild_members(
             member = {**member, "status": "active", "left_at": None}
             user_id = str(member["user_id"])
             username = str(member.get("username") or user_id)
-            display_name = str(member.get("display_name") or member.get("global_name") or username)
+            display_name = str(
+                member.get("display_name") or member.get("global_name") or username
+            )
             existing = conn.execute(
                 "SELECT * FROM guild_members WHERE guild_id = ? AND user_id = ?",
                 (guild_id, user_id),
@@ -593,7 +634,9 @@ def sync_guild_members(
                 (guild_id,),
             ).fetchall()
             missing_ids = [
-                row["user_id"] for row in active_before if row["user_id"] not in seen_ids
+                row["user_id"]
+                for row in active_before
+                if row["user_id"] not in seen_ids
             ]
         if missing_ids:
             placeholders = ",".join("?" * len(missing_ids))
@@ -637,9 +680,7 @@ def _guild_members_where(
         params.append(status)
     if q:
         q_like = f"%{q}%"
-        clauses.append(
-            "(username LIKE ? OR global_name LIKE ? OR display_name LIKE ?)"
-        )
+        clauses.append("(username LIKE ? OR global_name LIKE ? OR display_name LIKE ?)")
         params.extend([q_like, q_like, q_like])
     return clauses, params
 
@@ -676,7 +717,7 @@ def list_guild_members(
                   ON msg.guild_id = gm.guild_id
                  AND msg.user_id = gm.user_id
                  AND msg.deleted_at IS NULL
-                WHERE {' AND '.join(joined_clauses)}
+                WHERE {" AND ".join(joined_clauses)}
                 GROUP BY gm.id
                 ORDER BY gm.status ASC, gm.display_name COLLATE NOCASE ASC
                 LIMIT ? OFFSET ?""",
@@ -761,7 +802,8 @@ def upsert_guild_message(guild_id: str, message: dict[str, Any]) -> dict:
                 conn,
                 guild_id=guild_id,
                 channel_id=channel_id,
-                channel_name=message.get("channel_name") or existing.get("channel_name"),
+                channel_name=message.get("channel_name")
+                or existing.get("channel_name"),
                 message_id=message_id,
                 user_id=user_id,
                 event_type="edit",
@@ -823,7 +865,11 @@ def upsert_guild_messages(
     skipped = 0
     with _connect() as conn:
         for message in messages:
-            if not message.get("channel_id") or not message.get("message_id") or not message.get("user_id"):
+            if (
+                not message.get("channel_id")
+                or not message.get("message_id")
+                or not message.get("user_id")
+            ):
                 continue
             channel_id = str(message["channel_id"])
             message_id = str(message["message_id"])
@@ -844,7 +890,8 @@ def upsert_guild_messages(
                     conn,
                     guild_id=guild_id,
                     channel_id=channel_id,
-                    channel_name=message.get("channel_name") or existing.get("channel_name"),
+                    channel_name=message.get("channel_name")
+                    or existing.get("channel_name"),
                     message_id=message_id,
                     user_id=user_id,
                     event_type="edit",
@@ -946,7 +993,9 @@ def _guild_messages_where(
         clauses.append("gm.channel_id = ?")
         params.append(channel_id)
     if q:
-        clauses.append("(gm.content LIKE ? OR gm.original_content LIKE ? OR gm.channel_name LIKE ? OR m.display_name LIKE ?)")
+        clauses.append(
+            "(gm.content LIKE ? OR gm.original_content LIKE ? OR gm.channel_name LIKE ? OR m.display_name LIKE ?)"
+        )
         q_like = f"%{q}%"
         params.extend([q_like, q_like, q_like, q_like])
     if not include_deleted:
@@ -963,7 +1012,9 @@ def list_guild_messages(
     limit: int = 100,
     offset: int = 0,
 ) -> list[dict]:
-    clauses, params = _guild_messages_where(guild_id, user_id, channel_id, q, include_deleted)
+    clauses, params = _guild_messages_where(
+        guild_id, user_id, channel_id, q, include_deleted
+    )
     params.extend([limit, offset])
     with _connect() as conn:
         rows = conn.execute(
@@ -971,7 +1022,7 @@ def list_guild_messages(
                 FROM guild_messages gm
                 LEFT JOIN guild_members m
                   ON m.guild_id = gm.guild_id AND m.user_id = gm.user_id
-                WHERE {' AND '.join(clauses)}
+                WHERE {" AND ".join(clauses)}
                 ORDER BY gm.created_at DESC
                 LIMIT ? OFFSET ?""",
             params,
@@ -986,14 +1037,16 @@ def count_guild_messages(
     q: str = "",
     include_deleted: bool = False,
 ) -> int:
-    clauses, params = _guild_messages_where(guild_id, user_id, channel_id, q, include_deleted)
+    clauses, params = _guild_messages_where(
+        guild_id, user_id, channel_id, q, include_deleted
+    )
     with _connect() as conn:
         row = conn.execute(
             f"""SELECT COUNT(*) AS total
                 FROM guild_messages gm
                 LEFT JOIN guild_members m
                   ON m.guild_id = gm.guild_id AND m.user_id = gm.user_id
-                WHERE {' AND '.join(clauses)}""",
+                WHERE {" AND ".join(clauses)}""",
             params,
         ).fetchone()
         return int(row["total"] if row else 0)
@@ -1021,7 +1074,7 @@ def list_guild_message_history(
                 FROM guild_message_history h
                 LEFT JOIN guild_members m
                   ON m.guild_id = h.guild_id AND m.user_id = h.user_id
-                WHERE {' AND '.join(clauses)}
+                WHERE {" AND ".join(clauses)}
                 ORDER BY h.event_at DESC
                 LIMIT ? OFFSET ?""",
             params,
@@ -1061,12 +1114,16 @@ def get_user_message_stats(guild_id: str, user_id: str) -> dict:
                WHERE guild_id = ? AND user_id = ? AND deleted_at IS NULL""",
             (guild_id, user_id),
         ).fetchone()
-        return dict(row) if row else {
-            "message_count": 0,
-            "channel_count": 0,
-            "last_message_at": None,
-            "attachment_count": 0,
-        }
+        return (
+            dict(row)
+            if row
+            else {
+                "message_count": 0,
+                "channel_count": 0,
+                "last_message_at": None,
+                "attachment_count": 0,
+            }
+        )
 
 
 def get_user_channel_message_stats(guild_id: str, user_id: str) -> list[dict]:
@@ -1157,18 +1214,24 @@ def get_guild_message_chart_data(guild_id: str, limit: int = 8) -> dict:
                LIMIT ?""",
             (guild_id, limit),
         ).fetchall()
-        status_rows = conn.execute(
-            """SELECT
+        status_rows = (
+            conn.execute(
+                """SELECT
                  SUM(CASE WHEN deleted_at IS NOT NULL THEN 1 ELSE 0 END) AS deleted_count,
                  SUM(CASE WHEN deleted_at IS NULL AND edited_at IS NOT NULL AND COALESCE(original_content, '') <> COALESCE(content, '') THEN 1 ELSE 0 END) AS edited_count,
                  SUM(CASE WHEN deleted_at IS NULL AND NOT (edited_at IS NOT NULL AND COALESCE(original_content, '') <> COALESCE(content, '')) THEN 1 ELSE 0 END) AS original_count
                FROM guild_messages
                WHERE guild_id = ?""",
-            (guild_id,),
-        ).fetchone() or {}
+                (guild_id,),
+            ).fetchone()
+            or {}
+        )
 
     def with_other(rows: list[dict], total: int) -> list[dict]:
-        items = [{"label": str(row["label"] or "-"), "value": int(row["value"] or 0)} for row in rows]
+        items = [
+            {"label": str(row["label"] or "-"), "value": int(row["value"] or 0)}
+            for row in rows
+        ]
         shown = sum(item["value"] for item in items)
         other = max(0, int(total or 0) - shown)
         if other:
@@ -1226,16 +1289,29 @@ def list_message_filter_channels(guild_id: str, limit: int = 500) -> list[dict]:
 
 ALL_PERMISSIONS = [
     "admin",
-    "tickets.view", "tickets.reply", "tickets.close",
-    "tickets.discord.view", "tickets.twitch.view", "tickets.general.view", "tickets.admin.view",
-    "users.view", "users.warn", "users.ban", "users.timeout",
-    "counting.view", "counting.manage",
-    "birthdays.view", "birthdays.manage",
-    "stats.view", "stats.manage",
-    "warnings.view", "warnings.manage",
+    "tickets.view",
+    "tickets.reply",
+    "tickets.close",
+    "tickets.discord.view",
+    "tickets.twitch.view",
+    "tickets.general.view",
+    "tickets.admin.view",
+    "users.view",
+    "users.warn",
+    "users.ban",
+    "users.timeout",
+    "counting.view",
+    "counting.manage",
+    "birthdays.view",
+    "birthdays.manage",
+    "stats.view",
+    "stats.manage",
+    "warnings.view",
+    "warnings.manage",
     "roles.manage",
     "config.manage",
-    "logs.view", "logs.manage",
+    "logs.view",
+    "logs.manage",
     "commands.all.use",
     "commands.ticket.panel.use",
     "commands.ticket.close.use",
@@ -1401,7 +1477,9 @@ def get_role(role_id: int) -> dict | None:
         return d
 
 
-def create_role(guild_id: str, discord_role_id: str, role_name: str, permissions: list[str]) -> dict:
+def create_role(
+    guild_id: str, discord_role_id: str, role_name: str, permissions: list[str]
+) -> dict:
     with _connect() as conn:
         conn.execute(
             "INSERT INTO roles (guild_id, discord_role_id, role_name, permissions) VALUES (?, ?, ?, ?)",
@@ -1417,7 +1495,9 @@ def create_role(guild_id: str, discord_role_id: str, role_name: str, permissions
         return d
 
 
-def update_role(role_id: int, role_name: str | None = None, permissions: list[str] | None = None) -> None:
+def update_role(
+    role_id: int, role_name: str | None = None, permissions: list[str] | None = None
+) -> None:
     parts, params = [], []
     if role_name is not None:
         parts.append("role_name = ?")
@@ -1439,7 +1519,62 @@ def delete_role(role_id: int) -> None:
         conn.commit()
 
 
-def get_permissions_for_discord_roles(guild_id: str, discord_role_ids: list[str]) -> set[str]:
+PERMISSION_LABELS: dict[str, str] = {
+    perm: label
+    for group in (PERMISSION_GROUPS + COMMAND_PERMISSION_GROUPS)
+    for perm, label in group["permissions"]
+}
+
+
+def permission_label(perm: str) -> str:
+    return PERMISSION_LABELS.get(perm, perm)
+
+
+def _role_member_like_patterns(discord_role_id: str) -> tuple[str, str]:
+    return (
+        f'%"id": "{discord_role_id}"%',
+        f'%"id":"{discord_role_id}"%',
+    )
+
+
+def list_role_members(
+    guild_id: str, discord_role_id: str, limit: int = 500
+) -> list[dict]:
+    if not discord_role_id:
+        return []
+    pat, pat_compact = _role_member_like_patterns(discord_role_id)
+    with _connect() as conn:
+        rows = conn.execute(
+            """SELECT user_id, username, display_name, global_name, avatar_url,
+                      status, presence_status, joined_at
+               FROM guild_members
+               WHERE guild_id = ?
+                 AND (roles_json LIKE ? OR roles_json LIKE ?)
+               ORDER BY status ASC, COALESCE(display_name, username, user_id) COLLATE NOCASE ASC
+               LIMIT ?""",
+            (guild_id, pat, pat_compact, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def count_role_members(guild_id: str, discord_role_id: str) -> int:
+    if not discord_role_id:
+        return 0
+    pat, pat_compact = _role_member_like_patterns(discord_role_id)
+    with _connect() as conn:
+        row = conn.execute(
+            """SELECT COUNT(*) AS total
+               FROM guild_members
+               WHERE guild_id = ?
+                 AND (roles_json LIKE ? OR roles_json LIKE ?)""",
+            (guild_id, pat, pat_compact),
+        ).fetchone()
+        return int(row["total"]) if row else 0
+
+
+def get_permissions_for_discord_roles(
+    guild_id: str, discord_role_ids: list[str]
+) -> set[str]:
     if not discord_role_ids:
         return set()
     placeholders = ",".join("?" * len(discord_role_ids))
@@ -1458,6 +1593,7 @@ def get_permissions_for_discord_roles(guild_id: str, discord_role_ids: list[str]
 
 
 # ══════════ Guild Config ══════════
+
 
 def get_config(guild_id: str, key: str) -> str | None:
     with _connect() as conn:
@@ -1482,14 +1618,18 @@ def set_config(guild_id: str, key: str, value: str) -> None:
 def delete_config(guild_id: str, key: str) -> None:
     with _connect() as conn:
         conn.execute(
-            "DELETE FROM guild_config WHERE guild_id = ? AND config_key = ?", (guild_id, key)
+            "DELETE FROM guild_config WHERE guild_id = ? AND config_key = ?",
+            (guild_id, key),
         )
         conn.commit()
 
 
 # ══════════ Birthdays ══════════
 
-def get_birthdays(guild_id: str, limit: int | None = None, offset: int = 0) -> list[dict]:
+
+def get_birthdays(
+    guild_id: str, limit: int | None = None, offset: int = 0
+) -> list[dict]:
     with _connect() as conn:
         if limit is None:
             rows = conn.execute(
@@ -1524,7 +1664,9 @@ def get_birthday(guild_id: str, user_id: str) -> dict | None:
         return dict(row) if row else None
 
 
-def set_birthday(guild_id: str, user_id: str, day: int, month: int, year: int | None = None) -> None:
+def set_birthday(
+    guild_id: str, user_id: str, day: int, month: int, year: int | None = None
+) -> None:
     with _connect() as conn:
         conn.execute(
             """INSERT INTO birthdays (guild_id, user_id, day, month, year)
@@ -1539,7 +1681,8 @@ def set_birthday(guild_id: str, user_id: str, day: int, month: int, year: int | 
 def delete_birthday(guild_id: str, user_id: str) -> None:
     with _connect() as conn:
         conn.execute(
-            "DELETE FROM birthdays WHERE guild_id = ? AND user_id = ?", (guild_id, user_id)
+            "DELETE FROM birthdays WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id),
         )
         conn.commit()
 
@@ -1618,6 +1761,7 @@ def delete_bot_message(guild_id: str, message_type: str, message_id: str) -> Non
 
 # ══════════ Warnings ══════════
 
+
 def get_warnings(
     guild_id: str, user_id: str, limit: int | None = None, offset: int = 0
 ) -> list[dict]:
@@ -1646,7 +1790,9 @@ def add_warning(guild_id: str, user_id: str, moderator_id: str, reason: str) -> 
         )
         warning_id = conn.conn.insert_id()
         conn.commit()
-        row = conn.execute("SELECT * FROM warnings WHERE id = ?", (warning_id,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM warnings WHERE id = ?", (warning_id,)
+        ).fetchone()
         return dict(row)
 
 
@@ -1659,7 +1805,8 @@ def remove_warning(warning_id: int) -> None:
 def clear_warnings(guild_id: str, user_id: str) -> int:
     with _connect() as conn:
         cursor = conn.execute(
-            "DELETE FROM warnings WHERE guild_id = ? AND user_id = ?", (guild_id, user_id)
+            "DELETE FROM warnings WHERE guild_id = ? AND user_id = ?",
+            (guild_id, user_id),
         )
         conn.commit()
         return cursor.rowcount
@@ -1693,6 +1840,7 @@ def count_warnings(guild_id: str, user_id: str | None = None) -> int:
 
 
 # ══════════ Counting ══════════
+
 
 def get_counting(guild_id: str) -> dict | None:
     with _connect() as conn:
@@ -1728,7 +1876,8 @@ def set_counting(guild_id: str, **kwargs: Any) -> None:
             params.append(guild_id)
             with _connect() as conn:
                 conn.execute(
-                    f"UPDATE counting_state SET {', '.join(parts)} WHERE guild_id = ?", params
+                    f"UPDATE counting_state SET {', '.join(parts)} WHERE guild_id = ?",
+                    params,
                 )
                 conn.commit()
 
@@ -1751,7 +1900,8 @@ def set_counting_stats(guild_id: str, user_id: str, **kwargs: Any) -> None:
                    (guild_id, user_id, correct, fails, best_streak, current_streak)
                    VALUES (?, ?, ?, ?, ?, ?)""",
                 (
-                    guild_id, user_id,
+                    guild_id,
+                    user_id,
                     kwargs.get("correct", 0),
                     kwargs.get("fails", 0),
                     kwargs.get("best_streak", 0),
@@ -1775,7 +1925,9 @@ def set_counting_stats(guild_id: str, user_id: str, **kwargs: Any) -> None:
                 conn.commit()
 
 
-def get_counting_leaderboard(guild_id: str, limit: int = 10, offset: int = 0) -> list[dict]:
+def get_counting_leaderboard(
+    guild_id: str, limit: int = 10, offset: int = 0
+) -> list[dict]:
     with _connect() as conn:
         rows = conn.execute(
             """SELECT s.*, m.display_name, m.username, m.status AS member_status
@@ -1801,10 +1953,12 @@ def count_counting_leaderboard(guild_id: str) -> int:
 
 # ══════════ Auto Publisher ══════════
 
+
 def get_auto_publisher_channels(guild_id: str) -> list[str]:
     with _connect() as conn:
         rows = conn.execute(
-            "SELECT channel_id FROM auto_publisher_channels WHERE guild_id = ?", (guild_id,)
+            "SELECT channel_id FROM auto_publisher_channels WHERE guild_id = ?",
+            (guild_id,),
         ).fetchall()
         return [row["channel_id"] for row in rows]
 
@@ -1829,6 +1983,7 @@ def remove_auto_publisher_channel(guild_id: str, channel_id: str) -> None:
 
 # ══════════ Selfroles ══════════
 
+
 def get_selfrole_panel(message_id: str) -> dict | None:
     with _connect() as conn:
         row = conn.execute(
@@ -1838,7 +1993,8 @@ def get_selfrole_panel(message_id: str) -> dict | None:
             return None
         panel = dict(row)
         mappings = conn.execute(
-            "SELECT emoji, role_id FROM selfrole_mappings WHERE panel_id = ?", (panel["id"],)
+            "SELECT emoji, role_id FROM selfrole_mappings WHERE panel_id = ?",
+            (panel["id"],),
         ).fetchall()
         panel["roles"] = {m["emoji"]: m["role_id"] for m in mappings}
         return panel
@@ -1862,8 +2018,12 @@ def get_all_selfrole_panels(guild_id: str) -> list[dict]:
 
 
 def create_selfrole_panel(
-    guild_id: str, message_id: str, channel_id: str,
-    title: str, max_roles: int, roles: dict[str, str],
+    guild_id: str,
+    message_id: str,
+    channel_id: str,
+    title: str,
+    max_roles: int,
+    roles: dict[str, str],
 ) -> dict:
     with _connect() as conn:
         conn.execute(
@@ -1915,6 +2075,7 @@ def delete_selfrole_panel(message_id: str) -> None:
 
 # ══════════ Server Stats ══════════
 
+
 def get_server_stats(guild_id: str) -> dict:
     with _connect() as conn:
         rows = conn.execute(
@@ -1929,7 +2090,9 @@ def get_server_stats(guild_id: str) -> dict:
         return result
 
 
-def set_server_stats(guild_id: str, category_id: str | None, stats: dict[str, str]) -> None:
+def set_server_stats(
+    guild_id: str, category_id: str | None, stats: dict[str, str]
+) -> None:
     with _connect() as conn:
         conn.execute("DELETE FROM server_stats WHERE guild_id = ?", (guild_id,))
         for key, channel_id in stats.items():
@@ -1943,6 +2106,7 @@ def set_server_stats(guild_id: str, category_id: str | None, stats: dict[str, st
 
 
 # ══════════ Log Channels ══════════
+
 
 def get_log_channel(guild_id: str, log_type: str) -> str | None:
     with _connect() as conn:
@@ -1976,12 +2140,14 @@ def remove_log_channel(guild_id: str, log_type: str) -> None:
 def get_all_log_channels(guild_id: str) -> dict[str, str]:
     with _connect() as conn:
         rows = conn.execute(
-            "SELECT log_type, channel_id FROM log_channels WHERE guild_id = ?", (guild_id,)
+            "SELECT log_type, channel_id FROM log_channels WHERE guild_id = ?",
+            (guild_id,),
         ).fetchall()
         return {row["log_type"]: row["channel_id"] for row in rows}
 
 
 # ══════════ Discord Log Entries ══════════
+
 
 def _discord_log_where(
     guild_id: str,
@@ -2002,7 +2168,9 @@ def _discord_log_where(
     return " AND ".join(clauses), params
 
 
-def upsert_discord_log_entry(guild_id: str, log_type: str, entry: dict[str, Any]) -> None:
+def upsert_discord_log_entry(
+    guild_id: str, log_type: str, entry: dict[str, Any]
+) -> None:
     with _connect() as conn:
         conn.execute(
             """INSERT INTO discord_log_entries
@@ -2148,6 +2316,7 @@ def get_discord_log_overview(guild_id: str) -> dict:
 
 # ══════════ Twitch Config ══════════
 
+
 def get_twitch_config(guild_id: str) -> dict | None:
     with _connect() as conn:
         row = conn.execute(
@@ -2156,7 +2325,9 @@ def get_twitch_config(guild_id: str) -> dict | None:
         return dict(row) if row else None
 
 
-def set_twitch_config(guild_id: str, channel_id: str | None = None, last_stream_id: str | None = None) -> None:
+def set_twitch_config(
+    guild_id: str, channel_id: str | None = None, last_stream_id: str | None = None
+) -> None:
     with _connect() as conn:
         conn.execute(
             """INSERT INTO twitch_config (guild_id, channel_id, last_stream_id)
@@ -2176,6 +2347,7 @@ def remove_twitch_config(guild_id: str) -> None:
 
 
 # ══════════ Tickets (enhanced) ══════════
+
 
 def upsert_ticket(ticket: dict[str, Any]) -> None:
     with _connect() as conn:
@@ -2230,7 +2402,9 @@ def get_ticket(ticket_id: str) -> dict[str, Any] | None:
         return dict(row) if row else None
 
 
-def _ticket_filter_sql(q: str = "", categories: set[str] | None = None) -> tuple[str, list[Any]]:
+def _ticket_filter_sql(
+    q: str = "", categories: set[str] | None = None
+) -> tuple[str, list[Any]]:
     q_like = f"%{q}%"
     clauses = [
         "(ticket_id LIKE ? OR subject LIKE ? OR creator_user_id LIKE ? OR creator_username LIKE ?)"
@@ -2310,7 +2484,7 @@ def list_tickets_for_user(
     with _connect() as conn:
         rows = conn.execute(
             f"""SELECT * FROM tickets
-                WHERE {' AND '.join(clauses)}
+                WHERE {" AND ".join(clauses)}
                 ORDER BY updated_at DESC LIMIT ? OFFSET ?""",
             (*params, limit, offset),
         ).fetchall()
@@ -2350,19 +2524,28 @@ def get_ticket_stats_for_user(guild_id: str, user_id: str) -> dict:
                WHERE creator_user_id = ?""",
             (str(user_id),),
         ).fetchone()
-        return dict(row) if row else {
-            "ticket_count": 0,
-            "open_tickets": 0,
-            "closed_tickets": 0,
-            "last_ticket_at": None,
-        }
+        return (
+            dict(row)
+            if row
+            else {
+                "ticket_count": 0,
+                "open_tickets": 0,
+                "closed_tickets": 0,
+                "last_ticket_at": None,
+            }
+        )
 
 
 # ══════════ Ticket Messages ══════════
 
+
 def add_ticket_message(
-    ticket_id: str, author_id: str, author_name: str,
-    content: str, source: str = "discord", discord_message_id: str | None = None,
+    ticket_id: str,
+    author_id: str,
+    author_name: str,
+    content: str,
+    source: str = "discord",
+    discord_message_id: str | None = None,
 ) -> dict:
     with _connect() as conn:
         conn.execute(
@@ -2390,6 +2573,7 @@ def get_ticket_messages(ticket_id: str, limit: int = 500) -> list[dict]:
 
 
 # ══════════ Ticket Logs ══════════
+
 
 def insert_ticket_log(data: dict[str, Any]) -> None:
     level = data.get("level") or data.get("action") or data.get("event") or "info"
@@ -2423,6 +2607,7 @@ def list_logs_for_ticket(ticket_id: str, limit: int = 200) -> list[dict]:
 
 # ══════════ Close Reasons ══════════
 
+
 def list_close_reasons(guild_id: str) -> list[dict]:
     with _connect() as conn:
         rows = conn.execute(
@@ -2447,7 +2632,9 @@ def add_close_reason(guild_id: str, label: str, sort_order: int = 0) -> dict:
         return dict(row)
 
 
-def update_close_reason(reason_id: int, label: str | None = None, sort_order: int | None = None) -> None:
+def update_close_reason(
+    reason_id: int, label: str | None = None, sort_order: int | None = None
+) -> None:
     parts, params = [], []
     if label is not None:
         parts.append("label = ?")
@@ -2459,7 +2646,9 @@ def update_close_reason(reason_id: int, label: str | None = None, sort_order: in
         return
     params.append(reason_id)
     with _connect() as conn:
-        conn.execute(f"UPDATE close_reasons SET {', '.join(parts)} WHERE id = ?", params)
+        conn.execute(
+            f"UPDATE close_reasons SET {', '.join(parts)} WHERE id = ?", params
+        )
         conn.commit()
 
 

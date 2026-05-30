@@ -51,6 +51,12 @@
           {% else %}
           {{ badge("Online unbekannt", "default") }}
           {% endif %}
+          {% for role in member_web_roles %}
+          <span class="inline-flex items-center gap-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-0.5 text-xs font-medium text-cyan-300" title="Web Rolle: {{ role.role_name }}">
+            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0-1.66-1.34-3-3-3S6 9.34 6 11s1.34 3 3 3 3-1.34 3-3zm0 0V5a2 2 0 012-2h4a2 2 0 012 2v6m-8 0v6a2 2 0 002 2h4a2 2 0 002-2v-6"/></svg>
+            {{ role.role_name }}
+          </span>
+          {% endfor %}
         </div>
       </div>
     </div>
@@ -91,16 +97,24 @@
 <section data-tab-panel="roles" class="hidden">
   <div class="grid gap-6 {% if member_web_roles %}lg:grid-cols-2{% endif %}">
     {% if member_web_roles %}
-    <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
-      <h2 class="mb-4 text-sm font-semibold text-white">Web Rollen</h2>
-      <div class="grid gap-2">
+    <div class="rounded-xl border border-cyan-500/20 bg-cyan-500/[0.04] p-5">
+      <div class="mb-4 flex items-center justify-between gap-3">
+        <h2 class="text-sm font-semibold text-white">Web Rollen <span class="ml-1 rounded-full bg-cyan-500/15 px-2 py-0.5 text-[10px] uppercase tracking-wide text-cyan-300">{{ member_web_roles|length }}</span></h2>
+        <span class="text-xs text-slate-500">Panel-Rechte aus diesen Rollen</span>
+      </div>
+      <div class="grid gap-3 sm:grid-cols-2">
         {% for role in member_web_roles %}
-        <div class="rounded-lg border border-white/[0.06] bg-black/10 p-3">
-          <div class="font-medium text-slate-200">{{ role.role_name }}</div>
-          <div class="mt-1 font-mono text-xs text-slate-500">{{ role.discord_role_id }}</div>
+        <div class="rounded-lg border border-cyan-500/15 bg-black/20 p-3">
+          <div class="flex items-center justify-between gap-2">
+            <div class="font-medium text-slate-100">{{ role.role_name }}</div>
+            {% if "admin" in role.permissions %}
+            <span class="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">Admin</span>
+            {% endif %}
+          </div>
+          <div class="mt-1 font-mono text-[11px] text-slate-500">{{ role.discord_role_id }}</div>
           <div class="mt-2 flex flex-wrap gap-1">
             {% for perm in role.permissions %}
-            <span class="rounded border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[11px] text-cyan-300">{{ perm }}</span>
+            <span class="rounded border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[11px] text-cyan-300" title="{{ perm }}">{{ perm|permission_label }}</span>
             {% endfor %}
           </div>
         </div>

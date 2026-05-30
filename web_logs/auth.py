@@ -279,6 +279,18 @@ def login_user_from_oauth(code: str) -> bool:
         return False
 
 
+def refresh_current_user_permissions() -> bool:
+    discord_id = session.get("discord_id")
+    if not discord_id:
+        return False
+
+    guild_roles = fetch_guild_member_roles(str(discord_id))
+    permissions = get_permissions_for_discord_roles(DEFAULT_GUILD_ID, guild_roles)
+    session["discord_roles"] = guild_roles
+    session["permissions"] = list(permissions)
+    return bool(permissions)
+
+
 def current_user() -> dict | None:
     if "discord_id" not in session:
         return None

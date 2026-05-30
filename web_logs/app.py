@@ -126,6 +126,7 @@ try:
         login_required,
         login_user_from_oauth,
         permission_required,
+        refresh_current_user_permissions,
     )
     from .token_utils import verify_transcript_token
     from .datetime_format import format_berlin_date, format_berlin_datetime
@@ -231,6 +232,7 @@ except ImportError:
         login_required,
         login_user_from_oauth,
         permission_required,
+        refresh_current_user_permissions,
     )
     from token_utils import verify_transcript_token
     from datetime_format import format_berlin_date, format_berlin_datetime
@@ -247,6 +249,26 @@ init_db()
 
 def create_app() -> Flask:
     return app
+
+
+@app.before_request
+def _refresh_session_permissions():
+    if request.endpoint in {"static", "login", "auth_discord", "auth_discord_callback", "logout"}:
+        return None
+    if "discord_id" not in session:
+        return None
+    if refresh_current_user_permissions():
+        return None
+
+    app.logger.warning(
+        "Session permissions revoked for user %s on %s",
+        session.get("discord_id"),
+        request.path,
+    )
+    session.clear()
+    if request.path.startswith("/panel-api/") or request.path.startswith("/api/"):
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+    return redirect(url_for("login"))
 
 
 def _ctx() -> dict:

@@ -1205,40 +1205,6 @@ def server_stats_save():
     return redirect(url_for("server_stats_page"))
 
 
-@app.get("/database")
-@permission_required("admin")
-def database_page():
-    ctx = _ctx()
-    return render_template(
-        "database.html",
-        result=session.pop("migration_result", None),
-        error=session.pop("migration_error", None),
-        default_sqlite_path=str((Path(__file__).resolve().parent / "data" / "pumbot.db")),
-        active_page="database",
-        **ctx,
-    )
-
-
-@app.post("/database/migrate")
-@permission_required("admin")
-def database_migrate():
-    sqlite_path = Path(
-        request.form.get("sqlite_path")
-        or (Path(__file__).resolve().parent / "data" / "pumbot.db")
-    )
-    truncate = request.form.get("truncate") == "1"
-    try:
-        from scripts.migrate_sqlite_to_mysql import migrate_sqlite_to_mysql
-
-        session["migration_result"] = migrate_sqlite_to_mysql(
-            sqlite_path=sqlite_path,
-            truncate=truncate,
-        )
-    except Exception as exc:
-        session["migration_error"] = str(exc)
-    return redirect(url_for("database_page"))
-
-
 @app.get("/panel-api/tickets")
 @login_required
 def panel_api_tickets():

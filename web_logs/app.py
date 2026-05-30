@@ -63,6 +63,7 @@ try:
         get_guild_member,
         get_guild_member_name_history,
         get_guild_members_panel_guild_id,
+        get_guild_message_chart_data,
         get_guild_message_overview,
         list_user_connections,
         get_log_channel,
@@ -167,6 +168,7 @@ except ImportError:
         get_guild_member,
         get_guild_member_name_history,
         get_guild_members_panel_guild_id,
+        get_guild_message_chart_data,
         get_guild_message_overview,
         list_user_connections,
         get_log_channel,
@@ -1149,6 +1151,7 @@ def stats_page():
         filter_users=filter_users,
         filter_channels=filter_channels,
         evaluated_stats=evaluated_stats,
+        chart_data=get_guild_message_chart_data(guild_id),
         overview={
             **overview,
             "totals": totals,
@@ -1156,6 +1159,34 @@ def stats_page():
         },
         active_page="stats",
         **ctx,
+    )
+
+
+@app.get("/panel-api/stats/overview")
+@permission_required("users.view")
+def panel_api_stats_overview():
+    guild_id = request.args.get("guild_id") or _active_panel_guild_id()
+    overview = get_guild_message_overview(guild_id)
+    totals = _format_date_fields([overview.get("totals") or {}], "last_message_at")[0]
+    top_channels = _format_date_fields(overview.get("top_channels") or [], "last_message_at")
+    filter_users = list_message_filter_users(guild_id)
+    filter_channels = list_message_filter_channels(guild_id)
+    evaluated_stats = [
+        {"label": "Nachrichten gesamt", "value": totals.get("message_count") or 0},
+        {"label": "Schreibende User", "value": totals.get("active_writers") or 0},
+        {"label": "Aktive Channels", "value": totals.get("active_channels") or 0},
+        {"label": "Letzte Nachricht", "value": totals.get("last_message_at") or "-"},
+        {"label": "Top-User ausgewertet", "value": len(overview.get("top_users") or [])},
+        {"label": "Top-Channels ausgewertet", "value": len(top_channels)},
+        {"label": "Nachrichtenfilter User", "value": len(filter_users)},
+        {"label": "Nachrichtenfilter Channels", "value": len(filter_channels)},
+    ]
+    return jsonify(
+        {
+            "totals": totals,
+            "evaluated_stats": evaluated_stats,
+            "chart_data": get_guild_message_chart_data(guild_id),
+        }
     )
 
 

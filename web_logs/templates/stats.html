@@ -19,6 +19,25 @@
 </div>
 
 <section data-tab-panel="overview">
+  <script id="stats-chart-data" type="application/json">{{ chart_data | tojson }}</script>
+  <div class="mb-6 grid gap-6 lg:grid-cols-3">
+    <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+      <h2 class="mb-4 text-sm font-semibold text-white">User</h2>
+      <canvas data-pie-chart="users" height="220" class="w-full"></canvas>
+      <div data-pie-legend="users" class="mt-4 grid gap-2 text-xs text-slate-400"></div>
+    </div>
+    <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+      <h2 class="mb-4 text-sm font-semibold text-white">Channels</h2>
+      <canvas data-pie-chart="channels" height="220" class="w-full"></canvas>
+      <div data-pie-legend="channels" class="mt-4 grid gap-2 text-xs text-slate-400"></div>
+    </div>
+    <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+      <h2 class="mb-4 text-sm font-semibold text-white">Gesamt</h2>
+      <canvas data-pie-chart="overall" height="220" class="w-full"></canvas>
+      <div data-pie-legend="overall" class="mt-4 grid gap-2 text-xs text-slate-400"></div>
+    </div>
+  </div>
+
   <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
     <h2 class="mb-4 text-sm font-semibold text-white">Ausgewertete Statistiken</h2>
     <div class="overflow-x-auto">
@@ -29,7 +48,7 @@
             <th class="px-3 py-2.5">Wert</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="evaluated-stats-body">
           {% for item in evaluated_stats %}
           <tr class="border-b border-white/[0.04]">
             <td class="px-3 py-2.5 text-slate-300">{{ item.label }}</td>
@@ -193,6 +212,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     const buttons = Array.from(document.querySelectorAll("[data-tab-target]"));
     const panels = Array.from(document.querySelectorAll("[data-tab-panel]"));
+    const storageKey = `pumbot:tab:${window.location.pathname}`;
     const activate = (name) => {
       buttons.forEach((button) => {
         const active = button.dataset.tabTarget === name;
@@ -201,11 +221,83 @@
           : "rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-300";
       });
       panels.forEach((panel) => panel.classList.toggle("hidden", panel.dataset.tabPanel !== name));
+      window.sessionStorage.setItem(storageKey, name);
     };
     buttons.forEach((button) => button.addEventListener("click", () => activate(button.dataset.tabTarget)));
     if (new URLSearchParams(window.location.search).has("user_id") || new URLSearchParams(window.location.search).has("channel_id") || new URLSearchParams(window.location.search).has("q")) {
       activate("messages");
+    } else {
+      activate(window.sessionStorage.getItem(storageKey) || "overview");
     }
+
+    const colors = ["#22d3ee", "#34d399", "#f59e0b", "#f87171", "#a78bfa", "#60a5fa", "#f472b6", "#a3e635", "#94a3b8"];
+    const escapeHtml = (value) => String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+    const drawPie = (name, rows) => {
+      const canvas = document.querySelector(`[data-pie-chart="${name}"]`);
+      const legend = document.querySelector(`[data-pie-legend="${name}"]`);
+      if (!canvas || !legend) return;
+      const context = canvas.getContext("2d");
+      const rect = canvas.getBoundingClientRect();
+      const ratio = window.devicePixelRatio || 1;
+      canvas.width = Math.max(260, rect.width) * ratio;
+      canvas.height = 220 * ratio;
+      context.scale(ratio, ratio);
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      const total = (rows || []).reduce((sum, row) => sum + Number(row.value || 0), 0);
+      const cx = Math.max(130, rect.width / 2);
+      const cy = 106;
+      const radius = 82;
+      if (!total) {
+        context.fillStyle = "#334155";
+        context.beginPath();
+        context.arc(cx, cy, radius, 0, Math.PI * 2);
+        context.fill();
+        legend.innerHTML = '<div class="text-slate-500">Keine Daten</div>';
+        return;
+      }
+      let start = -Math.PI / 2;
+      legend.innerHTML = rows.map((row, index) => {
+        const value = Number(row.value || 0);
+        const angle = (value / total) * Math.PI * 2;
+        context.fillStyle = colors[index % colors.length];
+        context.beginPath();
+        context.moveTo(cx, cy);
+        context.arc(cx, cy, radius, start, start + angle);
+        context.closePath();
+        context.fill();
+        start += angle;
+        const percent = Math.round((value / total) * 100);
+        return `<div class="flex items-center justify-between gap-3"><span class="flex min-w-0 items-center gap-2"><span class="h-2.5 w-2.5 rounded-full" style="background:${colors[index % colors.length]}"></span><span class="truncate">${escapeHtml(row.label)}</span></span><span class="text-slate-300">${value} (${percent}%)</span></div>`;
+      }).join("");
+      context.fillStyle = "#0f172a";
+      context.beginPath();
+      context.arc(cx, cy, 38, 0, Math.PI * 2);
+      context.fill();
+    };
+    const renderCharts = (chartData) => {
+      drawPie("users", chartData.users || []);
+      drawPie("channels", chartData.channels || []);
+      drawPie("overall", chartData.overall || []);
+    };
+    const updateEvaluatedStats = (items) => {
+      const body = document.querySelector("#evaluated-stats-body");
+      if (!body) return;
+      body.innerHTML = (items || []).map((item) => `<tr class="border-b border-white/[0.04]"><td class="px-3 py-2.5 text-slate-300">${escapeHtml(item.label)}</td><td class="px-3 py-2.5 font-medium text-white">${escapeHtml(item.value)}</td></tr>`).join("");
+    };
+    const initialChartData = JSON.parse(document.querySelector("#stats-chart-data")?.textContent || "{}");
+    renderCharts(initialChartData);
+    window.addEventListener("resize", () => renderCharts(initialChartData));
+    const refreshStats = async () => {
+      const params = new URLSearchParams({ guild_id: "{{ guild_id }}" });
+      const response = await fetch(`{{ url_for('panel_api_stats_overview') }}?${params.toString()}`, { headers: { Accept: "application/json" } });
+      if (!response.ok) return;
+      const data = await response.json();
+      renderCharts(data.chart_data || {});
+      updateEvaluatedStats(data.evaluated_stats || []);
+    };
+    window.setInterval(() => {
+      if (!document.hidden) refreshStats();
+    }, 5000);
   });
 </script>
 {% endblock %}

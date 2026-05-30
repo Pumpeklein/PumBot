@@ -255,6 +255,19 @@
       sb.classList.toggle("-translate-x-full");
       ov.classList.toggle("hidden");
     }
+    document.addEventListener("DOMContentLoaded", () => {
+      const main = document.querySelector("main");
+      const key = `pumbot:scroll:${window.location.pathname}${window.location.search}`;
+      const saved = Number(window.sessionStorage.getItem(key) || 0);
+      if (main && saved > 0) {
+        window.requestAnimationFrame(() => {
+          main.scrollTop = saved;
+        });
+      }
+      window.addEventListener("beforeunload", () => {
+        if (main) window.sessionStorage.setItem(key, String(main.scrollTop || 0));
+      });
+    });
   </script>
   {% block scripts %}{% endblock %}
   {% endblock %}

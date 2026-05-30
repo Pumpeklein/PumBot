@@ -1094,6 +1094,66 @@ def get_guild_message_overview(guild_id: str) -> dict:
         }
 
 
+def get_guild_message_chart_data(guild_id: str, limit: int = 8) -> dict:
+    with _connect() as conn:
+        top_users = conn.execute(
+            """SELECT COALESCE(MAX(m.display_name), MAX(m.username), gm.user_id) AS label,
+                      COUNT(*) AS value
+               FROM guild_messages gm
+               LEFT JOIN guild_members m
+                 ON m.guild_id = gm.guild_id AND m.user_id = gm.user_id
+               WHERE gm.guild_id = ? AND gm.deleted_at IS NULL
+               GROUP BY gm.user_id
+               ORDER BY value DESC
+               LIMIT ?""",
+            (guild_id, limit),
+        ).fetchall()
+        user_total = conn.execute(
+            """SELECT COUNT(*) AS total
+               FROM guild_messages
+               WHERE guild_id = ? AND deleted_at IS NULL""",
+            (guild_id,),
+        ).fetchone()
+        top_channels = conn.execute(
+            """SELECT COALESCE(MAX(channel_name), channel_id) AS label,
+                      COUNT(*) AS value
+               FROM guild_messages
+               WHERE guild_id = ? AND deleted_at IS NULL
+               GROUP BY channel_id
+               ORDER BY value DESC
+               LIMIT ?""",
+            (guild_id, limit),
+        ).fetchall()
+        status_rows = conn.execute(
+            """SELECT
+                 SUM(CASE WHEN deleted_at IS NOT NULL THEN 1 ELSE 0 END) AS deleted_count,
+                 SUM(CASE WHEN deleted_at IS NULL AND edited_at IS NOT NULL AND COALESCE(original_content, '') <> COALESCE(content, '') THEN 1 ELSE 0 END) AS edited_count,
+                 SUM(CASE WHEN deleted_at IS NULL AND NOT (edited_at IS NOT NULL AND COALESCE(original_content, '') <> COALESCE(content, '')) THEN 1 ELSE 0 END) AS original_count
+               FROM guild_messages
+               WHERE guild_id = ?""",
+            (guild_id,),
+        ).fetchone() or {}
+
+    def with_other(rows: list[dict], total: int) -> list[dict]:
+        items = [{"label": str(row["label"] or "-"), "value": int(row["value"] or 0)} for row in rows]
+        shown = sum(item["value"] for item in items)
+        other = max(0, int(total or 0) - shown)
+        if other:
+            items.append({"label": "Weitere", "value": other})
+        return items
+
+    total = int((user_total or {}).get("total") or 0)
+    return {
+        "users": with_other([dict(r) for r in top_users], total),
+        "channels": with_other([dict(r) for r in top_channels], total),
+        "overall": [
+            {"label": "Original", "value": int(status_rows.get("original_count") or 0)},
+            {"label": "Bearbeitet", "value": int(status_rows.get("edited_count") or 0)},
+            {"label": "Gelöscht", "value": int(status_rows.get("deleted_count") or 0)},
+        ],
+    }
+
+
 def list_message_filter_users(guild_id: str, limit: int = 500) -> list[dict]:
     with _connect() as conn:
         rows = conn.execute(

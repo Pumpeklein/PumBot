@@ -333,7 +333,7 @@ TICKET_CATEGORY_PERMISSIONS = {
 
 
 def _allowed_ticket_categories(permissions: set[str]) -> set[str] | None:
-    if "admin" in permissions or "tickets.view" in permissions:
+    if "admin" in permissions:
         return None
     return {
         category

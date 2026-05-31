@@ -1033,6 +1033,7 @@ def roles_create():
             )
             return redirect(url_for("roles_page"))
     create_role(DEFAULT_GUILD_ID, discord_role_id, role_name, perms)
+    refresh_current_user_permissions()
     return redirect(url_for("roles_page"))
 
 
@@ -1044,6 +1045,7 @@ def roles_update(role_id: int):
         perm for perm in request.form.getlist("permissions") if perm in ALL_PERMISSIONS
     ]
     update_role(role_id, role_name=role_name or None, permissions=perms)
+    refresh_current_user_permissions()
     return redirect(url_for("roles_page"))
 
 
@@ -1051,6 +1053,7 @@ def roles_update(role_id: int):
 @permission_required("roles.manage")
 def roles_delete(role_id: int):
     delete_role(role_id)
+    refresh_current_user_permissions()
     return redirect(url_for("roles_page"))
 
 

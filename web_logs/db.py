@@ -1327,6 +1327,8 @@ ALL_PERMISSIONS = [
     "admin",
     "team_updates.view",
     "team_updates.send",
+    "bot_updates.view",
+    "bot_updates.send",
     "tickets.view",
     "tickets.reply",
     "tickets.close",
@@ -1368,10 +1370,12 @@ ALL_PERMISSIONS = [
 PERMISSION_GROUPS = [
     {
         "key": "team_updates",
-        "label": "Team Änderungen",
+        "label": "Änderungen",
         "permissions": [
             ("team_updates.view", "Team Änderungen ansehen"),
             ("team_updates.send", "Team Änderungen senden"),
+            ("bot_updates.view", "Bot Änderungen ansehen"),
+            ("bot_updates.send", "Bot Änderungen senden"),
         ],
     },
     {

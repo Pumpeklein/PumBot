@@ -284,7 +284,29 @@ LOG_TYPES = [
     "message_log",
     "welcome_log",
     "team_change_log",
+    "bot_change_log",
 ]
+
+CHANGE_UPDATE_TYPES = {
+    "team": {
+        "title": "Team Änderungen",
+        "singular": "Team Änderung",
+        "log_type": "team_change_log",
+        "view_permission": "team_updates.view",
+        "send_permission": "team_updates.send",
+        "active_page": "team_changes",
+        "endpoint": "team_changes_page",
+    },
+    "bot": {
+        "title": "Bot-Änderungen",
+        "singular": "Bot-Änderung",
+        "log_type": "bot_change_log",
+        "view_permission": "bot_updates.view",
+        "send_permission": "bot_updates.send",
+        "active_page": "bot_changes",
+        "endpoint": "bot_changes_page",
+    },
+}
 
 
 def create_app() -> Flask:
@@ -652,23 +674,73 @@ def _format_git_summary(commits: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
-async def _send_team_change_message(
+def _selected_git_commits(all_commits: list[dict[str, str]], selected_hashes: list[str]) -> list[dict[str, str]]:
+    selected = {str(commit_hash).strip() for commit_hash in selected_hashes if commit_hash}
+    if not selected:
+        return []
+    return [commit for commit in all_commits if commit["hash"] in selected]
+
+
+def _ping_role_options(guild_id: str) -> list[dict[str, str]]:
+    by_id: dict[str, dict[str, str]] = {}
+    for role in list_roles(guild_id):
+        role_id = str(role.get("discord_role_id") or "").strip()
+        if role_id:
+            by_id[role_id] = {
+                "id": role_id,
+                "name": str(role.get("role_name") or role_id),
+                "source": "Web Rolle",
+            }
+    for role in _live_discord_roles(guild_id):
+        role_id = str(role.get("id") or "").strip()
+        if role_id and role_id not in by_id:
+            by_id[role_id] = {
+                "id": role_id,
+                "name": str(role.get("name") or role_id),
+                "source": "Discord",
+            }
+    return sorted(by_id.values(), key=lambda role: role["name"].lower())
+
+
+def _valid_ping_role_ids(guild_id: str, requested_role_ids: list[str]) -> list[str]:
+    allowed = {role["id"] for role in _ping_role_options(guild_id)}
+    result = []
+    for role_id in requested_role_ids:
+        role_id = str(role_id).strip()
+        if role_id in allowed and role_id not in result:
+            result.append(role_id)
+    return result
+
+
+async def _send_change_message(
     channel_id: int,
+    change_label: str,
     author: str,
     content: str,
     git_summary: str | None = None,
+    ping_role_ids: list[str] | None = None,
 ) -> None:
+    import discord
+
     bot = app.config.get("DISCORD_BOT")
     channel = bot.get_channel(channel_id) if bot else None
     if channel is None and bot:
         channel = await bot.fetch_channel(channel_id)
     if channel is None or not hasattr(channel, "send"):
-        raise RuntimeError("Team-Änderungs-Channel nicht gefunden.")
+        raise RuntimeError(f"{change_label}-Channel nicht gefunden.")
 
-    message = f"**Team Änderung**\n**Von:** {author}\n\n{content}"
+    ping_line = " ".join(f"<@&{role_id}>" for role_id in (ping_role_ids or []))
+    message = f"**{change_label}**\n**Von:** {author}"
+    if ping_line:
+        message = f"{ping_line}\n{message}"
+    if content:
+        message = f"{message}\n\n{content}"
     if git_summary:
         message = f"{message}\n\n```text\n{git_summary[:1500]}\n```"
-    await channel.send(message[:1900])
+    await channel.send(
+        message[:1900],
+        allowed_mentions=discord.AllowedMentions(roles=True, users=False, everyone=False),
+    )
 
 
 def _role_dict(role, *, actor_member=None, bot_member=None) -> dict:
@@ -1889,97 +1961,147 @@ def warnings_delete(warning_id: int):
     return redirect(url_for("warnings_page"))
 
 
-# -- Team Changes Page --
+# -- Change Updates Pages --
 
 
-@app.get("/team-changes")
-@login_required
-def team_changes_page():
-    if not (has_permission("team_updates.view") or has_permission("team_updates.send")):
+def _render_change_updates(kind: str):
+    config = CHANGE_UPDATE_TYPES[kind]
+    if not (
+        has_permission(config["view_permission"])
+        or has_permission(config["send_permission"])
+    ):
         abort(403)
     ctx = _ctx()
-    summary_limit = request.args.get("summary_limit", 5, type=int) or 5
+    summary_limit = request.args.get("summary_limit", 10, type=int) or 10
     summary_limit = max(1, min(50, summary_limit))
-    selected_commits = _git_commit_summary(summary_limit)
+    commits = _git_commit_summary(summary_limit)
+    selected_hashes = request.args.getlist("commit_hashes")
+    selected_commits = _selected_git_commits(commits, selected_hashes)
+    if not selected_commits:
+        selected_commits = commits[: min(5, len(commits))]
     latest_commits = _git_commit_summary(5)
-    channel_id = get_log_channel(DEFAULT_GUILD_ID, "team_change_log")
+    channel_id = get_log_channel(DEFAULT_GUILD_ID, config["log_type"])
     channel_names = get_channel_names(
         DEFAULT_GUILD_ID, [channel_id] if channel_id else []
     )
     return render_template(
         "team_changes.html",
-        active_page="team_changes",
+        change_kind=kind,
+        change_config=config,
+        active_page=config["active_page"],
         log_channel_id=channel_id,
         log_channel_name=channel_names.get(str(channel_id)) if channel_id else None,
         latest_commits=latest_commits,
+        commits=commits,
+        selected_hashes=[commit["hash"] for commit in selected_commits],
         selected_commits=selected_commits,
         selected_summary=_format_git_summary(selected_commits),
         summary_limit=summary_limit,
+        ping_roles=_ping_role_options(DEFAULT_GUILD_ID),
         error=request.args.get("error"),
         success=request.args.get("success"),
         **ctx,
     )
 
 
-@app.post("/team-changes/send")
-@permission_required("team_updates.send")
-def team_changes_send():
+@app.get("/team-changes")
+@login_required
+def team_changes_page():
+    return _render_change_updates("team")
+
+
+@app.get("/bot-changes")
+@login_required
+def bot_changes_page():
+    return _render_change_updates("bot")
+
+
+def _handle_change_send(kind: str):
+    config = CHANGE_UPDATE_TYPES[kind]
+    if not has_permission(config["send_permission"]):
+        abort(403)
     content = (request.form.get("message") or "").strip()
     include_git = request.form.get("include_git") == "1"
-    summary_limit = request.form.get("summary_limit", 5, type=int) or 5
+    summary_limit = request.form.get("summary_limit", 10, type=int) or 10
     summary_limit = max(1, min(50, summary_limit))
-    if not content:
+    commits = _git_commit_summary(summary_limit)
+    selected_commits = _selected_git_commits(
+        commits,
+        request.form.getlist("commit_hashes"),
+    )
+    ping_role_ids = _valid_ping_role_ids(
+        DEFAULT_GUILD_ID,
+        request.form.getlist("ping_role_ids"),
+    )
+    if not content and not (include_git and selected_commits):
         return redirect(
             url_for(
-                "team_changes_page",
+                config["endpoint"],
                 summary_limit=summary_limit,
-                error="Nachricht darf nicht leer sein.",
+                error="Nachricht oder ausgewählte Git-Einträge erforderlich.",
             )
         )
 
-    channel_id = get_log_channel(DEFAULT_GUILD_ID, "team_change_log")
+    channel_id = get_log_channel(DEFAULT_GUILD_ID, config["log_type"])
     if not channel_id:
         return redirect(
             url_for(
-                "team_changes_page",
+                config["endpoint"],
                 summary_limit=summary_limit,
-                error="Kein Team-Änderungs-Channel unter Log Channels definiert.",
+                error=f"Kein Channel für {config['title']} unter Log Channels definiert.",
             )
         )
 
     user = current_user() or {}
     author = user.get("username") or "Web Panel"
-    git_summary = (
-        _format_git_summary(_git_commit_summary(summary_limit)) if include_git else None
-    )
+    git_summary = _format_git_summary(selected_commits) if include_git else None
     try:
         target_channel_id = int(channel_id)
     except (TypeError, ValueError):
         return redirect(
             url_for(
-                "team_changes_page",
+                config["endpoint"],
                 summary_limit=summary_limit,
-                error="Der Team-Änderungs-Channel ist keine gültige Discord-ID.",
+                error=f"Der Channel für {config['title']} ist keine gültige Discord-ID.",
             )
         )
     _, error = _run_bot_coro(
-        _send_team_change_message(target_channel_id, author, content, git_summary)
+        _send_change_message(
+            target_channel_id,
+            config["singular"],
+            author,
+            content,
+            git_summary,
+            ping_role_ids,
+        )
     )
     if error:
         return redirect(
             url_for(
-                "team_changes_page",
+                config["endpoint"],
                 summary_limit=summary_limit,
                 error=f"Senden fehlgeschlagen: {error}",
             )
         )
     return redirect(
         url_for(
-            "team_changes_page",
+            config["endpoint"],
             summary_limit=summary_limit,
-            success="Team-Änderung wurde gesendet.",
+            success=f"{config['singular']} wurde gesendet.",
         )
     )
+
+
+@app.post("/team-changes/send")
+@permission_required("team_updates.send")
+def team_changes_send():
+    return _handle_change_send("team")
+
+
+@app.post("/bot-changes/send")
+@permission_required("bot_updates.send")
+def bot_changes_send():
+    return _handle_change_send("bot")
 
 
 # -- Log Channels Config Page --
@@ -2409,6 +2531,7 @@ def panel_api_discord_logs():
         "message_log": "Nachrichten",
         "welcome_log": "Welcome",
         "team_change_log": "Team",
+        "bot_change_log": "Bot",
     }
     rows = []
     for entry in list_discord_log_entries(

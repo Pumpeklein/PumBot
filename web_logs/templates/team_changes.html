@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 {% from "_macros.html" import page_header, stat_tile, empty_state, btn, id_chip %}
 
+{% set can_send = change_config.send_permission in permissions or "admin" in permissions %}
+
 {% block content %}
-{{ page_header("Team", "Team Änderungen", "Nachrichten an den Team-Änderungs-Channel senden und aktuelle Git-Einträge zusammenfassen.") }}
+{{ page_header("Änderungen", change_config.title, "Nachrichten senden, gezielte Git-Einträge zusammenfassen und Rollen pingen.") }}
 
 {% if success %}
 <div class="mb-5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
@@ -12,16 +14,29 @@
 
 <div class="mb-6 grid gap-3 sm:grid-cols-3">
   {{ stat_tile("Automatische Zusammenfassung", latest_commits|length, accent="cyan", sub="Letzte 5 Git-Einträge") }}
-  {{ stat_tile("Auswahl", selected_commits|length, accent="emerald", sub=summary_limit ~ " Einträge") }}
+  {{ stat_tile("Ausgewählt", selected_commits|length, accent="emerald", sub="für den Versand") }}
   {{ stat_tile("Log Channel", "#" ~ log_channel_name if log_channel_name else "Nicht gesetzt", accent=("emerald" if log_channel_id else "amber"), sub=log_channel_id or "Log Channels öffnen") }}
 </div>
+
+<form method="get" action="{{ url_for(change_config.endpoint) }}" class="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-white/[0.06] bg-[#0d1320] p-4">
+  <div>
+    <label for="summary_limit_view" class="mb-1.5 block text-sm font-medium text-slate-400">Git-Einträge anzeigen</label>
+    <select id="summary_limit_view" name="summary_limit"
+      class="rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none focus:border-cyan-500/50">
+      {% for n in [5, 10, 15, 25, 50] %}
+      <option value="{{ n }}" {% if summary_limit == n %}selected{% endif %}>{{ n }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {{ btn("Aktualisieren") }}
+</form>
 
 <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
   <section class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
     <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h2 class="text-sm font-semibold text-white">Team-Änderung senden</h2>
-        <p class="mt-0.5 text-xs text-slate-500">Die Nachricht wird in den Log-Channel-Typ Team-Änderungen gesendet.</p>
+        <h2 class="text-sm font-semibold text-white">{{ change_config.singular }} senden</h2>
+        <p class="mt-0.5 text-xs text-slate-500">Die Nachricht wird in den Log-Channel-Typ {{ change_config.log_type }} gesendet.</p>
       </div>
       {% if log_channel_id %}
       <div class="flex items-center gap-2 text-xs text-slate-400">
@@ -33,47 +48,70 @@
 
     {% if not log_channel_id %}
     <div class="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-      Setze zuerst unter Log Channels einen Channel für Team-Änderungen.
+      Setze zuerst unter Log Channels einen Channel für {{ change_config.title }}.
     </div>
     {% endif %}
 
-    <form method="post" action="{{ url_for('team_changes_send') }}" class="space-y-4">
+    <form method="post" action="{{ url_for(change_kind ~ '_changes_send') }}" class="space-y-5">
       <div>
         <label for="message" class="mb-1.5 block text-sm font-medium text-slate-400">Nachricht</label>
-        <textarea id="message" name="message" rows="8" required maxlength="1600"
+        <textarea id="message" name="message" rows="7" maxlength="1600"
           class="w-full resize-y rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-2.5 text-white placeholder-slate-500 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40"
-          placeholder="Beschreibe die Änderung für das Team."></textarea>
+          placeholder="Beschreibe die Änderung."></textarea>
       </div>
 
-      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-4">
-        <label class="inline-flex items-center gap-2 text-sm text-slate-300">
-          <input type="checkbox" name="include_git" value="1" checked
-            class="rounded border-white/20 bg-white/5 text-cyan-500 focus:ring-cyan-500/30">
-          Git-Zusammenfassung anhängen
-        </label>
-        <div class="flex items-center gap-2">
-          <label for="send_summary_limit" class="text-xs text-slate-500">Einträge</label>
-          <select id="send_summary_limit" name="summary_limit"
-            class="rounded-lg border border-white/10 bg-[#151c2c] px-3 py-2 text-sm text-white outline-none focus:border-cyan-500/50">
-            {% for n in [5, 10, 15, 25, 50] %}
-            <option value="{{ n }}" {% if summary_limit == n %}selected{% endif %}>{{ n }}</option>
-            {% endfor %}
-          </select>
-          <button type="submit" {% if not log_channel_id or "team_updates.send" not in permissions and "admin" not in permissions %}disabled{% endif %}
-            class="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-45">
-            Senden
-          </button>
+      <div>
+        <label for="ping_role_ids" class="mb-1.5 block text-sm font-medium text-slate-400">Rollen-Pings</label>
+        <select id="ping_role_ids" name="ping_role_ids" multiple
+          class="min-h-28 w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-sm text-white outline-none focus:border-cyan-500/50">
+          {% for role in ping_roles %}
+          <option value="{{ role.id }}">{{ role.name }} · {{ role.source }} · {{ role.id }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="rounded-lg border border-white/[0.06] bg-black/15 p-4">
+        <div class="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <label class="inline-flex items-center gap-2 text-sm text-slate-300">
+            <input type="checkbox" name="include_git" value="1" checked
+              class="rounded border-white/20 bg-white/5 text-cyan-500 focus:ring-cyan-500/30">
+            Git-Zusammenfassung anhängen
+          </label>
+          <input type="hidden" name="summary_limit" value="{{ summary_limit }}">
         </div>
+
+        {% if commits %}
+        <div class="grid gap-2 md:grid-cols-2">
+          {% for commit in commits %}
+          <label class="flex cursor-pointer gap-3 rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 text-sm transition hover:border-cyan-500/25 hover:bg-white/[0.04]">
+            <input type="checkbox" name="commit_hashes" value="{{ commit.hash }}" {% if commit.hash in selected_hashes %}checked{% endif %}
+              class="mt-1 rounded border-white/20 bg-white/5 text-cyan-500 focus:ring-cyan-500/30">
+            <span class="min-w-0">
+              <span class="block font-mono text-xs text-cyan-300">{{ commit.hash }} <span class="text-slate-500">{{ commit.date }}</span></span>
+              <span class="block truncate text-white">{{ commit.subject }}</span>
+              <span class="block truncate text-xs text-slate-500">{{ commit.author }}</span>
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+        {% else %}
+        {{ empty_state("Keine Git-Einträge", "Git konnte keine Commits für dieses Repository liefern.") }}
+        {% endif %}
+      </div>
+
+      <div class="flex flex-wrap items-center justify-end gap-2 border-t border-white/[0.06] pt-4">
+        <button type="submit" {% if not log_channel_id or not can_send %}disabled{% endif %}
+          class="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-45">
+          Senden
+        </button>
       </div>
     </form>
   </section>
 
   <aside class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
-    <div class="mb-4 flex items-center justify-between gap-3">
-      <div>
-        <h2 class="text-sm font-semibold text-white">Letzte 5 Git-Einträge</h2>
-        <p class="mt-0.5 text-xs text-slate-500">Wird automatisch angezeigt.</p>
-      </div>
+    <div class="mb-4">
+      <h2 class="text-sm font-semibold text-white">Letzte 5 Git-Einträge</h2>
+      <p class="mt-0.5 text-xs text-slate-500">Automatische Zusammenfassung der aktuellsten Einträge.</p>
     </div>
     {% if latest_commits %}
     <ol class="space-y-2">
@@ -95,19 +133,7 @@
 </div>
 
 <section class="mt-6 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
-  <form method="get" action="{{ url_for('team_changes_page') }}" class="mb-4 flex flex-wrap items-end gap-3">
-    <div>
-      <label for="summary_limit" class="mb-1.5 block text-sm font-medium text-slate-400">Zusammenfassen</label>
-      <select id="summary_limit" name="summary_limit"
-        class="rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none focus:border-cyan-500/50">
-        {% for n in [5, 10, 15, 25, 50] %}
-        <option value="{{ n }}" {% if summary_limit == n %}selected{% endif %}>{{ n }} Git-Einträge</option>
-        {% endfor %}
-      </select>
-    </div>
-    {{ btn("Aktualisieren") }}
-  </form>
-
+  <h2 class="mb-3 text-sm font-semibold text-white">Vorschau der Zusammenfassung</h2>
   <pre class="whitespace-pre-wrap rounded-lg border border-white/[0.06] bg-black/25 p-4 text-sm leading-relaxed text-slate-200">{{ selected_summary }}</pre>
 </section>
 {% endblock %}

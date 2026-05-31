@@ -548,11 +548,10 @@ def _format_stats_filter_users(rows: list[dict]) -> list[dict]:
             or item.get("username")
             or item.get("oauth_username")
         )
-        item["filter_label"] = display_name or "Unbekannter User"
-        if display_name and item.get("user_id"):
-            item["filter_subtitle"] = str(item["user_id"])
-        else:
-            item["filter_subtitle"] = ""
+        if not display_name:
+            continue
+        item["filter_label"] = display_name
+        item["filter_subtitle"] = str(item["user_id"]) if item.get("user_id") else ""
         formatted.append(item)
     return formatted
 

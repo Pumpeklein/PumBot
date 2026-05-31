@@ -18,11 +18,14 @@ TICKET_CATEGORY_NAME = "🎫 Tickets"
 TICKET_LOG_CHANNEL_ID = 1441186559486595142
 ADMIN_TICKET_ROLE_ID = 1510385400173039629
 
-TICKET_STAFF_ROLES = {"Admin", "Team", "Twitch Moderator", "Discord Moderator", "Admin Ticket"}
+DISCORD_MOD_ROLES = {"Discord Moderator", "Discord Moderation"}
+TWITCH_MOD_ROLES = {"Twitch Moderator", "Twitch Moderation"}
+GENERAL_TICKET_ROLES = {"Admin", "Team", *DISCORD_MOD_ROLES, *TWITCH_MOD_ROLES}
+TICKET_STAFF_ROLES = {*GENERAL_TICKET_ROLES, "Admin Ticket"}
 TICKET_CATEGORY_STAFF_ROLES = {
-    "discord": {"Admin", "Team", "Discord Moderator"},
-    "twitch": {"Admin", "Team", "Twitch Moderator"},
-    "general": {"Admin", "Team", "Discord Moderator", "Twitch Moderator"},
+    "discord": DISCORD_MOD_ROLES,
+    "twitch": TWITCH_MOD_ROLES,
+    "general": GENERAL_TICKET_ROLES,
     "admin": {"Admin Ticket"},
 }
 

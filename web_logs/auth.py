@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import json
 import logging
 import time
 from functools import wraps
@@ -7,7 +8,7 @@ from threading import Lock
 from urllib.parse import urlencode
 
 import requests
-from flask import abort, redirect, request, session, url_for
+from flask import abort, g, redirect, request, session, url_for
 
 try:
     from .config import Config, DEFAULT_GUILD_ID
@@ -294,11 +295,37 @@ def refresh_current_user_permissions() -> bool:
 def current_user() -> dict | None:
     if "discord_id" not in session:
         return None
+    discord_id = str(session["discord_id"])
+
+    cached = getattr(g, "_pumbot_perms_cache", None)
+    if cached and cached.get("discord_id") == discord_id:
+        permissions = cached["permissions"]
+    else:
+        member = get_guild_member(DEFAULT_GUILD_ID, discord_id)
+        role_ids: list[str] = []
+        if member:
+            try:
+                roles = json.loads(member.get("roles_json") or "[]")
+            except (TypeError, ValueError):
+                roles = []
+            role_ids = [
+                str(role.get("id"))
+                for role in roles
+                if isinstance(role, dict) and role.get("id")
+            ]
+        permissions = get_permissions_for_discord_roles(DEFAULT_GUILD_ID, role_ids)
+        g._pumbot_perms_cache = {
+            "discord_id": discord_id,
+            "permissions": permissions,
+        }
+        session["permissions"] = list(permissions)
+        session["discord_roles"] = role_ids
+
     return {
-        "discord_id": session["discord_id"],
+        "discord_id": discord_id,
         "username": session["discord_username"],
         "avatar": session.get("discord_avatar"),
-        "permissions": set(session.get("permissions", [])),
+        "permissions": set(permissions),
     }
 
 

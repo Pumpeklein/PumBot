@@ -332,36 +332,14 @@ TICKET_CATEGORY_PERMISSIONS = {
 }
 
 
-def _current_discord_role_names() -> set[str]:
-    user = current_user()
-    if not user or not user.get("discord_id"):
-        return set()
-    member = get_guild_member(DEFAULT_GUILD_ID, str(user["discord_id"]))
-    return {
-        str(role.get("name"))
-        for role in parse_member_roles(member)
-        if isinstance(role, dict) and role.get("name")
-    }
-
-
 def _allowed_ticket_categories(permissions: set[str]) -> set[str] | None:
     if "admin" in permissions or "tickets.view" in permissions:
         return None
-    allowed = {
+    return {
         category
         for category, permission in TICKET_CATEGORY_PERMISSIONS.items()
         if permission in permissions
     }
-    role_names = _current_discord_role_names()
-    if {"Admin", "Team"} & role_names:
-        return None
-    if "Discord Moderator" in role_names:
-        allowed.update({"discord", "general"})
-    if "Twitch Moderator" in role_names:
-        allowed.update({"twitch", "general"})
-    if "Admin Ticket" in role_names:
-        allowed.add("admin")
-    return allowed
 
 
 def _ticket_category_key(ticket: dict | None) -> str:

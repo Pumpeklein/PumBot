@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header, stat_tile, empty_state, btn, id_chip %}
+
+{% block content %}
+{{ page_header("Team", "Team Änderungen", "Nachrichten an den Team-Änderungs-Channel senden und aktuelle Git-Einträge zusammenfassen.") }}
+
+{% if success %}
+<div class="mb-5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+  {{ success }}
+</div>
+{% endif %}
+
+<div class="mb-6 grid gap-3 sm:grid-cols-3">
+  {{ stat_tile("Automatische Zusammenfassung", latest_commits|length, accent="cyan", sub="Letzte 5 Git-Einträge") }}
+  {{ stat_tile("Auswahl", selected_commits|length, accent="emerald", sub=summary_limit ~ " Einträge") }}
+  {{ stat_tile("Log Channel", "#" ~ log_channel_name if log_channel_name else "Nicht gesetzt", accent=("emerald" if log_channel_id else "amber"), sub=log_channel_id or "Log Channels öffnen") }}
+</div>
+
+<div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+  <section class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 class="text-sm font-semibold text-white">Team-Änderung senden</h2>
+        <p class="mt-0.5 text-xs text-slate-500">Die Nachricht wird in den Log-Channel-Typ Team-Änderungen gesendet.</p>
+      </div>
+      {% if log_channel_id %}
+      <div class="flex items-center gap-2 text-xs text-slate-400">
+        <span>#{{ log_channel_name or "nicht zwischengespeichert" }}</span>
+        {{ id_chip(log_channel_id, "ID") }}
+      </div>
+      {% endif %}
+    </div>
+
+    {% if not log_channel_id %}
+    <div class="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+      Setze zuerst unter Log Channels einen Channel für Team-Änderungen.
+    </div>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('team_changes_send') }}" class="space-y-4">
+      <div>
+        <label for="message" class="mb-1.5 block text-sm font-medium text-slate-400">Nachricht</label>
+        <textarea id="message" name="message" rows="8" required maxlength="1600"
+          class="w-full resize-y rounded-lg border border-white/10 bg-white/[0.03] px-3.5 py-2.5 text-white placeholder-slate-500 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40"
+          placeholder="Beschreibe die Änderung für das Team."></textarea>
+      </div>
+
+      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-4">
+        <label class="inline-flex items-center gap-2 text-sm text-slate-300">
+          <input type="checkbox" name="include_git" value="1" checked
+            class="rounded border-white/20 bg-white/5 text-cyan-500 focus:ring-cyan-500/30">
+          Git-Zusammenfassung anhängen
+        </label>
+        <div class="flex items-center gap-2">
+          <label for="send_summary_limit" class="text-xs text-slate-500">Einträge</label>
+          <select id="send_summary_limit" name="summary_limit"
+            class="rounded-lg border border-white/10 bg-[#151c2c] px-3 py-2 text-sm text-white outline-none focus:border-cyan-500/50">
+            {% for n in [5, 10, 15, 25, 50] %}
+            <option value="{{ n }}" {% if summary_limit == n %}selected{% endif %}>{{ n }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" {% if not log_channel_id or "team_updates.send" not in permissions and "admin" not in permissions %}disabled{% endif %}
+            class="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-45">
+            Senden
+          </button>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <aside class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    <div class="mb-4 flex items-center justify-between gap-3">
+      <div>
+        <h2 class="text-sm font-semibold text-white">Letzte 5 Git-Einträge</h2>
+        <p class="mt-0.5 text-xs text-slate-500">Wird automatisch angezeigt.</p>
+      </div>
+    </div>
+    {% if latest_commits %}
+    <ol class="space-y-2">
+      {% for commit in latest_commits %}
+      <li class="rounded-lg border border-white/[0.06] bg-black/20 p-3">
+        <div class="flex items-center justify-between gap-2">
+          <span class="font-mono text-xs text-cyan-300">{{ commit.hash }}</span>
+          <span class="text-xs text-slate-500">{{ commit.date }}</span>
+        </div>
+        <div class="mt-1 text-sm text-white">{{ commit.subject }}</div>
+        <div class="mt-1 text-xs text-slate-500">{{ commit.author }}</div>
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    {{ empty_state("Keine Git-Einträge", "Git konnte keine Commits für dieses Repository liefern.") }}
+    {% endif %}
+  </aside>
+</div>
+
+<section class="mt-6 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+  <form method="get" action="{{ url_for('team_changes_page') }}" class="mb-4 flex flex-wrap items-end gap-3">
+    <div>
+      <label for="summary_limit" class="mb-1.5 block text-sm font-medium text-slate-400">Zusammenfassen</label>
+      <select id="summary_limit" name="summary_limit"
+        class="rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none focus:border-cyan-500/50">
+        {% for n in [5, 10, 15, 25, 50] %}
+        <option value="{{ n }}" {% if summary_limit == n %}selected{% endif %}>{{ n }} Git-Einträge</option>
+        {% endfor %}
+      </select>
+    </div>
+    {{ btn("Aktualisieren") }}
+  </form>
+
+  <pre class="whitespace-pre-wrap rounded-lg border border-white/[0.06] bg-black/25 p-4 text-sm leading-relaxed text-slate-200">{{ selected_summary }}</pre>
+</section>
+{% endblock %}

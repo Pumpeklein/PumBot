@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import subprocess
 from datetime import datetime, timezone
 from functools import wraps
 from html import escape
@@ -275,6 +276,15 @@ app.jinja_env.filters["permission_label"] = permission_label
 app.jinja_env.globals["PERMISSION_LABELS"] = PERMISSION_LABELS
 
 init_db()
+
+LOG_TYPES = [
+    "voice_log",
+    "user_log",
+    "server_log",
+    "message_log",
+    "welcome_log",
+    "team_change_log",
+]
 
 
 def create_app() -> Flask:
@@ -591,6 +601,76 @@ def _trigger_discord_log_sync(guild_id: str) -> None:
         app.logger.warning("Discord log sync trigger failed: %s", error)
 
 
+def _git_commit_summary(limit: int = 5) -> list[dict[str, str]]:
+    limit = max(1, min(50, int(limit or 5)))
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "log",
+                f"-n{limit}",
+                "--date=short",
+                "--pretty=format:%h%x1f%ad%x1f%an%x1f%s",
+            ],
+            cwd=Path(__file__).resolve().parent.parent,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            capture_output=True,
+            check=True,
+            timeout=10,
+        )
+    except (subprocess.SubprocessError, OSError) as exc:
+        app.logger.warning("Git summary failed: %s", exc)
+        return []
+
+    commits = []
+    for line in result.stdout.splitlines():
+        parts = line.split("\x1f", 3)
+        if len(parts) != 4:
+            continue
+        commit_hash, date, author, subject = parts
+        commits.append(
+            {
+                "hash": commit_hash,
+                "date": date,
+                "author": author,
+                "subject": subject,
+            }
+        )
+    return commits
+
+
+def _format_git_summary(commits: list[dict[str, str]]) -> str:
+    if not commits:
+        return "Keine Git-Einträge gefunden."
+    lines = [f"Git-Zusammenfassung ({len(commits)} Einträge):"]
+    for commit in commits:
+        lines.append(
+            f"- {commit['hash']} ({commit['date']}): {commit['subject']} [{commit['author']}]"
+        )
+    return "\n".join(lines)
+
+
+async def _send_team_change_message(
+    channel_id: int,
+    author: str,
+    content: str,
+    git_summary: str | None = None,
+) -> None:
+    bot = app.config.get("DISCORD_BOT")
+    channel = bot.get_channel(channel_id) if bot else None
+    if channel is None and bot:
+        channel = await bot.fetch_channel(channel_id)
+    if channel is None or not hasattr(channel, "send"):
+        raise RuntimeError("Team-Änderungs-Channel nicht gefunden.")
+
+    message = f"**Team Änderung**\n**Von:** {author}\n\n{content}"
+    if git_summary:
+        message = f"{message}\n\n```text\n{git_summary[:1500]}\n```"
+    await channel.send(message[:1900])
+
+
 def _role_dict(role, *, actor_member=None, bot_member=None) -> dict:
     actor_can_manage = _member_can_manage_role(actor_member, role)
     bot_can_manage = _member_can_manage_role(bot_member, role)
@@ -631,9 +711,9 @@ def _role_blocked_reason(role, actor_member=None, bot_member=None) -> str:
     if getattr(role, "managed", False):
         return "Managed Rolle"
     if not _member_can_manage_role(actor_member, role):
-        return "�ber deiner h�chsten Rolle"
+        return "Über deiner höchsten Rolle"
     if not _member_can_manage_role(bot_member, role):
-        return "�ber der Bot-Rolle"
+        return "Über der Bot-Rolle"
     return "Nicht verwaltbar"
 
 
@@ -690,14 +770,14 @@ async def _discord_add_member_role(
         )
     if not _member_can_manage_role(actor, role):
         raise RuntimeError(
-            "Du kannst keine Rolle vergeben, die �ber deiner h�chsten Rolle liegt."
+            "Du kannst keine Rolle vergeben, die über deiner höchsten Rolle liegt."
         )
     if not _member_can_manage_role(guild.me, role):
         raise RuntimeError(
             "Der Bot kann diese Rolle wegen der Discord-Hierarchie nicht vergeben."
         )
     if getattr(role, "managed", False):
-        raise RuntimeError("Managed Rollen k�nnen nicht manuell vergeben werden.")
+        raise RuntimeError("Managed Rollen können nicht manuell vergeben werden.")
     await member.add_roles(role, reason="Web Panel")
     return [
         {"id": str(role.id), "name": role.name}
@@ -724,14 +804,14 @@ async def _discord_remove_member_role(
         )
     if not _member_can_manage_role(actor, role):
         raise RuntimeError(
-            "Du kannst keine Rolle entfernen, die �ber deiner h�chsten Rolle liegt."
+            "Du kannst keine Rolle entfernen, die über deiner höchsten Rolle liegt."
         )
     if not _member_can_manage_role(guild.me, role):
         raise RuntimeError(
             "Der Bot kann diese Rolle wegen der Discord-Hierarchie nicht entfernen."
         )
     if getattr(role, "managed", False):
-        raise RuntimeError("Managed Rollen k�nnen nicht manuell entfernt werden.")
+        raise RuntimeError("Managed Rollen können nicht manuell entfernt werden.")
     await member.remove_roles(role, reason="Web Panel")
     return [
         {"id": str(role.id), "name": role.name}
@@ -818,7 +898,7 @@ def auth_discord_callback():
         return render_template(
             "login.html",
             discord_url=discord_login_url(),
-            error="Login fehlgeschlagen. Stelle sicher, dass du eine verkn�pfte Rolle auf dem Server hast.",
+            error="Login fehlgeschlagen. Stelle sicher, dass du eine verknüpfte Rolle auf dem Server hast.",
         )
     return redirect(url_for("tickets_page"))
 
@@ -1187,7 +1267,7 @@ def ticket_close_web(ticket_id: str):
     if not t or not _can_access_ticket(t) or t.get("status") == "closed":
         return redirect(url_for("ticket_detail", ticket_id=ticket_id))
 
-    reason = (request.form.get("reason") or "").strip() or "�ber Web Panel geschlossen."
+    reason = (request.form.get("reason") or "").strip() or "Über Web Panel geschlossen."
     u = current_user()
 
     # Mark closed in DB immediately so the page reflects the new state
@@ -1247,7 +1327,7 @@ async def _close_discord_ticket(
 
         embed = _discord.Embed(
             title="Ticket geschlossen",
-            description=f"Dieses Ticket wurde �ber das Web Panel geschlossen.",
+            description=f"Dieses Ticket wurde über das Web Panel geschlossen.",
             color=_discord.Color.red(),
         )
         embed.add_field(name="Grund", value=reason, inline=False)
@@ -1809,6 +1889,99 @@ def warnings_delete(warning_id: int):
     return redirect(url_for("warnings_page"))
 
 
+# -- Team Changes Page --
+
+
+@app.get("/team-changes")
+@login_required
+def team_changes_page():
+    if not (has_permission("team_updates.view") or has_permission("team_updates.send")):
+        abort(403)
+    ctx = _ctx()
+    summary_limit = request.args.get("summary_limit", 5, type=int) or 5
+    summary_limit = max(1, min(50, summary_limit))
+    selected_commits = _git_commit_summary(summary_limit)
+    latest_commits = _git_commit_summary(5)
+    channel_id = get_log_channel(DEFAULT_GUILD_ID, "team_change_log")
+    channel_names = get_channel_names(
+        DEFAULT_GUILD_ID, [channel_id] if channel_id else []
+    )
+    return render_template(
+        "team_changes.html",
+        active_page="team_changes",
+        log_channel_id=channel_id,
+        log_channel_name=channel_names.get(str(channel_id)) if channel_id else None,
+        latest_commits=latest_commits,
+        selected_commits=selected_commits,
+        selected_summary=_format_git_summary(selected_commits),
+        summary_limit=summary_limit,
+        error=request.args.get("error"),
+        success=request.args.get("success"),
+        **ctx,
+    )
+
+
+@app.post("/team-changes/send")
+@permission_required("team_updates.send")
+def team_changes_send():
+    content = (request.form.get("message") or "").strip()
+    include_git = request.form.get("include_git") == "1"
+    summary_limit = request.form.get("summary_limit", 5, type=int) or 5
+    summary_limit = max(1, min(50, summary_limit))
+    if not content:
+        return redirect(
+            url_for(
+                "team_changes_page",
+                summary_limit=summary_limit,
+                error="Nachricht darf nicht leer sein.",
+            )
+        )
+
+    channel_id = get_log_channel(DEFAULT_GUILD_ID, "team_change_log")
+    if not channel_id:
+        return redirect(
+            url_for(
+                "team_changes_page",
+                summary_limit=summary_limit,
+                error="Kein Team-Änderungs-Channel unter Log Channels definiert.",
+            )
+        )
+
+    user = current_user() or {}
+    author = user.get("username") or "Web Panel"
+    git_summary = (
+        _format_git_summary(_git_commit_summary(summary_limit)) if include_git else None
+    )
+    try:
+        target_channel_id = int(channel_id)
+    except (TypeError, ValueError):
+        return redirect(
+            url_for(
+                "team_changes_page",
+                summary_limit=summary_limit,
+                error="Der Team-Änderungs-Channel ist keine gültige Discord-ID.",
+            )
+        )
+    _, error = _run_bot_coro(
+        _send_team_change_message(target_channel_id, author, content, git_summary)
+    )
+    if error:
+        return redirect(
+            url_for(
+                "team_changes_page",
+                summary_limit=summary_limit,
+                error=f"Senden fehlgeschlagen: {error}",
+            )
+        )
+    return redirect(
+        url_for(
+            "team_changes_page",
+            summary_limit=summary_limit,
+            success="Team-Änderung wurde gesendet.",
+        )
+    )
+
+
 # -- Log Channels Config Page --
 
 
@@ -1817,7 +1990,7 @@ def warnings_delete(warning_id: int):
 def log_channels_page():
     ctx = _ctx()
     raw = get_all_log_channels(DEFAULT_GUILD_ID)
-    log_types = ["voice_log", "user_log", "server_log", "message_log", "welcome_log"]
+    log_types = LOG_TYPES
     names = get_channel_names(DEFAULT_GUILD_ID, list(raw.values()))
     channels: dict[str, dict] = {}
     for lt in log_types:
@@ -1861,7 +2034,7 @@ def discord_logs_page():
 def log_channels_set():
     log_type = (request.form.get("log_type") or "").strip()
     channel_id = (request.form.get("channel_id") or "").strip()
-    if log_type and channel_id:
+    if log_type in LOG_TYPES and channel_id:
         set_log_channel(DEFAULT_GUILD_ID, log_type, channel_id)
     return redirect(url_for("log_channels_page"))
 
@@ -1869,7 +2042,8 @@ def log_channels_set():
 @app.post("/log-channels/<log_type>/delete")
 @permission_required("config.manage")
 def log_channels_delete(log_type: str):
-    remove_log_channel(DEFAULT_GUILD_ID, log_type)
+    if log_type in LOG_TYPES:
+        remove_log_channel(DEFAULT_GUILD_ID, log_type)
     return redirect(url_for("log_channels_page"))
 
 
@@ -2156,7 +2330,7 @@ def panel_api_messages():
             (item.get("original_content") or "") != (item.get("content") or "")
         )
         if is_deleted:
-            item["message_status"] = "Gel�scht"
+            item["message_status"] = "Gelöscht"
             item["_row_class"] = "bg-red-500/10 hover:bg-red-500/15"
         elif is_edited:
             item["message_status"] = "Bearbeitet"
@@ -2204,7 +2378,7 @@ def panel_api_message_history():
     ):
         item = dict(event)
         item["event_label"] = (
-            "Bearbeitet" if item.get("event_type") == "edit" else "Gel�scht"
+            "Bearbeitet" if item.get("event_type") == "edit" else "Gelöscht"
         )
         item["message_status"] = item["event_label"]
         item["user_detail_url"] = (
@@ -2228,6 +2402,14 @@ def panel_api_discord_logs():
     log_type = request.args.get("log_type", "").strip() or None
     q = request.args.get("q", "").strip()
     page, page_size, offset = _pagination_args(default_page_size=25)
+    log_type_labels = {
+        "voice_log": "Voice",
+        "user_log": "User",
+        "server_log": "Server",
+        "message_log": "Nachrichten",
+        "welcome_log": "Welcome",
+        "team_change_log": "Team",
+    }
     rows = []
     for entry in list_discord_log_entries(
         guild_id,
@@ -2237,7 +2419,9 @@ def panel_api_discord_logs():
         offset=offset,
     ):
         item = dict(entry)
-        item["log_type_label"] = item.get("log_type") or "-"
+        item["log_type_label"] = log_type_labels.get(
+            item.get("log_type"), item.get("log_type") or "-"
+        )
         item["author_label"] = item.get("author_name") or item.get("author_id") or "-"
         item["message_url"] = item.get("jump_url")
         rows.append(item)
@@ -2271,7 +2455,7 @@ def panel_api_birthdays():
     month_names = {
         1: "Januar",
         2: "Februar",
-        3: "M�rz",
+        3: "März",
         4: "April",
         5: "Mai",
         6: "Juni",
@@ -2292,7 +2476,7 @@ def panel_api_birthdays():
             day = 0
             month = 0
         item["date_label"] = (
-            f"{day:02d}.{month:02d}" if day and month else "Ung�ltiges Datum"
+            f"{day:02d}.{month:02d}" if day and month else "Ungültiges Datum"
         ) + (f".{item['year']}" if item.get("year") and day and month else "")
         item["month_name"] = month_names.get(month, "?")
         item["delete_url"] = url_for("birthdays_delete", user_id=item["user_id"])

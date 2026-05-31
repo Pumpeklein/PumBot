@@ -1325,6 +1325,8 @@ def list_message_filter_channels(guild_id: str, limit: int = 500) -> list[dict]:
 
 ALL_PERMISSIONS = [
     "admin",
+    "team_updates.view",
+    "team_updates.send",
     "tickets.view",
     "tickets.reply",
     "tickets.close",
@@ -1364,6 +1366,14 @@ ALL_PERMISSIONS = [
 
 
 PERMISSION_GROUPS = [
+    {
+        "key": "team_updates",
+        "label": "Team Änderungen",
+        "permissions": [
+            ("team_updates.view", "Team Änderungen ansehen"),
+            ("team_updates.send", "Team Änderungen senden"),
+        ],
+    },
     {
         "key": "tickets",
         "label": "Tickets",

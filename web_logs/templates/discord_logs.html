@@ -9,7 +9,8 @@
   "user_log":    {"label": "User",        "variant": "success"},
   "server_log":  {"label": "Server",      "variant": "default"},
   "message_log": {"label": "Nachrichten", "variant": "warning"},
-  "welcome_log": {"label": "Welcome",     "variant": "success"}
+  "welcome_log": {"label": "Welcome",     "variant": "success"},
+  "team_change_log": {"label": "Team",    "variant": "default"}
 } %}
 
 <div class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -52,7 +53,7 @@
   <script type="application/json">
     [
       {"key":"created_at","type":"date","class":"px-3 py-2.5 text-slate-400 text-xs whitespace-nowrap w-32"},
-      {"key":"log_type_label","type":"badge","variants":{"Voice":"default","User":"success","Server":"default","Nachrichten":"warning","Welcome":"success"},"class":"px-3 py-2.5"},
+      {"key":"log_type_label","type":"badge","variants":{"Voice":"default","User":"success","Server":"default","Nachrichten":"warning","Welcome":"success","Team":"default"},"class":"px-3 py-2.5"},
       {"key":"channel_name","fallback":"—","class":"px-3 py-2.5 text-slate-200"},
       {"key":"author_label","fallback":"—","class":"px-3 py-2.5 text-slate-300"},
       {"key":"content","type":"message","editedAtKey":"edited_at","fallback":"—","class":"px-3 py-2.5"},

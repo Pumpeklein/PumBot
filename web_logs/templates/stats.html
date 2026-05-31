@@ -167,7 +167,7 @@
         <select id="filter-user" name="user_id" class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
           <option value="">Alle User</option>
           {% for user in filter_users %}
-          <option value="{{ user.user_id }}" {% if filter_user_id == user.user_id %}selected{% endif %}>{{ user.display_name or user.username or user.user_id }} ({{ user.message_count }})</option>
+          <option value="{{ user.user_id }}" {% if filter_user_id == user.user_id %}selected{% endif %}>{{ user.filter_label }} ({{ user.message_count }})</option>
           {% endfor %}
         </select>
       </div>

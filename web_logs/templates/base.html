@@ -30,6 +30,16 @@
     *::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, .35); border: 2px solid transparent; background-clip: padding-box; }
     *::-webkit-scrollbar-corner { background: transparent; }
     html { scrollbar-color: rgba(148, 163, 184, .25) transparent; scrollbar-width: thin; }
+    select,
+    select option,
+    select optgroup {
+      background-color: #151c2c;
+      color: #f8fafc;
+    }
+    select option:checked {
+      background-color: #0e7490;
+      color: #ffffff;
+    }
 
     /* ── Scrollspy sticky sub-header ── */
     [data-scrollspy] {

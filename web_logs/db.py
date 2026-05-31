@@ -1292,13 +1292,16 @@ def list_message_filter_users(guild_id: str, limit: int = 500) -> list[dict]:
             """SELECT gm.user_id,
                       COUNT(*) AS message_count,
                       MAX(m.display_name) AS display_name,
-                      MAX(m.username) AS username
+                      MAX(m.username) AS username,
+                      MAX(u.discord_username) AS oauth_username
                FROM guild_messages gm
                LEFT JOIN guild_members m
                  ON m.guild_id = gm.guild_id AND m.user_id = gm.user_id
+               LEFT JOIN users u
+                 ON u.discord_id = gm.user_id
                WHERE gm.guild_id = ? AND gm.deleted_at IS NULL
                GROUP BY gm.user_id
-               ORDER BY COALESCE(MAX(m.display_name), MAX(m.username), gm.user_id) COLLATE NOCASE ASC
+               ORDER BY COALESCE(MAX(m.display_name), MAX(m.username), MAX(u.discord_username), gm.user_id) COLLATE NOCASE ASC
                LIMIT ?""",
             (guild_id, limit),
         ).fetchall()

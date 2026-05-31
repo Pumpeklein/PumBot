@@ -4,7 +4,7 @@
 {% set can_send = change_config.send_permission in permissions or "admin" in permissions %}
 
 {% block content %}
-{{ page_header("Änderungen", change_config.title, "Nachrichten senden, gezielte Git-Einträge zusammenfassen und Rollen pingen.") }}
+{{ page_header("Änderungen", change_config.title, "Nachrichten senden{% if show_git %}, gezielte Git-Einträge zusammenfassen{% endif %} und optional eine Team-Rolle pingen.") }}
 
 {% if success %}
 <div class="mb-5 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
@@ -12,12 +12,15 @@
 </div>
 {% endif %}
 
-<div class="mb-6 grid gap-3 sm:grid-cols-3">
+<div class="mb-6 grid gap-3 {% if show_git %}sm:grid-cols-3{% else %}sm:grid-cols-2{% endif %}">
+  {% if show_git %}
   {{ stat_tile("Automatische Zusammenfassung", latest_commits|length, accent="cyan", sub="Letzte 5 Git-Einträge") }}
   {{ stat_tile("Ausgewählt", selected_commits|length, accent="emerald", sub="für den Versand") }}
+  {% endif %}
   {{ stat_tile("Log Channel", "#" ~ log_channel_name if log_channel_name else "Nicht gesetzt", accent=("emerald" if log_channel_id else "amber"), sub=log_channel_id or "Log Channels öffnen") }}
 </div>
 
+{% if show_git %}
 <form method="get" action="{{ url_for(change_config.endpoint) }}" class="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-white/[0.06] bg-[#0d1320] p-4">
   <div>
     <label for="summary_limit_view" class="mb-1.5 block text-sm font-medium text-slate-400">Git-Einträge anzeigen</label>
@@ -30,8 +33,9 @@
   </div>
   {{ btn("Aktualisieren") }}
 </form>
+{% endif %}
 
-<div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+<div class="grid gap-6 {% if show_git %}xl:grid-cols-[minmax(0,1fr)_420px]{% endif %}">
   <section class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
     <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -61,15 +65,17 @@
       </div>
 
       <div>
-        <label for="ping_role_ids" class="mb-1.5 block text-sm font-medium text-slate-400">Rollen-Pings</label>
-        <select id="ping_role_ids" name="ping_role_ids" multiple
-          class="min-h-28 w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-sm text-white outline-none focus:border-cyan-500/50">
+        <label for="ping_role_id" class="mb-1.5 block text-sm font-medium text-slate-400">Team-Rolle pingen</label>
+        <select id="ping_role_id" name="ping_role_id"
+          class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-sm text-white outline-none focus:border-cyan-500/50">
+          <option value="">Keine Rolle pingen</option>
           {% for role in ping_roles %}
           <option value="{{ role.id }}">{{ role.name }} · {{ role.source }} · {{ role.id }}</option>
           {% endfor %}
         </select>
       </div>
 
+      {% if show_git %}
       <div class="rounded-lg border border-white/[0.06] bg-black/15 p-4">
         <div class="mb-3 flex flex-wrap items-end justify-between gap-3">
           <label class="inline-flex items-center gap-2 text-sm text-slate-300">
@@ -98,6 +104,7 @@
         {{ empty_state("Keine Git-Einträge", "Git konnte keine Commits für dieses Repository liefern.") }}
         {% endif %}
       </div>
+      {% endif %}
 
       <div class="flex flex-wrap items-center justify-end gap-2 border-t border-white/[0.06] pt-4">
         <button type="submit" {% if not log_channel_id or not can_send %}disabled{% endif %}
@@ -108,6 +115,7 @@
     </form>
   </section>
 
+  {% if show_git %}
   <aside class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
     <div class="mb-4">
       <h2 class="text-sm font-semibold text-white">Letzte 5 Git-Einträge</h2>
@@ -130,10 +138,13 @@
     {{ empty_state("Keine Git-Einträge", "Git konnte keine Commits für dieses Repository liefern.") }}
     {% endif %}
   </aside>
+  {% endif %}
 </div>
 
+{% if show_git %}
 <section class="mt-6 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
   <h2 class="mb-3 text-sm font-semibold text-white">Vorschau der Zusammenfassung</h2>
   <pre class="whitespace-pre-wrap rounded-lg border border-white/[0.06] bg-black/25 p-4 text-sm leading-relaxed text-slate-200">{{ selected_summary }}</pre>
 </section>
+{% endif %}
 {% endblock %}

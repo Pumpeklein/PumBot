@@ -308,6 +308,16 @@ CHANGE_UPDATE_TYPES = {
     },
 }
 
+TEAM_PING_ROLE_NAMES = {
+    "admin",
+    "team",
+    "twitch moderator",
+    "twitch moderation",
+    "discord moderator",
+    "discord moderation",
+    "admin ticket",
+}
+
 
 def create_app() -> Flask:
     return app
@@ -529,6 +539,24 @@ def _attach_display_name(
     return enriched
 
 
+def _format_stats_filter_users(rows: list[dict]) -> list[dict]:
+    formatted = []
+    for row in rows:
+        item = dict(row)
+        display_name = (
+            item.get("display_name")
+            or item.get("username")
+            or item.get("oauth_username")
+        )
+        item["filter_label"] = display_name or "Unbekannter User"
+        if display_name and item.get("user_id"):
+            item["filter_subtitle"] = str(item["user_id"])
+        else:
+            item["filter_subtitle"] = ""
+        formatted.append(item)
+    return formatted
+
+
 def _active_panel_guild_id() -> str:
     requested_guild_id = (request.args.get("guild_id") or "").strip()
     if requested_guild_id:
@@ -681,29 +709,36 @@ def _selected_git_commits(all_commits: list[dict[str, str]], selected_hashes: li
     return [commit for commit in all_commits if commit["hash"] in selected]
 
 
-def _ping_role_options(guild_id: str) -> list[dict[str, str]]:
+def _is_team_ping_role_name(name: str) -> bool:
+    normalized = " ".join(str(name or "").strip().lower().split())
+    return normalized in TEAM_PING_ROLE_NAMES
+
+
+def _team_ping_role_options(guild_id: str) -> list[dict[str, str]]:
     by_id: dict[str, dict[str, str]] = {}
     for role in list_roles(guild_id):
         role_id = str(role.get("discord_role_id") or "").strip()
-        if role_id:
+        role_name = str(role.get("role_name") or role_id)
+        if role_id and _is_team_ping_role_name(role_name):
             by_id[role_id] = {
                 "id": role_id,
-                "name": str(role.get("role_name") or role_id),
+                "name": role_name,
                 "source": "Web Rolle",
             }
     for role in _live_discord_roles(guild_id):
         role_id = str(role.get("id") or "").strip()
-        if role_id and role_id not in by_id:
+        role_name = str(role.get("name") or role_id)
+        if role_id and role_id not in by_id and _is_team_ping_role_name(role_name):
             by_id[role_id] = {
                 "id": role_id,
-                "name": str(role.get("name") or role_id),
+                "name": role_name,
                 "source": "Discord",
             }
     return sorted(by_id.values(), key=lambda role: role["name"].lower())
 
 
 def _valid_ping_role_ids(guild_id: str, requested_role_ids: list[str]) -> list[str]:
-    allowed = {role["id"] for role in _ping_role_options(guild_id)}
+    allowed = {role["id"] for role in _team_ping_role_options(guild_id)}
     result = []
     for role_id in requested_role_ids:
         role_id = str(role_id).strip()
@@ -1710,7 +1745,7 @@ def stats_page():
     top_channels = _format_date_fields(
         overview.get("top_channels") or [], "last_message_at"
     )
-    filter_users = list_message_filter_users(guild_id)
+    filter_users = _format_stats_filter_users(list_message_filter_users(guild_id))
     filter_channels = list_message_filter_channels(guild_id)
     evaluated_stats = [
         {"label": "Nachrichten gesamt", "value": totals.get("message_count") or 0},
@@ -1754,7 +1789,7 @@ def panel_api_stats_overview():
     top_channels = _format_date_fields(
         overview.get("top_channels") or [], "last_message_at"
     )
-    filter_users = list_message_filter_users(guild_id)
+    filter_users = _format_stats_filter_users(list_message_filter_users(guild_id))
     filter_channels = list_message_filter_channels(guild_id)
     evaluated_stats = [
         {"label": "Nachrichten gesamt", "value": totals.get("message_count") or 0},
@@ -1972,14 +2007,15 @@ def _render_change_updates(kind: str):
     ):
         abort(403)
     ctx = _ctx()
+    show_git = kind == "bot"
     summary_limit = request.args.get("summary_limit", 10, type=int) or 10
     summary_limit = max(1, min(50, summary_limit))
-    commits = _git_commit_summary(summary_limit)
+    commits = _git_commit_summary(summary_limit) if show_git else []
     selected_hashes = request.args.getlist("commit_hashes")
     selected_commits = _selected_git_commits(commits, selected_hashes)
-    if not selected_commits:
+    if show_git and not selected_commits:
         selected_commits = commits[: min(5, len(commits))]
-    latest_commits = _git_commit_summary(5)
+    latest_commits = _git_commit_summary(5) if show_git else []
     channel_id = get_log_channel(DEFAULT_GUILD_ID, config["log_type"])
     channel_names = get_channel_names(
         DEFAULT_GUILD_ID, [channel_id] if channel_id else []
@@ -1997,7 +2033,8 @@ def _render_change_updates(kind: str):
         selected_commits=selected_commits,
         selected_summary=_format_git_summary(selected_commits),
         summary_limit=summary_limit,
-        ping_roles=_ping_role_options(DEFAULT_GUILD_ID),
+        show_git=show_git,
+        ping_roles=_team_ping_role_options(DEFAULT_GUILD_ID),
         error=request.args.get("error"),
         success=request.args.get("success"),
         **ctx,
@@ -2021,24 +2058,28 @@ def _handle_change_send(kind: str):
     if not has_permission(config["send_permission"]):
         abort(403)
     content = (request.form.get("message") or "").strip()
-    include_git = request.form.get("include_git") == "1"
+    show_git = kind == "bot"
+    include_git = show_git and request.form.get("include_git") == "1"
     summary_limit = request.form.get("summary_limit", 10, type=int) or 10
     summary_limit = max(1, min(50, summary_limit))
-    commits = _git_commit_summary(summary_limit)
+    commits = _git_commit_summary(summary_limit) if show_git else []
     selected_commits = _selected_git_commits(
         commits,
         request.form.getlist("commit_hashes"),
     )
     ping_role_ids = _valid_ping_role_ids(
         DEFAULT_GUILD_ID,
-        request.form.getlist("ping_role_ids"),
+        request.form.getlist("ping_role_ids")
+        + ([request.form.get("ping_role_id")] if request.form.get("ping_role_id") else []),
     )
-    if not content and not (include_git and selected_commits):
+    if not content and not (show_git and include_git and selected_commits):
         return redirect(
             url_for(
                 config["endpoint"],
                 summary_limit=summary_limit,
-                error="Nachricht oder ausgewählte Git-Einträge erforderlich.",
+                error="Nachricht oder ausgewählte Git-Einträge erforderlich."
+                if show_git
+                else "Nachricht darf nicht leer sein.",
             )
         )
 

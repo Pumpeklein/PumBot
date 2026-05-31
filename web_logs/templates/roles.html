@@ -43,6 +43,7 @@
       </summary>
       <div class="grid gap-1.5 px-3 pb-3 sm:grid-cols-2" data-perm-group-body>
         {% for perm, label in group.permissions %}
+        {% if perm != "admin" %}
         <label class="group/perm flex cursor-pointer items-start gap-2.5 rounded-md border border-transparent bg-white/[0.02] px-2.5 py-2 text-sm text-slate-300 transition hover:border-white/10 hover:bg-white/[0.05]"
                data-perm-item data-perm-haystack="{{ label|lower }} {{ perm|lower }}">
           <input type="checkbox" name="{{ input_name }}" value="{{ perm }}" {{ "checked" if perm in selected else "" }}
@@ -52,6 +53,7 @@
             <span class="block truncate font-mono text-[10.5px] text-slate-500">{{ perm }}</span>
           </span>
         </label>
+        {% endif %}
         {% endfor %}
       </div>
     </details>

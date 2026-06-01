@@ -42,17 +42,17 @@
   <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
     {% for log_type, channel_id in channels.items() %}
     {% set meta = log_type_meta.get(log_type, {"label": log_type, "variant": "default"}) %}
-    <button type="button"
+    <div role="button" tabindex="0"
       data-log-channel-open
       data-channel-id="{{ channel_id }}"
       data-log-type="{{ log_type }}"
       data-channel-label="{{ meta.label }}"
-      class="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 text-left transition hover:border-cyan-500/30 hover:bg-white/[0.04]">
+      class="cursor-pointer rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 text-left transition hover:border-cyan-500/30 hover:bg-white/[0.04]">
       <div class="flex items-center justify-between gap-2">
         {{ badge(meta.label, meta.variant) }}
         {{ id_chip(channel_id) }}
       </div>
-    </button>
+    </div>
     {% endfor %}
   </div>
   {% else %}
@@ -216,6 +216,11 @@
     });
     document.querySelectorAll("[data-log-channel-open]").forEach((button) => {
       button.addEventListener("click", () => openChannelLogs(button));
+      button.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        openChannelLogs(button);
+      });
     });
   })();
 </script>

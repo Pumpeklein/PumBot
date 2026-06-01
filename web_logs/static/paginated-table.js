@@ -84,53 +84,6 @@
       </div>`;
     }
 
-    if (column.type === "discord-log") {
-      const title = getValue(row, column.titleKey) || "-";
-      const summary = getValue(row, column.summaryKey) || "-";
-      const createdAt = getValue(row, column.createdAtKey);
-      const typeLabel = getValue(row, column.typeLabelKey) || "-";
-      const typeVariant = (column.variants && column.variants[typeLabel]) || "default";
-      const channel = getValue(row, column.channelKey) || "-";
-      const actor = getValue(row, column.actorKey) || "-";
-      const meta = getValue(row, column.metaKey);
-      const messageId = getValue(row, column.messageIdKey);
-      const messageUrl = getValue(row, column.messageUrlKey);
-      const previewLength = column.previewLength || 260;
-      const fullText = String(summary || "-");
-      const truncated = fullText.length > previewLength;
-      const preview = truncated ? fullText.slice(0, previewLength) + "..." : fullText;
-      const payload = {
-        title: column.modalTitle || "Log-Details",
-        content: fullText,
-      };
-      const detailsAttr = truncated
-        ? ` data-pumbot-message='${escapeHtml(JSON.stringify(payload))}'`
-        : "";
-      return `<article class="rounded-lg border border-white/[0.06] bg-black/10 px-4 py-3">
-        <div class="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-          <div class="min-w-0">
-            <div class="flex flex-wrap items-center gap-2">
-              ${renderBadge(typeLabel, { [typeLabel]: typeVariant })}
-              <span class="min-w-0 break-words text-sm font-semibold text-white">${escapeHtml(title)}</span>
-            </div>
-            <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
-              <span>#${escapeHtml(channel)}</span>
-              <span>Ausgel&ouml;st von ${escapeHtml(actor)}</span>
-              ${meta && meta !== "-" ? `<span>${escapeHtml(meta)}</span>` : ""}
-            </div>
-          </div>
-          <div class="shrink-0 text-xs text-slate-500">${formatDate(createdAt)}</div>
-        </div>
-        <div class="mt-3 rounded-md border border-white/[0.05] bg-white/[0.02] px-3 py-2">
-          <div${detailsAttr} class="${truncated ? "cursor-pointer hover:text-white" : ""} whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-300">${escapeHtml(preview)}${truncated ? '<span class="ml-1 text-[10.5px] uppercase tracking-wider text-cyan-400">mehr</span>' : ""}</div>
-        </div>
-        <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
-          ${messageUrl ? `<a href="${escapeHtml(messageUrl)}" class="font-medium text-cyan-300 hover:text-cyan-200">Discord-Nachricht</a>` : ""}
-          ${messageId ? `<span class="font-mono text-slate-600">${escapeHtml(messageId)}</span>` : ""}
-        </div>
-      </article>`;
-    }
-
     if (column.type === "user") {
       const name = getValue(row, column.nameKey) || value || "-";
       const sub = getValue(row, column.subKey);
@@ -303,30 +256,6 @@
     const paginationEl = root.querySelector("[data-table-pagination]");
     const tableContent = root.querySelector("[data-table-content]");
     const tableFooter = root.querySelector("[data-table-footer]");
-    const isDiscordLogTable = endpoint && endpoint.includes("discord-logs");
-    const discordLogColumn = {
-      type: "discord-log",
-      titleKey: "event_title",
-      summaryKey: "event_summary",
-      createdAtKey: "created_at",
-      typeLabelKey: "log_type_label",
-      channelKey: "channel_name",
-      actorKey: "actor_label",
-      metaKey: "log_meta",
-      messageIdKey: "message_id",
-      messageUrlKey: "message_url",
-      previewLength: 320,
-      modalTitle: "Log-Details",
-      variants: {
-        Voice: "default",
-        User: "success",
-        Server: "default",
-        Nachrichten: "warning",
-        Welcome: "success",
-        Team: "default",
-        Bot: "default",
-      },
-    };
     const refreshMs =
       root.dataset.autoRefreshMs === undefined
         ? 15000
@@ -337,31 +266,15 @@
     let loading = false;
     let lastSignature = null;
 
-    if (isDiscordLogTable) {
-      root.querySelector("thead")?.classList.add("sr-only");
-      root.querySelector("table")?.classList.add("table-fixed");
-      body.classList.add("block", "space-y-2");
-    }
-
-    const rowsHtmlFor = (items) => {
-      if (isDiscordLogTable) {
-        return items
-          .map(
-            (row) =>
-              `<tr class="block"><td class="block px-0 py-1.5">${renderCell(row, discordLogColumn)}</td></tr>`,
-          )
-          .join("");
-      }
-      return items
+    const rowsHtmlFor = (items) =>
+      items
         .map(
           (row) =>
             `<tr class="border-b border-white/[0.04] transition ${escapeHtml(row._row_class || "hover:bg-white/[0.02]")}">${columns.map((column) => `<td class="${column.class || "px-3 py-2.5"}">${renderCell(row, column)}</td>`).join("")}</tr>`,
         )
         .join("");
-    };
 
     const fillerRowsHtml = (count) => {
-      if (isDiscordLogTable) return "";
       if (count <= 0) return "";
       const cells = columns
         .map(
@@ -377,13 +290,6 @@
     };
 
     const skeletonRowsHtml = (count) => {
-      if (isDiscordLogTable) {
-        let html = "";
-        for (let i = 0; i < count; i += 1) {
-          html += `<tr aria-hidden="true" class="block"><td class="block px-0 py-1.5"><div class="rounded-lg border border-white/[0.06] bg-black/10 px-4 py-3"><div class="h-4 w-48 animate-pulse rounded bg-white/[0.06]"></div><div class="mt-3 h-14 animate-pulse rounded bg-white/[0.04]"></div></div></td></tr>`;
-        }
-        return html;
-      }
       const cells = columns
         .map(
           (column) =>

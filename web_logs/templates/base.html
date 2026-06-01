@@ -209,7 +209,7 @@
     <div id="sidebar-overlay" class="fixed inset-0 z-20 bg-black/50 lg:hidden hidden" onclick="toggleSidebar()"></div>
 
     {# ── Main content ── #}
-    <div class="flex flex-1 flex-col overflow-hidden">
+    <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
 
       {# Mobile topbar #}
       <header class="flex items-center gap-3 border-b border-white/[0.06] px-4 py-3 lg:hidden">
@@ -223,8 +223,8 @@
         <span class="text-sm font-semibold text-white">PumBot</span>
       </header>
 
-      <main class="flex-1 overflow-y-auto px-4 pb-6 sm:px-6 lg:px-8">
-        <div class="pt-6">
+      <main class="min-w-0 flex-1 overflow-y-auto px-4 pb-6 sm:px-6 lg:px-8">
+        <div class="min-w-0 pt-6">
         {% if error %}
         <div class="mb-5 rounded-lg border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-300">
           {{ error }}

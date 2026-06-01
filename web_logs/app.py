@@ -2150,6 +2150,25 @@ def _render_change_updates(kind: str):
     channel_names = get_channel_names(
         DEFAULT_GUILD_ID, [channel_id] if channel_id else []
     )
+    recent_updates = []
+    for entry in list_discord_log_entries(
+        DEFAULT_GUILD_ID,
+        log_type=config["log_type"],
+        limit=10,
+    ):
+        item = dict(entry)
+        parsed_title, parsed_summary = _split_log_content(item.get("content"))
+        item["event_title"] = item.get("event_title") or parsed_title or config["singular"]
+        item["event_summary"] = (
+            item.get("event_summary") or parsed_summary or item.get("content") or ""
+        )
+        item["actor_label"] = (
+            item.get("actor_name")
+            or _extract_change_actor(item.get("content"))
+            or item.get("author_name")
+            or "Unbekannt"
+        )
+        recent_updates.append(item)
     return render_template(
         "team_changes.html",
         change_kind=kind,
@@ -2164,6 +2183,9 @@ def _render_change_updates(kind: str):
         selected_summary=_format_git_summary(selected_commits),
         summary_limit=summary_limit,
         show_git=show_git,
+        recent_updates=_format_date_fields(
+            recent_updates, "created_at", "edited_at", "synced_at"
+        ),
         ping_roles=_team_ping_role_options(DEFAULT_GUILD_ID),
         error=request.args.get("error"),
         success=request.args.get("success"),

@@ -2,16 +2,17 @@
 {% from "_macros.html" import page_header, stat_tile, empty_state, btn, badge, id_chip %}
 
 {% block content %}
-{{ page_header("Logs", "Discord Logs", "Synchronisierte Nachrichten aus den konfigurierten Log-Channels. Updates alle 5s.") }}
+{{ page_header("Logs", "Discord Logs", "Synchronisierte Nachrichten aus den konfigurierten Log-Channels. Updates alle
+5s.") }}
 
 {% set log_type_meta = {
-  "voice_log":   {"label": "Voice",       "variant": "default"},
-  "user_log":    {"label": "User",        "variant": "success"},
-  "server_log":  {"label": "Server",      "variant": "default"},
-  "message_log": {"label": "Nachrichten", "variant": "warning"},
-  "welcome_log": {"label": "Welcome",     "variant": "success"},
-  "team_change_log": {"label": "Team",    "variant": "default"},
-  "bot_change_log":  {"label": "Bot",     "variant": "default"}
+"voice_log": {"label": "Voice-Logs", "variant": "default"},
+"user_log": {"label": "User", "variant": "success"},
+"server_log": {"label": "Server", "variant": "default"},
+"message_log": {"label": "Nachrichten", "variant": "warning"},
+"welcome_log": {"label": "Welcome", "variant": "success"},
+"team_change_log": {"label": "Team", "variant": "default"},
+"bot_change_log": {"label": "Bot", "variant": "default"}
 } %}
 
 <div class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -24,29 +25,30 @@
   </button>
   <div class="rounded-xl border border-violet-500/15 bg-gradient-to-br from-violet-500/[0.08] to-transparent p-4">
     <div class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Letzter Log</div>
-    <div class="mt-1 truncate text-base font-bold text-white" data-log-overview="latest_created_at">{{ overview.latest_created_at or "—" }}</div>
+    <div class="mt-1 truncate text-base font-bold text-white" data-log-overview="latest_created_at">{{
+      overview.latest_created_at or "—" }}</div>
     <div class="mt-0.5 text-[11px] text-slate-500">Neueste Nachricht</div>
   </div>
   <div class="rounded-xl border border-emerald-500/15 bg-gradient-to-br from-emerald-500/[0.08] to-transparent p-4">
     <div class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Letzter Sync</div>
-    <div class="mt-1 truncate text-base font-bold text-white" data-log-overview="latest_synced_at">{{ overview.latest_synced_at or "—" }}</div>
+    <div class="mt-1 truncate text-base font-bold text-white" data-log-overview="latest_synced_at">{{
+      overview.latest_synced_at or "—" }}</div>
     <div class="mt-0.5 text-[11px] text-slate-500">Bot ↔ DB</div>
   </div>
 </div>
 
-<details id="log-channel-list" class="mb-6 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5" {% if not channels %}open{% endif %}>
+<details id="log-channel-list" class="mb-6 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5" {% if not channels
+  %}open{% endif %}>
   <summary class="cursor-pointer text-sm font-semibold text-white">
-    Ausgewertete Log-Channels <span class="ml-2 rounded-full bg-white/5 px-2 py-0.5 text-xs text-slate-400">{{ channels|length }}</span>
+    Ausgewertete Log-Channels <span class="ml-2 rounded-full bg-white/5 px-2 py-0.5 text-xs text-slate-400">{{
+      channels|length }}</span>
   </summary>
   {% if channels %}
   <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
     {% for log_type, channel_id in channels.items() %}
     {% set meta = log_type_meta.get(log_type, {"label": log_type, "variant": "default"}) %}
-    <div role="button" tabindex="0"
-      data-log-channel-open
-      data-channel-id="{{ channel_id }}"
-      data-log-type="{{ log_type }}"
-      data-channel-label="{{ meta.label }}"
+    <div role="button" tabindex="0" data-log-channel-open data-channel-id="{{ channel_id }}"
+      data-log-type="{{ log_type }}" data-channel-label="{{ meta.label }}"
       class="cursor-pointer rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 text-left transition hover:border-cyan-500/30 hover:bg-white/[0.04]">
       <div class="flex items-center justify-between gap-2">
         {{ badge(meta.label, meta.variant) }}
@@ -56,15 +58,17 @@
     {% endfor %}
   </div>
   {% else %}
-  <div class="mt-4">{{ empty_state("Keine Log-Channels", "Unter „Log-Kanäle“ wurden noch keine Channels hinterlegt.") }}</div>
+  <div class="mt-4">{{ empty_state("Keine Log-Channels", "Unter „Log-Kanäle“ wurden noch keine Channels hinterlegt.") }}
+  </div>
   {% endif %}
 </details>
 
-<div data-paginated-table data-endpoint="{{ url_for('panel_api_discord_logs') }}" data-form="#discord-log-filter" data-page-size="10" class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+<div data-paginated-table data-endpoint="{{ url_for('panel_api_discord_logs') }}" data-form="#discord-log-filter"
+  data-page-size="10" class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
   <script type="application/json">
     [
       {"key":"created_at","type":"date","class":"px-3 py-2.5 text-slate-400 text-xs whitespace-nowrap w-32"},
-      {"key":"log_type_label","type":"badge","variants":{"Voice":"default","User":"success","Server":"default","Nachrichten":"warning","Welcome":"success","Team":"default","Bot":"default"},"class":"px-3 py-2.5"},
+      {"key":"log_type_label","type":"badge","variants":{"Voice-Log":"default","User":"success","Server":"default","Nachrichten":"warning","Welcome":"success","Team":"default","Bot":"default"},"class":"px-3 py-2.5"},
       {"key":"channel_name","fallback":"—","class":"px-3 py-2.5 text-slate-200"},
       {"key":"actor_label","fallback":"—","class":"px-3 py-2.5 text-slate-300"},
       {"key":"event_title","fallback":"—","class":"px-3 py-2.5 font-medium text-white"},
@@ -75,14 +79,15 @@
   </script>
   <form id="discord-log-filter" class="mb-4 grid gap-3 lg:grid-cols-[180px_1fr_auto]">
     <input type="hidden" name="guild_id" value="{{ guild_id }}">
-    <select name="log_type" class="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm text-white focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30">
+    <select name="log_type"
+      class="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm text-white focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30">
       <option value="">Alle Log-Typen</option>
       {% for option in log_type_options %}
       <option value="{{ option.value }}">{{ option.label }}</option>
       {% endfor %}
     </select>
     <input name="q" data-live-search type="search" placeholder="Suche nach Inhalt, Autor oder Channel …"
-           class="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30">
+      class="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30">
     {{ btn("Filtern") }}
   </form>
   <div class="overflow-x-auto">
@@ -102,11 +107,17 @@
       <tbody data-table-body></tbody>
     </table>
   </div>
-  <div data-table-empty class="hidden">{{ empty_state("Keine Logs", "Es wurden noch keine Log-Nachrichten synchronisiert.") }}</div>
+  <div data-table-empty class="hidden">{{ empty_state("Keine Logs", "Es wurden noch keine Log-Nachrichten
+    synchronisiert.") }}</div>
   <div class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
     <label class="flex items-center gap-2 text-xs text-slate-500">
       Pro Seite
-      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white">
+        <option selected>10</option>
+        <option>25</option>
+        <option>50</option>
+        <option>100</option>
+      </select>
     </label>
     <div data-table-pagination class="flex-1"></div>
   </div>

@@ -91,6 +91,11 @@
               <span class="h-2 w-2 rounded-full" style="background-color:{{ rcolor }}"></span>
               <span class="font-medium">{{ role.name }}</span>
             </span>
+            {% if role.selfrole_meta %}
+            <div class="mt-1 text-[11px] text-slate-500">
+              {{ role.selfrole_meta.emoji }} {{ role.selfrole_meta.panel_title }}
+            </div>
+            {% endif %}
           </td>
           <td class="px-3 py-2.5 text-slate-400 text-xs">#{{ role.position }}</td>
           <td class="px-3 py-2.5">
@@ -432,7 +437,14 @@
 
 {% block scripts %}
 <script>
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
   document.addEventListener("DOMContentLoaded", () => {
+    if (!window.location.hash) {
+      window.requestAnimationFrame(() => {
+        const scroller = document.querySelector("main") || document.scrollingElement;
+        scroller?.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      });
+    }
     /* ─── Modal helpers ─── */
     const showModal = (el) => {
       if (!el) return;

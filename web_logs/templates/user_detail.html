@@ -246,7 +246,7 @@
     {% endif %}
   </div>
 
-  <div data-paginated-table data-endpoint="{{ url_for('panel_api_messages') }}" data-form="#messages-filter" data-page-size="10" class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+  <div data-paginated-table data-endpoint="{{ url_for('panel_api_messages') }}" data-form="#messages-filter" data-page-size="10" data-auto-refresh-ms="5000" class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
     <script type="application/json">
       [
         {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},

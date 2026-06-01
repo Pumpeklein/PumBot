@@ -1150,20 +1150,39 @@ def roles_page():
         len(role.get("permissions") or []) for role in roles
     )
     selfrole_panels = get_all_selfrole_panels(DEFAULT_GUILD_ID)
+    selfrole_meta: dict[str, dict] = {}
     selfrole_order: dict[str, tuple[int, int, str]] = {}
     for panel_index, panel in enumerate(selfrole_panels):
         mappings = panel.get("roles") or {}
         for mapping_index, (emoji, role_id) in enumerate(mappings.items()):
-            selfrole_order.setdefault(
-                str(role_id),
-                (panel_index, mapping_index, str(emoji)),
+            normalized_role_id = str(role_id or "").strip()
+            if not normalized_role_id:
+                continue
+            order = (panel_index, mapping_index, str(emoji))
+            selfrole_order.setdefault(normalized_role_id, order)
+            selfrole_meta.setdefault(
+                normalized_role_id,
+                {
+                    "panel_title": panel.get("title") or "Selfrole-Panel",
+                    "panel_id": panel.get("id"),
+                    "message_id": panel.get("message_id"),
+                    "emoji": str(emoji),
+                    "order": order,
+                },
             )
-    selfrole_ids = set(selfrole_order) or get_selfrole_role_ids(DEFAULT_GUILD_ID)
-    regular_server_roles = [r for r in server_roles if str(r["id"]) not in selfrole_ids]
+    selfrole_ids = set(selfrole_meta) or {
+        str(role_id).strip() for role_id in get_selfrole_role_ids(DEFAULT_GUILD_ID)
+    }
+    for role in server_roles:
+        role_id = str(role.get("id") or "").strip()
+        role["is_selfrole"] = role_id in selfrole_ids
+        role["selfrole_meta"] = selfrole_meta.get(role_id)
+    regular_server_roles = [r for r in server_roles if not r.get("is_selfrole")]
     selfrole_server_roles = sorted(
-        [r for r in server_roles if str(r["id"]) in selfrole_ids],
+        [r for r in server_roles if r.get("is_selfrole")],
         key=lambda r: selfrole_order.get(
-            str(r["id"]), (9999, 9999, str(r.get("name") or "").lower())
+            str(r.get("id") or "").strip(),
+            (9999, 9999, str(r.get("name") or "").lower()),
         ),
     )
     return render_template(

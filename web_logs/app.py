@@ -1655,6 +1655,22 @@ def user_detail_page(user_id: str):
                 name_cache,
                 guild_id=guild_id,
             )
+        if not entry.get("changed_by_name"):
+            user_changed_identity = (
+                (entry.get("old_username") or "") != (entry.get("new_username") or "")
+                or (entry.get("old_global_name") or "")
+                != (entry.get("new_global_name") or "")
+            )
+            if user_changed_identity:
+                entry["changed_by_id"] = user_id
+                entry["changed_by_name"] = (
+                    member.get("display_name") or member.get("username") or user_id
+                )
+                entry["changed_by_note"] = "Aus alter Historie abgeleitet."
+            else:
+                entry["changed_by_note"] = (
+                    "Bei alten Einträgen wurde der Auslöser noch nicht gespeichert."
+                )
     oauth_user = get_user_by_discord_id(user_id) or {}
     if oauth_user:
         member["banner_url"] = member.get("banner_url") or oauth_user.get(

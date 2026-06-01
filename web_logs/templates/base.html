@@ -282,10 +282,18 @@
       );
     });
 
-    document.addEventListener("DOMContentLoaded", () => {
+    const pumbotScrollTop = () => {
       const main = document.querySelector("main");
-      if (main) main.scrollTop = 0;
+      if (main) main.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    };
+    document.addEventListener("DOMContentLoaded", () => {
+      pumbotScrollTop();
+      window.requestAnimationFrame(pumbotScrollTop);
+      window.setTimeout(pumbotScrollTop, 0);
+      window.setTimeout(pumbotScrollTop, 120);
     });
+    window.addEventListener("pageshow", pumbotScrollTop);
 
     /* ─── Scrollspy navigation (sticky anchor sub-header) ─── */
     document.addEventListener("DOMContentLoaded", () => {

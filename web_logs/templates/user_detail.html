@@ -286,7 +286,7 @@
   <h2 class="mb-4 text-base font-semibold text-white">Historie</h2>
 
   <div class="mb-5 grid gap-5 lg:grid-cols-2">
-    <details data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#edited-history-filter" data-page-size="10" class="group rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    <details data-collapsed-default data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#edited-history-filter" data-page-size="10" class="group rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
       <summary class="mb-4 flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden">
         <span>Bearbeitete Nachrichten</span>
         <span class="text-xs font-normal text-slate-500 group-open:hidden">Eingeklappt</span>
@@ -310,7 +310,7 @@
       </div>
     </details>
 
-    <details data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#deleted-history-filter" data-page-size="10" class="group rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    <details data-collapsed-default data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#deleted-history-filter" data-page-size="10" class="group rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
       <summary class="mb-4 flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden">
         <span>Gelöschte Nachrichten</span>
         <span class="text-xs font-normal text-slate-500 group-open:hidden">Eingeklappt</span>
@@ -342,7 +342,7 @@
         <thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Zeitpunkt</th><th class="px-3 py-2.5">Alter Anzeigename</th><th class="px-3 py-2.5">Neuer Anzeigename</th><th class="px-3 py-2.5">Alter Username</th><th class="px-3 py-2.5">Neuer Username</th><th class="px-3 py-2.5">Geändert von</th></tr></thead>
         <tbody>
           {% for h in history %}
-          <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]"><td class="px-3 py-2.5 text-slate-400">{{ h.changed_at }}</td><td class="px-3 py-2.5 text-slate-300">{{ h.old_display_name or "—" }}</td><td class="px-3 py-2.5 text-white">{{ h.new_display_name or "—" }}</td><td class="px-3 py-2.5 text-slate-400">{{ h.old_username or "—" }}</td><td class="px-3 py-2.5 text-slate-300">{{ h.new_username or "—" }}</td><td class="px-3 py-2.5"><button type="button" class="text-cyan-300 hover:text-cyan-200" data-name-history='{{ h|tojson|forceescape }}'>{{ h.changed_by_name or "Unbekannt" }}</button></td></tr>
+          <tr class="cursor-pointer border-b border-white/[0.04] transition hover:bg-white/[0.04]" data-name-history='{{ h|tojson|forceescape }}'><td class="px-3 py-2.5 text-slate-400">{{ h.changed_at }}</td><td class="px-3 py-2.5 text-slate-300">{{ h.old_display_name or "—" }}</td><td class="px-3 py-2.5 text-white">{{ h.new_display_name or "—" }}</td><td class="px-3 py-2.5 text-slate-400">{{ h.old_username or "—" }}</td><td class="px-3 py-2.5 text-slate-300">{{ h.new_username or "—" }}</td><td class="px-3 py-2.5 text-cyan-300">{{ h.changed_by_name or "Nicht gespeichert" }}</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -356,7 +356,7 @@
 {# ════════════════ TICKETS ════════════════ #}
 <section id="tickets" class="scroll-mt-24 mb-10">
   <h2 class="mb-4 text-base font-semibold text-white">Tickets</h2>
-  <details data-paginated-table data-endpoint="{{ url_for('panel_api_user_tickets', user_id=member.user_id, guild_id=guild_id) }}" data-page-size="10" class="group overflow-hidden rounded-xl border border-white/[0.06] bg-[#0d1320]">
+  <details data-collapsed-default data-paginated-table data-endpoint="{{ url_for('panel_api_user_tickets', user_id=member.user_id, guild_id=guild_id) }}" data-page-size="10" class="group overflow-hidden rounded-xl border border-white/[0.06] bg-[#0d1320]">
     <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden">
       <span>Tickets</span>
       <span class="text-xs font-normal text-slate-500 group-open:hidden">Eingeklappt</span>
@@ -388,6 +388,10 @@
 <script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
 <script>
   document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll("details[data-collapsed-default]").forEach((details) => {
+      details.open = false;
+    });
+
     const avatarUrl = document.querySelector("[data-avatar-open]")?.dataset.avatarOpen;
     document.querySelector("[data-avatar-open]")?.addEventListener("click", () => {
       if (!avatarUrl) return;
@@ -467,6 +471,7 @@
           </div>
           <dl class="grid gap-3 px-5 py-4 text-sm">
             <div><dt class="text-xs uppercase tracking-wider text-slate-500">Geändert von</dt><dd data-name-history-actor class="mt-1 text-white"></dd></div>
+            <div data-name-history-note-wrap class="hidden"><dt class="text-xs uppercase tracking-wider text-slate-500">Hinweis</dt><dd data-name-history-note class="mt-1 text-amber-300"></dd></div>
             <div><dt class="text-xs uppercase tracking-wider text-slate-500">Zeitpunkt</dt><dd data-name-history-time class="mt-1 text-slate-300"></dd></div>
             <div><dt class="text-xs uppercase tracking-wider text-slate-500">Anzeigename</dt><dd data-name-history-display class="mt-1 text-slate-300"></dd></div>
             <div><dt class="text-xs uppercase tracking-wider text-slate-500">Username</dt><dd data-name-history-username class="mt-1 text-slate-300"></dd></div>
@@ -482,12 +487,21 @@
       return modal;
     };
 
-    document.querySelectorAll("[data-name-history]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const item = JSON.parse(button.dataset.nameHistory || "{}");
+    document.querySelectorAll("[data-name-history]").forEach((row) => {
+      row.addEventListener("click", () => {
+        const item = JSON.parse(row.dataset.nameHistory || "{}");
         const modal = ensureNameHistoryModal();
         modal.querySelector("[data-name-history-actor]").textContent =
-          item.changed_by_name || item.changed_by_id || "Unbekannt";
+          item.changed_by_name || item.changed_by_id || "Nicht gespeichert";
+        const noteWrap = modal.querySelector("[data-name-history-note-wrap]");
+        const note = modal.querySelector("[data-name-history-note]");
+        if (item.changed_by_note) {
+          note.textContent = item.changed_by_note;
+          noteWrap.classList.remove("hidden");
+        } else {
+          note.textContent = "";
+          noteWrap.classList.add("hidden");
+        }
         modal.querySelector("[data-name-history-time]").textContent =
           item.changed_at || "-";
         modal.querySelector("[data-name-history-display]").textContent =

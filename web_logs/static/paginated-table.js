@@ -243,6 +243,7 @@
       root.dataset.autoRefreshMs === undefined
         ? 15000
         : Number(root.dataset.autoRefreshMs || 0);
+    const preserveEmptyRows = root.dataset.preserveEmptyRows !== "false";
     let page = 1;
     let loading = false;
     let lastSignature = null;
@@ -323,7 +324,10 @@
         }
         lastSignature = signature;
 
-        const filler = fillerRowsHtml(Math.max(0, size - items.length));
+        const filler =
+          preserveEmptyRows || items.length > 0
+            ? fillerRowsHtml(Math.max(0, size - items.length))
+            : "";
         const html = rowsHtmlFor(items) + filler;
         if (body.innerHTML !== html) body.innerHTML = html;
         if (empty) empty.classList.toggle("hidden", items.length > 0);

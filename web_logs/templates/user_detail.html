@@ -246,7 +246,7 @@
     {% endif %}
   </div>
 
-  <div data-paginated-table data-endpoint="{{ url_for('panel_api_messages') }}" data-form="#messages-filter" data-page-size="10" data-auto-refresh-ms="5000" class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+  <div data-paginated-table data-preserve-empty-rows="false" data-endpoint="{{ url_for('panel_api_messages') }}" data-form="#messages-filter" data-page-size="10" data-auto-refresh-ms="5000" class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
     <script type="application/json">
       [
         {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},
@@ -286,7 +286,7 @@
   <h2 class="mb-4 text-base font-semibold text-white">Historie</h2>
 
   <div class="mb-5 grid gap-5 lg:grid-cols-2">
-    <details data-collapsed-default data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#edited-history-filter" data-page-size="10" class="group rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    <details data-independent-details data-collapsed-default data-paginated-table data-preserve-empty-rows="false" data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#edited-history-filter" data-page-size="10" class="group rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
       <summary class="mb-4 flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden">
         <span>Bearbeitete Nachrichten</span>
         <svg class="h-4 w-4 text-slate-500 transition group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -312,7 +312,7 @@
       </div>
     </details>
 
-    <details data-collapsed-default data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#deleted-history-filter" data-page-size="10" class="group rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    <details data-independent-details data-collapsed-default data-paginated-table data-preserve-empty-rows="false" data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#deleted-history-filter" data-page-size="10" class="group rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
       <summary class="mb-4 flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden">
         <span>Gelöschte Nachrichten</span>
         <svg class="h-4 w-4 text-slate-500 transition group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -352,7 +352,9 @@
       </table>
     </div>
     {% else %}
-    {{ empty_state("Keine Namensänderungen", "Für diesen User wurde noch keine Namensänderung gespeichert.") }}
+    <div class="rounded-lg border border-white/[0.06] bg-black/10 px-4 py-3 text-sm text-slate-500">
+      Keine Namensänderungen gespeichert.
+    </div>
     {% endif %}
   </div>
 </section>
@@ -360,7 +362,7 @@
 {# ════════════════ TICKETS ════════════════ #}
 <section id="tickets" class="scroll-mt-24 mb-10">
   <h2 class="mb-4 text-base font-semibold text-white">Tickets</h2>
-  <details data-collapsed-default data-paginated-table data-endpoint="{{ url_for('panel_api_user_tickets', user_id=member.user_id, guild_id=guild_id) }}" data-page-size="10" class="group overflow-hidden rounded-xl border border-white/[0.06] bg-[#0d1320]">
+  <details data-collapsed-default data-paginated-table data-preserve-empty-rows="false" data-endpoint="{{ url_for('panel_api_user_tickets', user_id=member.user_id, guild_id=guild_id) }}" data-page-size="10" class="group overflow-hidden rounded-xl border border-white/[0.06] bg-[#0d1320]">
     <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden">
       <span>Tickets</span>
       <svg class="h-4 w-4 text-slate-500 transition group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -396,6 +398,13 @@
   document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll("details[data-collapsed-default]").forEach((details) => {
       details.open = false;
+    });
+    document.querySelectorAll("details[data-independent-details] > summary").forEach((summary) => {
+      summary.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        summary.parentElement.open = !summary.parentElement.open;
+      });
     });
 
     const avatarUrl = document.querySelector("[data-avatar-open]")?.dataset.avatarOpen;

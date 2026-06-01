@@ -372,7 +372,7 @@
     <details data-independent-details data-collapsed-default data-paginated-table data-preserve-empty-rows="false"
       data-compact-empty="true" data-endpoint="{{ url_for('panel_api_message_history') }}"
       data-form="#edited-history-filter" data-page-size="10"
-      class="group rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+      class="flex flex-col gap-4 group rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
       <summary
         class="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden">
         <span class="flex items-center gap-2">Bearbeitete Nachrichten{% if edited_message_count %}<span
@@ -428,7 +428,7 @@
     <details data-independent-details data-collapsed-default data-paginated-table data-preserve-empty-rows="false"
       data-compact-empty="true" data-endpoint="{{ url_for('panel_api_message_history') }}"
       data-form="#deleted-history-filter" data-page-size="10"
-      class="group rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+      class="flex flex-col gap-4 group rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
       <summary
         class="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden">
         <span class="flex items-center gap-2">Gelöschte Nachrichten{% if deleted_message_count %}<span

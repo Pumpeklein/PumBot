@@ -16,7 +16,12 @@
 
 <div class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
   {{ stat_tile("Einträge", overview.total or 0, accent="cyan", sub="Gesamt synchronisiert") }}
-  {{ stat_tile("Log-Channels", channels|length, accent=("emerald" if channels else "amber"), sub="Aktiv konfiguriert") }}
+  <button type="button" data-log-channels-list
+    class="rounded-xl border border-emerald-500/15 bg-gradient-to-br from-emerald-500/[0.08] to-transparent p-4 text-left transition hover:border-emerald-500/30 hover:bg-emerald-500/[0.08]">
+    <div class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Log-Channels</div>
+    <div class="mt-1 truncate text-2xl font-bold text-white">{{ channels|length }}</div>
+    <div class="mt-0.5 text-[11px] text-slate-500">Aktiv konfiguriert</div>
+  </button>
   <div class="rounded-xl border border-violet-500/15 bg-gradient-to-br from-violet-500/[0.08] to-transparent p-4">
     <div class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Letzter Log</div>
     <div class="mt-1 truncate text-base font-bold text-white" data-log-overview="latest_created_at">{{ overview.latest_created_at or "—" }}</div>
@@ -29,7 +34,7 @@
   </div>
 </div>
 
-<details class="mb-6 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5" {% if not channels %}open{% endif %}>
+<details id="log-channel-list" class="mb-6 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5" {% if not channels %}open{% endif %}>
   <summary class="cursor-pointer text-sm font-semibold text-white">
     Ausgewertete Log-Channels <span class="ml-2 rounded-full bg-white/5 px-2 py-0.5 text-xs text-slate-400">{{ channels|length }}</span>
   </summary>
@@ -37,12 +42,17 @@
   <div class="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
     {% for log_type, channel_id in channels.items() %}
     {% set meta = log_type_meta.get(log_type, {"label": log_type, "variant": "default"}) %}
-    <div class="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+    <button type="button"
+      data-log-channel-open
+      data-channel-id="{{ channel_id }}"
+      data-log-type="{{ log_type }}"
+      data-channel-label="{{ meta.label }}"
+      class="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 text-left transition hover:border-cyan-500/30 hover:bg-white/[0.04]">
       <div class="flex items-center justify-between gap-2">
         {{ badge(meta.label, meta.variant) }}
         {{ id_chip(channel_id) }}
       </div>
-    </div>
+    </button>
     {% endfor %}
   </div>
   {% else %}
@@ -106,6 +116,87 @@
 <script>
   (() => {
     const endpoint = "{{ url_for('panel_api_discord_logs_overview') }}?guild_id={{ guild_id }}";
+    const logsEndpoint = "{{ url_for('panel_api_discord_logs') }}";
+    const guildId = "{{ guild_id }}";
+    const escapeHtml = (value) =>
+      String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    const formatDate = (value) => {
+      if (!value) return "-";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+      return new Intl.DateTimeFormat("de-DE", { dateStyle: "short", timeStyle: "short" }).format(date);
+    };
+    const ensureModal = () => {
+      let modal = document.getElementById("log-channel-modal");
+      if (modal) return modal;
+      modal = document.createElement("div");
+      modal.id = "log-channel-modal";
+      modal.className = "fixed inset-0 z-[200] hidden items-center justify-center bg-black/70 p-4 backdrop-blur-sm";
+      modal.innerHTML = `
+        <div class="flex max-h-[82vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-white/10 bg-[#0d1320] shadow-2xl">
+          <div class="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-3">
+            <div class="min-w-0">
+              <h3 data-log-channel-title class="truncate text-sm font-semibold text-white">Log-Channel</h3>
+              <div data-log-channel-subtitle class="mt-0.5 text-xs text-slate-500"></div>
+            </div>
+            <button type="button" data-log-channel-close class="rounded p-1 text-slate-400 hover:bg-white/10 hover:text-white">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div data-log-channel-body class="min-h-0 flex-1 overflow-y-auto p-5"></div>
+        </div>`;
+      document.body.appendChild(modal);
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal || event.target.closest("[data-log-channel-close]")) {
+          modal.classList.add("hidden");
+          modal.classList.remove("flex");
+        }
+      });
+      return modal;
+    };
+    const renderRows = (items) => {
+      if (!items.length) {
+        return `<div class="rounded-lg border border-white/[0.06] bg-black/20 p-5 text-sm text-slate-400">Keine Nachrichten für diesen Log-Channel gefunden.</div>`;
+      }
+      return `<div class="space-y-2">${items.map((item) => `
+        <article class="rounded-lg border border-white/[0.06] bg-black/20 p-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex min-w-0 items-center gap-2">
+              <span class="rounded-full border border-slate-500/25 bg-slate-500/10 px-2 py-0.5 text-xs text-slate-300">${escapeHtml(item.log_type_label || "-")}</span>
+              <span class="truncate text-sm font-medium text-white">${escapeHtml(item.event_title || "-")}</span>
+            </div>
+            <span class="text-xs text-slate-500">${escapeHtml(formatDate(item.created_at))}</span>
+          </div>
+          <div class="mt-1 text-xs text-slate-500">Ausgelöst von ${escapeHtml(item.actor_label || "-")} · #${escapeHtml(item.channel_name || item.channel_id || "-")}</div>
+          <pre class="mt-2 whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-slate-300">${escapeHtml(item.event_summary || item.content || "-")}</pre>
+          ${item.message_url ? `<a href="${escapeHtml(item.message_url)}" class="mt-2 inline-flex text-xs font-medium text-cyan-300 hover:text-cyan-200">Discord-Nachricht öffnen</a>` : ""}
+        </article>`).join("")}</div>`;
+    };
+    const openChannelLogs = async (button) => {
+      const channelId = button.dataset.channelId;
+      const label = button.dataset.channelLabel || "Log-Channel";
+      if (!channelId) return;
+      const modal = ensureModal();
+      modal.querySelector("[data-log-channel-title]").textContent = `${label} Nachrichten`;
+      modal.querySelector("[data-log-channel-subtitle]").textContent = `Channel-ID ${channelId}`;
+      modal.querySelector("[data-log-channel-body]").innerHTML = `<div class="rounded-lg border border-white/[0.06] bg-black/20 p-5 text-sm text-slate-400">Lade Nachrichten ...</div>`;
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+      const params = new URLSearchParams({ guild_id: guildId, channel_id: channelId, page: "1", page_size: "25" });
+      const response = await fetch(`${logsEndpoint}?${params.toString()}`, { headers: { Accept: "application/json" }, credentials: "same-origin" });
+      if (!response.ok) {
+        modal.querySelector("[data-log-channel-body]").innerHTML = `<div class="rounded-lg border border-red-500/20 bg-red-500/10 p-5 text-sm text-red-300">Nachrichten konnten nicht geladen werden.</div>`;
+        return;
+      }
+      const data = await response.json();
+      modal.querySelector("[data-log-channel-subtitle]").textContent = `Channel-ID ${channelId} · ${(data.pagination?.total || 0).toLocaleString("de-DE")} Einträge`;
+      modal.querySelector("[data-log-channel-body]").innerHTML = renderRows(data.items || []);
+    };
     const update = async () => {
       if (document.hidden) return;
       const response = await fetch(endpoint, { headers: { Accept: "application/json" }, credentials: "same-origin" });
@@ -117,6 +208,15 @@
       });
     };
     window.setInterval(update, 5000);
+    document.querySelector("[data-log-channels-list]")?.addEventListener("click", () => {
+      const list = document.getElementById("log-channel-list");
+      if (!list) return;
+      list.open = true;
+      list.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    document.querySelectorAll("[data-log-channel-open]").forEach((button) => {
+      button.addEventListener("click", () => openChannelLogs(button));
+    });
   })();
 </script>
 {% endblock %}

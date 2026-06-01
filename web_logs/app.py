@@ -1647,6 +1647,14 @@ def user_detail_page(user_id: str):
             "status_updated_at": None,
         }
     history = get_guild_member_name_history(guild_id, user_id)
+    name_cache: dict[str, str | None] = {}
+    for entry in history:
+        if not entry.get("changed_by_name") and entry.get("changed_by_id"):
+            entry["changed_by_name"] = _resolve_display_name(
+                entry.get("changed_by_id"),
+                name_cache,
+                guild_id=guild_id,
+            )
     oauth_user = get_user_by_discord_id(user_id) or {}
     if oauth_user:
         member["banner_url"] = member.get("banner_url") or oauth_user.get(
@@ -2719,6 +2727,7 @@ def panel_api_message_history():
 def panel_api_discord_logs():
     guild_id = request.args.get("guild_id") or _active_panel_guild_id()
     log_type = request.args.get("log_type", "").strip() or None
+    channel_id = request.args.get("channel_id", "").strip() or None
     q = request.args.get("q", "").strip()
     page, page_size, offset = _pagination_args(default_page_size=25)
     log_type_labels = {
@@ -2734,6 +2743,7 @@ def panel_api_discord_logs():
     for entry in list_discord_log_entries(
         guild_id,
         log_type=log_type,
+        channel_id=channel_id,
         q=q,
         limit=page_size,
         offset=offset,
@@ -2766,7 +2776,9 @@ def panel_api_discord_logs():
         rows.append(item)
     return _paginated_response(
         _format_date_fields(rows, "created_at", "edited_at", "synced_at"),
-        count_discord_log_entries(guild_id, log_type=log_type, q=q),
+        count_discord_log_entries(
+            guild_id, log_type=log_type, channel_id=channel_id, q=q
+        ),
         page,
         page_size,
     )

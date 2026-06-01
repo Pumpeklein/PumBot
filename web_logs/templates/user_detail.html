@@ -286,7 +286,11 @@
   <h2 class="mb-4 text-base font-semibold text-white">Historie</h2>
 
   <div class="mb-5 grid gap-5 lg:grid-cols-2">
-    <div data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#edited-history-filter" data-page-size="10" class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    <details data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#edited-history-filter" data-page-size="10" class="group rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+      <summary class="mb-4 flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden">
+        <span>Bearbeitete Nachrichten</span>
+        <span class="text-xs font-normal text-slate-500 group-open:hidden">Eingeklappt</span>
+      </summary>
       <script type="application/json">
         [
           {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},
@@ -296,7 +300,6 @@
         ]
       </script>
       <form id="edited-history-filter"><input type="hidden" name="guild_id" value="{{ guild_id }}"><input type="hidden" name="user_id" value="{{ member.user_id }}"><input type="hidden" name="event_type" value="edit"></form>
-      <h3 class="mb-4 text-sm font-semibold text-white">Bearbeitete Nachrichten</h3>
       <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Vorher</th><th class="px-3 py-2.5">Nachher</th><th class="px-3 py-2.5">Zeitpunkt</th></tr></thead><tbody data-table-body></tbody></table></div>
       <div data-table-empty class="hidden">{{ empty_state("Keine Edits", "Für diesen User wurden keine bearbeiteten Nachrichten gespeichert.") }}</div>
       <div class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
@@ -305,9 +308,13 @@
         </label>
         <div data-table-pagination class="flex-1"></div>
       </div>
-    </div>
+    </details>
 
-    <div data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#deleted-history-filter" data-page-size="10" class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    <details data-paginated-table data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#deleted-history-filter" data-page-size="10" class="group rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+      <summary class="mb-4 flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden">
+        <span>Gelöschte Nachrichten</span>
+        <span class="text-xs font-normal text-slate-500 group-open:hidden">Eingeklappt</span>
+      </summary>
       <script type="application/json">
         [
           {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},
@@ -316,7 +323,6 @@
         ]
       </script>
       <form id="deleted-history-filter"><input type="hidden" name="guild_id" value="{{ guild_id }}"><input type="hidden" name="user_id" value="{{ member.user_id }}"><input type="hidden" name="event_type" value="delete"></form>
-      <h3 class="mb-4 text-sm font-semibold text-white">Gelöschte Nachrichten</h3>
       <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Gelöschter Inhalt</th><th class="px-3 py-2.5">Zeitpunkt</th></tr></thead><tbody data-table-body></tbody></table></div>
       <div data-table-empty class="hidden">{{ empty_state("Keine gelöschten Nachrichten", "Für diesen User wurden keine Löschungen gespeichert.") }}</div>
       <div class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
@@ -325,7 +331,7 @@
         </label>
         <div data-table-pagination class="flex-1"></div>
       </div>
-    </div>
+    </details>
   </div>
 
   <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
@@ -333,10 +339,10 @@
     {% if history %}
     <div class="overflow-x-auto">
       <table class="w-full text-left text-sm">
-        <thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Zeitpunkt</th><th class="px-3 py-2.5">Alter Anzeigename</th><th class="px-3 py-2.5">Neuer Anzeigename</th><th class="px-3 py-2.5">Alter Username</th><th class="px-3 py-2.5">Neuer Username</th></tr></thead>
+        <thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Zeitpunkt</th><th class="px-3 py-2.5">Alter Anzeigename</th><th class="px-3 py-2.5">Neuer Anzeigename</th><th class="px-3 py-2.5">Alter Username</th><th class="px-3 py-2.5">Neuer Username</th><th class="px-3 py-2.5">Geändert von</th></tr></thead>
         <tbody>
           {% for h in history %}
-          <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]"><td class="px-3 py-2.5 text-slate-400">{{ h.changed_at }}</td><td class="px-3 py-2.5 text-slate-300">{{ h.old_display_name or "—" }}</td><td class="px-3 py-2.5 text-white">{{ h.new_display_name or "—" }}</td><td class="px-3 py-2.5 text-slate-400">{{ h.old_username or "—" }}</td><td class="px-3 py-2.5 text-slate-300">{{ h.new_username or "—" }}</td></tr>
+          <tr class="border-b border-white/[0.04] transition hover:bg-white/[0.02]"><td class="px-3 py-2.5 text-slate-400">{{ h.changed_at }}</td><td class="px-3 py-2.5 text-slate-300">{{ h.old_display_name or "—" }}</td><td class="px-3 py-2.5 text-white">{{ h.new_display_name or "—" }}</td><td class="px-3 py-2.5 text-slate-400">{{ h.old_username or "—" }}</td><td class="px-3 py-2.5 text-slate-300">{{ h.new_username or "—" }}</td><td class="px-3 py-2.5"><button type="button" class="text-cyan-300 hover:text-cyan-200" data-name-history='{{ h|tojson|forceescape }}'>{{ h.changed_by_name or "Unbekannt" }}</button></td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -350,7 +356,11 @@
 {# ════════════════ TICKETS ════════════════ #}
 <section id="tickets" class="scroll-mt-24 mb-10">
   <h2 class="mb-4 text-base font-semibold text-white">Tickets</h2>
-  <div data-paginated-table data-endpoint="{{ url_for('panel_api_user_tickets', user_id=member.user_id, guild_id=guild_id) }}" data-page-size="10" class="overflow-hidden rounded-xl border border-white/[0.06] bg-[#0d1320]">
+  <details data-paginated-table data-endpoint="{{ url_for('panel_api_user_tickets', user_id=member.user_id, guild_id=guild_id) }}" data-page-size="10" class="group overflow-hidden rounded-xl border border-white/[0.06] bg-[#0d1320]">
+    <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden">
+      <span>Tickets</span>
+      <span class="text-xs font-normal text-slate-500 group-open:hidden">Eingeklappt</span>
+    </summary>
     <script type="application/json">
       [
         {"key":"ticket_id","type":"link","urlKey":"detail_url","class":"whitespace-nowrap px-4 py-3"},
@@ -369,7 +379,7 @@
       </label>
       <div data-table-pagination class="flex-1"></div>
     </div>
-  </div>
+  </details>
 </section>
 
 {% endblock %}
@@ -439,6 +449,54 @@
       if (!channelInput) return;
       channelInput.value = "";
       submitFilter();
+    });
+
+    const ensureNameHistoryModal = () => {
+      let modal = document.querySelector("#name-history-modal");
+      if (modal) return modal;
+      modal = document.createElement("div");
+      modal.id = "name-history-modal";
+      modal.className = "fixed inset-0 z-[200] hidden items-center justify-center bg-black/70 p-4 backdrop-blur-sm";
+      modal.innerHTML = `
+        <div class="w-full max-w-lg rounded-xl border border-white/10 bg-[#0d1320] shadow-2xl">
+          <div class="flex items-center justify-between border-b border-white/10 px-5 py-3">
+            <h3 class="text-sm font-semibold text-white">Namensänderung</h3>
+            <button type="button" data-name-history-close class="rounded p-1 text-slate-400 hover:bg-white/10 hover:text-white">
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <dl class="grid gap-3 px-5 py-4 text-sm">
+            <div><dt class="text-xs uppercase tracking-wider text-slate-500">Geändert von</dt><dd data-name-history-actor class="mt-1 text-white"></dd></div>
+            <div><dt class="text-xs uppercase tracking-wider text-slate-500">Zeitpunkt</dt><dd data-name-history-time class="mt-1 text-slate-300"></dd></div>
+            <div><dt class="text-xs uppercase tracking-wider text-slate-500">Anzeigename</dt><dd data-name-history-display class="mt-1 text-slate-300"></dd></div>
+            <div><dt class="text-xs uppercase tracking-wider text-slate-500">Username</dt><dd data-name-history-username class="mt-1 text-slate-300"></dd></div>
+          </dl>
+        </div>`;
+      document.body.appendChild(modal);
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal || event.target.closest("[data-name-history-close]")) {
+          modal.classList.add("hidden");
+          modal.classList.remove("flex");
+        }
+      });
+      return modal;
+    };
+
+    document.querySelectorAll("[data-name-history]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const item = JSON.parse(button.dataset.nameHistory || "{}");
+        const modal = ensureNameHistoryModal();
+        modal.querySelector("[data-name-history-actor]").textContent =
+          item.changed_by_name || item.changed_by_id || "Unbekannt";
+        modal.querySelector("[data-name-history-time]").textContent =
+          item.changed_at || "-";
+        modal.querySelector("[data-name-history-display]").textContent =
+          `${item.old_display_name || "-"} -> ${item.new_display_name || "-"}`;
+        modal.querySelector("[data-name-history-username]").textContent =
+          `${item.old_username || "-"} -> ${item.new_username || "-"}`;
+        modal.classList.remove("hidden");
+        modal.classList.add("flex");
+      });
     });
   });
 </script>

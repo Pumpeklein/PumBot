@@ -68,6 +68,8 @@ CREATE TABLE IF NOT EXISTS guild_member_name_history (
   new_username TEXT,
   new_global_name TEXT,
   new_display_name TEXT,
+  changed_by_id TEXT,
+  changed_by_name TEXT,
   changed_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

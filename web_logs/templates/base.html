@@ -240,6 +240,8 @@
   <div id="pumbot-toast" class="pointer-events-none fixed bottom-6 right-6 z-[100] flex translate-y-2 flex-col gap-2 opacity-0 transition"></div>
 
   <script>
+    if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+
     function toggleSidebar() {
       const sb = document.getElementById("sidebar");
       const ov = document.getElementById("sidebar-overlay");
@@ -282,16 +284,7 @@
 
     document.addEventListener("DOMContentLoaded", () => {
       const main = document.querySelector("main");
-      const key = `pumbot:scroll:${window.location.pathname}${window.location.search}`;
-      const saved = Number(window.sessionStorage.getItem(key) || 0);
-      if (main && saved > 0) {
-        window.requestAnimationFrame(() => {
-          main.scrollTop = saved;
-        });
-      }
-      window.addEventListener("beforeunload", () => {
-        if (main) window.sessionStorage.setItem(key, String(main.scrollTop || 0));
-      });
+      if (main) main.scrollTop = 0;
     });
 
     /* ─── Scrollspy navigation (sticky anchor sub-header) ─── */

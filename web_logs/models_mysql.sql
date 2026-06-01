@@ -62,6 +62,8 @@ CREATE TABLE IF NOT EXISTS guild_member_name_history (
   new_username VARCHAR(255),
   new_global_name VARCHAR(255),
   new_display_name VARCHAR(255),
+  changed_by_id VARCHAR(32),
+  changed_by_name VARCHAR(255),
   changed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

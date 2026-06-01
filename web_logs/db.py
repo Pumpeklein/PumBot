@@ -135,6 +135,14 @@ def init_db() -> None:
         )
         _ensure_columns(
             conn,
+            "guild_member_name_history",
+            {
+                "changed_by_id": "VARCHAR(32)",
+                "changed_by_name": "VARCHAR(255)",
+            },
+        )
+        _ensure_columns(
+            conn,
             "users",
             {
                 "discord_banner": "TEXT",
@@ -449,6 +457,8 @@ def upsert_guild_member(guild_id: str, member: dict[str, Any]) -> dict:
     activity_type = member.get("activity_type")
     joined_at = member.get("joined_at")
     left_at = member.get("left_at")
+    changed_by_id = member.get("changed_by_id")
+    changed_by_name = member.get("changed_by_name")
 
     with _connect() as conn:
         existing = conn.execute(
@@ -466,8 +476,9 @@ def upsert_guild_member(guild_id: str, member: dict[str, Any]) -> dict:
             conn.execute(
                 """INSERT INTO guild_member_name_history (
                      guild_id, user_id, old_username, old_global_name, old_display_name,
-                     new_username, new_global_name, new_display_name
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                     new_username, new_global_name, new_display_name,
+                     changed_by_id, changed_by_name
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     guild_id,
                     user_id,
@@ -477,6 +488,8 @@ def upsert_guild_member(guild_id: str, member: dict[str, Any]) -> dict:
                     username,
                     global_name,
                     display_name,
+                    changed_by_id,
+                    changed_by_name,
                 ),
             )
 
@@ -567,8 +580,9 @@ def sync_guild_members(
                 conn.execute(
                     """INSERT INTO guild_member_name_history (
                          guild_id, user_id, old_username, old_global_name, old_display_name,
-                         new_username, new_global_name, new_display_name
-                       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                         new_username, new_global_name, new_display_name,
+                         changed_by_id, changed_by_name
+                       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         guild_id,
                         user_id,
@@ -578,6 +592,8 @@ def sync_guild_members(
                         username,
                         member.get("global_name"),
                         display_name,
+                        member.get("changed_by_id"),
+                        member.get("changed_by_name"),
                     ),
                 )
             conn.execute(
@@ -2454,6 +2470,7 @@ def get_all_log_channels(guild_id: str) -> dict[str, str]:
 def _discord_log_where(
     guild_id: str,
     log_type: str | None = None,
+    channel_id: str | None = None,
     q: str | None = None,
 ) -> tuple[str, list[Any]]:
     clauses = ["guild_id = ?"]
@@ -2461,6 +2478,9 @@ def _discord_log_where(
     if log_type:
         clauses.append("log_type = ?")
         params.append(log_type)
+    if channel_id:
+        clauses.append("channel_id = ?")
+        params.append(str(channel_id))
     if q:
         pattern = f"%{q}%"
         clauses.append(
@@ -2575,11 +2595,12 @@ def upsert_discord_log_entries(
 def list_discord_log_entries(
     guild_id: str,
     log_type: str | None = None,
+    channel_id: str | None = None,
     q: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> list[dict]:
-    where_sql, params = _discord_log_where(guild_id, log_type, q)
+    where_sql, params = _discord_log_where(guild_id, log_type, channel_id, q)
     with _connect() as conn:
         rows = conn.execute(
             f"""SELECT *
@@ -2595,9 +2616,10 @@ def list_discord_log_entries(
 def count_discord_log_entries(
     guild_id: str,
     log_type: str | None = None,
+    channel_id: str | None = None,
     q: str | None = None,
 ) -> int:
-    where_sql, params = _discord_log_where(guild_id, log_type, q)
+    where_sql, params = _discord_log_where(guild_id, log_type, channel_id, q)
     with _connect() as conn:
         row = conn.execute(
             f"SELECT COUNT(*) AS total FROM discord_log_entries WHERE {where_sql}",

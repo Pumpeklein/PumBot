@@ -174,7 +174,10 @@ class PumpeBot(commands.Bot):
         return str(member.display_avatar.url) if member.display_avatar else None
 
     def _member_payload(
-        self, member: discord.Member, status: str = "active"
+        self,
+        member: discord.Member,
+        status: str = "active",
+        changed_by: discord.abc.User | None = None,
     ) -> dict[str, object | None]:
         activity = next((a for a in member.activities if a), None)
         return {
@@ -198,6 +201,8 @@ class PumpeBot(commands.Bot):
             "activity_name": getattr(activity, "name", None) if activity else None,
             "activity_type": activity.type.name if activity else None,
             "joined_at": member.joined_at.isoformat() if member.joined_at else None,
+            "changed_by_id": str(changed_by.id) if changed_by else None,
+            "changed_by_name": str(changed_by) if changed_by else None,
         }
 
     @staticmethod
@@ -493,12 +498,17 @@ class PumpeBot(commands.Bot):
             await asyncio.sleep(MEMBER_RESYNC_INTERVAL_SECONDS)
             await self._sync_all_guild_members_with_retries()
 
-    async def _upsert_member(self, member: discord.Member, status: str = "active") -> None:
+    async def _upsert_member(
+        self,
+        member: discord.Member,
+        status: str = "active",
+        changed_by: discord.abc.User | None = None,
+    ) -> None:
         try:
             await asyncio.to_thread(
                 upsert_guild_member,
                 str(member.guild.id),
-                self._member_payload(member, status=status),
+                self._member_payload(member, status=status, changed_by=changed_by),
             )
             logger.info(
                 "User %s (%s) fuer Guild %s als %s gespeichert.",
@@ -509,6 +519,30 @@ class PumpeBot(commands.Bot):
             )
         except Exception:
             logger.exception("User-Upsert fuer %s fehlgeschlagen", member.id)
+
+    async def _member_name_change_actor(
+        self, before: discord.Member, after: discord.Member
+    ) -> discord.abc.User | None:
+        if before.nick == after.nick:
+            if before.name != after.name or before.global_name != after.global_name:
+                return after
+            return None
+        try:
+            async for entry in after.guild.audit_logs(
+                limit=6,
+                action=discord.AuditLogAction.member_update,
+            ):
+                target = getattr(entry, "target", None)
+                if getattr(target, "id", None) != after.id:
+                    continue
+                if entry.created_at:
+                    age = (discord.utils.utcnow() - entry.created_at).total_seconds()
+                    if age > 30:
+                        continue
+                return entry.user if isinstance(entry.user, discord.abc.User) else None
+        except (discord.Forbidden, discord.HTTPException):
+            logger.debug("Audit-Log fuer Namensaenderung nicht lesbar.", exc_info=True)
+        return after
 
     async def setup_hook(self) -> None:
         guild_obj = discord.Object(id=int(GUILD_ID)) if GUILD_ID is not None else None
@@ -581,7 +615,14 @@ class PumpeBot(commands.Bot):
             or before.display_avatar.url != after.display_avatar.url
             or [role.id for role in before.roles] != [role.id for role in after.roles]
         ):
-            await self._upsert_member(after, status="active")
+            changed_by = None
+            if (
+                before.name != after.name
+                or before.global_name != after.global_name
+                or before.display_name != after.display_name
+            ):
+                changed_by = await self._member_name_change_actor(before, after)
+            await self._upsert_member(after, status="active", changed_by=changed_by)
 
     async def on_user_update(self, before: discord.User, after: discord.User) -> None:
         if before.name == after.name and before.global_name == after.global_name:
@@ -589,7 +630,7 @@ class PumpeBot(commands.Bot):
         for guild in self.guilds:
             member = guild.get_member(after.id)
             if member:
-                await self._upsert_member(member, status="active")
+                await self._upsert_member(member, status="active", changed_by=member)
 
     async def on_presence_update(
         self, before: discord.Member, after: discord.Member

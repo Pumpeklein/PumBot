@@ -158,6 +158,10 @@ def init_db() -> None:
                 "channel_name": "VARCHAR(255)",
                 "author_id": "VARCHAR(32)",
                 "author_name": "VARCHAR(255)",
+                "actor_id": "VARCHAR(32)",
+                "actor_name": "VARCHAR(255)",
+                "event_title": "VARCHAR(255)",
+                "event_summary": "TEXT",
                 "content": "LONGTEXT",
                 "embed_count": "INT NOT NULL DEFAULT 0",
                 "attachment_count": "INT NOT NULL DEFAULT 0",
@@ -2460,9 +2464,9 @@ def _discord_log_where(
     if q:
         pattern = f"%{q}%"
         clauses.append(
-            "(content LIKE ? OR author_name LIKE ? OR author_id LIKE ? OR channel_name LIKE ?)"
+            "(content LIKE ? OR event_title LIKE ? OR event_summary LIKE ? OR actor_name LIKE ? OR actor_id LIKE ? OR author_name LIKE ? OR author_id LIKE ? OR channel_name LIKE ?)"
         )
-        params.extend([pattern, pattern, pattern, pattern])
+        params.extend([pattern, pattern, pattern, pattern, pattern, pattern, pattern, pattern])
     return " AND ".join(clauses), params
 
 
@@ -2473,13 +2477,18 @@ def upsert_discord_log_entry(
         conn.execute(
             """INSERT INTO discord_log_entries
                (guild_id, log_type, channel_id, channel_name, message_id, author_id,
-                author_name, content, embed_count, attachment_count, jump_url, created_at, edited_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                author_name, actor_id, actor_name, event_title, event_summary, content,
+                embed_count, attachment_count, jump_url, created_at, edited_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON DUPLICATE KEY UPDATE
                  log_type = VALUES(log_type),
                  channel_name = VALUES(channel_name),
                  author_id = VALUES(author_id),
                  author_name = VALUES(author_name),
+                 actor_id = COALESCE(VALUES(actor_id), actor_id),
+                 actor_name = COALESCE(VALUES(actor_name), actor_name),
+                 event_title = VALUES(event_title),
+                 event_summary = VALUES(event_summary),
                  content = VALUES(content),
                  embed_count = VALUES(embed_count),
                  attachment_count = VALUES(attachment_count),
@@ -2494,6 +2503,10 @@ def upsert_discord_log_entry(
                 entry.get("message_id"),
                 entry.get("author_id"),
                 entry.get("author_name"),
+                entry.get("actor_id"),
+                entry.get("actor_name"),
+                entry.get("event_title"),
+                entry.get("event_summary"),
                 entry.get("content") or "",
                 int(entry.get("embed_count") or 0),
                 int(entry.get("attachment_count") or 0),
@@ -2517,13 +2530,18 @@ def upsert_discord_log_entries(
             conn.execute(
                 """INSERT INTO discord_log_entries
                    (guild_id, log_type, channel_id, channel_name, message_id, author_id,
-                    author_name, content, embed_count, attachment_count, jump_url, created_at, edited_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    author_name, actor_id, actor_name, event_title, event_summary,
+                    content, embed_count, attachment_count, jump_url, created_at, edited_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                    ON DUPLICATE KEY UPDATE
                      log_type = VALUES(log_type),
                      channel_name = VALUES(channel_name),
                      author_id = VALUES(author_id),
                      author_name = VALUES(author_name),
+                     actor_id = COALESCE(VALUES(actor_id), actor_id),
+                     actor_name = COALESCE(VALUES(actor_name), actor_name),
+                     event_title = VALUES(event_title),
+                     event_summary = VALUES(event_summary),
                      content = VALUES(content),
                      embed_count = VALUES(embed_count),
                      attachment_count = VALUES(attachment_count),
@@ -2538,6 +2556,10 @@ def upsert_discord_log_entries(
                     entry.get("message_id"),
                     entry.get("author_id"),
                     entry.get("author_name"),
+                    entry.get("actor_id"),
+                    entry.get("actor_name"),
+                    entry.get("event_title"),
+                    entry.get("event_summary"),
                     entry.get("content") or "",
                     int(entry.get("embed_count") or 0),
                     int(entry.get("attachment_count") or 0),

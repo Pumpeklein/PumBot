@@ -238,6 +238,10 @@ CREATE TABLE IF NOT EXISTS discord_log_entries (
   message_id TEXT NOT NULL,
   author_id TEXT,
   author_name TEXT,
+  actor_id TEXT,
+  actor_name TEXT,
+  event_title TEXT,
+  event_summary TEXT,
   content TEXT,
   embed_count INTEGER NOT NULL DEFAULT 0,
   attachment_count INTEGER NOT NULL DEFAULT 0,
@@ -329,3 +333,4 @@ CREATE INDEX IF NOT EXISTS idx_guild_message_history_user ON guild_message_histo
 CREATE INDEX IF NOT EXISTS idx_guild_message_history_type ON guild_message_history(guild_id, event_type, event_at);
 CREATE INDEX IF NOT EXISTS idx_discord_log_entries_type_created ON discord_log_entries(guild_id, log_type, created_at);
 CREATE INDEX IF NOT EXISTS idx_discord_log_entries_author ON discord_log_entries(guild_id, author_id);
+CREATE INDEX IF NOT EXISTS idx_discord_log_entries_actor ON discord_log_entries(guild_id, actor_id);

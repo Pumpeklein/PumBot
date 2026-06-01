@@ -238,6 +238,15 @@ class PumpeBot(commands.Bot):
             parts.append(embed.footer.text)
         return "\n".join(part for part in parts if part).strip()
 
+    @staticmethod
+    def _log_event_parts(content: str) -> tuple[str | None, str | None]:
+        lines = [line.strip() for line in (content or "").splitlines() if line.strip()]
+        if not lines:
+            return None, None
+        title = lines[0].strip("*` ")
+        summary = "\n".join(lines[1:]).strip()
+        return title[:255] if title else None, summary[:1200] if summary else None
+
     def log_message_payload(self, message: discord.Message) -> dict[str, Any]:
         channel = message.channel
         content = message.content or ""
@@ -245,12 +254,15 @@ class PumpeBot(commands.Bot):
         embed_text = "\n\n".join(text for text in embed_texts if text)
         if embed_text:
             content = f"{content}\n\n{embed_text}".strip()
+        event_title, event_summary = self._log_event_parts(content)
         return {
             "channel_id": str(channel.id),
             "channel_name": getattr(channel, "name", str(channel.id)),
             "message_id": str(message.id),
             "author_id": str(message.author.id) if message.author else None,
             "author_name": str(message.author) if message.author else None,
+            "event_title": event_title,
+            "event_summary": event_summary,
             "content": content,
             "embed_count": len(message.embeds),
             "attachment_count": len(message.attachments),

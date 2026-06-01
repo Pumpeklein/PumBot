@@ -11,6 +11,11 @@
   {{ success }}
 </div>
 {% endif %}
+{% if error %}
+<div class="mb-5 rounded-lg border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+  {{ error }}
+</div>
+{% endif %}
 
 <div class="mb-6 grid gap-3 {% if show_git %}sm:grid-cols-3{% else %}sm:grid-cols-2{% endif %}">
   {% if show_git %}

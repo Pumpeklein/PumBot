@@ -126,6 +126,7 @@ try:
         mark_guild_message_deleted,
         update_guild_member_profile_fields,
         update_guild_member_roles,
+        upsert_discord_log_entry,
         upsert_guild_member,
         upsert_bot_message,
         upsert_guild_message,
@@ -246,6 +247,7 @@ except ImportError:
         mark_guild_message_deleted,
         update_guild_member_profile_fields,
         update_guild_member_roles,
+        upsert_discord_log_entry,
         upsert_guild_member,
         upsert_bot_message,
         upsert_guild_message,
@@ -449,6 +451,22 @@ def _format_date_fields(rows: list[dict], *fields: str) -> list[dict]:
                 item[field] = format_berlin_datetime(item[field], fallback=item[field])
         formatted.append(item)
     return formatted
+
+
+def _extract_change_actor(content: str | None) -> str | None:
+    if not content:
+        return None
+    match = re.search(r"^\*\*Von:\*\*\s*(.+)$", content, flags=re.MULTILINE)
+    return match.group(1).strip()[:255] if match else None
+
+
+def _split_log_content(content: str | None) -> tuple[str | None, str | None]:
+    lines = [line.strip() for line in (content or "").splitlines() if line.strip()]
+    if not lines:
+        return None, None
+    title = lines[0].strip("*` ")
+    summary = "\n".join(lines[1:]).strip()
+    return title or None, summary or None
 
 
 def _resolve_display_name(
@@ -753,7 +771,7 @@ async def _send_change_message(
     content: str,
     git_summary: str | None = None,
     ping_role_ids: list[str] | None = None,
-) -> None:
+) -> object:
     import discord
 
     bot = app.config.get("DISCORD_BOT")
@@ -771,7 +789,7 @@ async def _send_change_message(
         message = f"{message}\n\n{content}"
     if git_summary:
         message = f"{message}\n\n```text\n{git_summary[:1500]}\n```"
-    await channel.send(
+    return await channel.send(
         message[:1900],
         allowed_mentions=discord.AllowedMentions(roles=True, users=False, everyone=False),
     )
@@ -2194,7 +2212,7 @@ def _handle_change_send(kind: str):
                 error=f"Der Channel für {config['title']} ist keine gültige Discord-ID.",
             )
         )
-    _, error = _run_bot_coro(
+    sent_message, error = _run_bot_coro(
         _send_change_message(
             target_channel_id,
             config["singular"],
@@ -2212,6 +2230,34 @@ def _handle_change_send(kind: str):
                 error=f"Senden fehlgeschlagen: {error}",
             )
         )
+    if sent_message is not None:
+        try:
+            bot = app.config.get("DISCORD_BOT")
+            if bot and hasattr(bot, "log_message_payload"):
+                payload = bot.log_message_payload(sent_message)
+            else:
+                payload = {
+                    "channel_id": str(channel_id),
+                    "channel_name": None,
+                    "message_id": str(getattr(sent_message, "id", "")),
+                    "author_id": str(getattr(getattr(sent_message, "author", None), "id", "") or ""),
+                    "author_name": str(getattr(sent_message, "author", "") or ""),
+                    "content": str(getattr(sent_message, "content", "") or ""),
+                    "jump_url": getattr(sent_message, "jump_url", None),
+                    "created_at": getattr(sent_message, "created_at", None),
+                    "edited_at": getattr(sent_message, "edited_at", None),
+                }
+            payload.update(
+                {
+                    "actor_id": str(user.get("discord_id") or "") or None,
+                    "actor_name": author,
+                    "event_title": config["singular"],
+                    "event_summary": content[:1200] if content else git_summary,
+                }
+            )
+            upsert_discord_log_entry(DEFAULT_GUILD_ID, config["log_type"], payload)
+        except Exception:
+            app.logger.exception("Change update log could not be saved")
     return redirect(
         url_for(
             config["endpoint"],
@@ -2696,8 +2742,27 @@ def panel_api_discord_logs():
         item["log_type_label"] = log_type_labels.get(
             item.get("log_type"), item.get("log_type") or "-"
         )
-        item["author_label"] = item.get("author_name") or item.get("author_id") or "-"
+        parsed_title, parsed_summary = _split_log_content(item.get("content"))
+        item["event_title"] = item.get("event_title") or parsed_title or "-"
+        item["event_summary"] = (
+            item.get("event_summary") or parsed_summary or item.get("content") or "-"
+        )
+        change_actor = _extract_change_actor(item.get("content"))
+        item["actor_label"] = (
+            item.get("actor_name")
+            or change_actor
+            or item.get("author_name")
+            or item.get("author_id")
+            or "-"
+        )
+        item["bot_author_label"] = item.get("author_name") or item.get("author_id") or "-"
         item["message_url"] = item.get("jump_url")
+        meta = []
+        if item.get("embed_count"):
+            meta.append(f"{item['embed_count']} Embed(s)")
+        if item.get("attachment_count"):
+            meta.append(f"{item['attachment_count']} Anhang/Anhänge")
+        item["log_meta"] = " · ".join(meta) if meta else "-"
         rows.append(item)
     return _paginated_response(
         _format_date_fields(rows, "created_at", "edited_at", "synced_at"),

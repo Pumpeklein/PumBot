@@ -195,7 +195,9 @@ class LogsCog(commands.Cog):
             )
             return False
         try:
-            await channel.send(embed=embed)
+            message = await channel.send(embed=embed)
+            if hasattr(self.bot, "_store_log_message"):
+                await self.bot._store_log_message(message)
             return True
         except Exception:
             logger.exception(

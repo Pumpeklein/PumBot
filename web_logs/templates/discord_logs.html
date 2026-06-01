@@ -56,8 +56,10 @@
       {"key":"created_at","type":"date","class":"px-3 py-2.5 text-slate-400 text-xs whitespace-nowrap w-32"},
       {"key":"log_type_label","type":"badge","variants":{"Voice":"default","User":"success","Server":"default","Nachrichten":"warning","Welcome":"success","Team":"default","Bot":"default"},"class":"px-3 py-2.5"},
       {"key":"channel_name","fallback":"—","class":"px-3 py-2.5 text-slate-200"},
-      {"key":"author_label","fallback":"—","class":"px-3 py-2.5 text-slate-300"},
-      {"key":"content","type":"message","editedAtKey":"edited_at","fallback":"—","class":"px-3 py-2.5"},
+      {"key":"actor_label","fallback":"—","class":"px-3 py-2.5 text-slate-300"},
+      {"key":"event_title","fallback":"—","class":"px-3 py-2.5 font-medium text-white"},
+      {"key":"event_summary","type":"message","editedAtKey":"edited_at","fallback":"—","previewLength":180,"modalTitle":"Log-Details","class":"px-3 py-2.5"},
+      {"key":"log_meta","fallback":"—","class":"px-3 py-2.5 text-xs text-slate-500"},
       {"key":"message_id","type":"link","urlKey":"message_url","class":"px-3 py-2.5 font-mono text-[10.5px]"}
     ]
   </script>
@@ -80,8 +82,10 @@
           <th class="px-3 py-2.5">Zeit</th>
           <th class="px-3 py-2.5">Typ</th>
           <th class="px-3 py-2.5">Channel</th>
-          <th class="px-3 py-2.5">Autor</th>
-          <th class="px-3 py-2.5">Inhalt</th>
+          <th class="px-3 py-2.5">Ausgelöst von</th>
+          <th class="px-3 py-2.5">Ereignis</th>
+          <th class="px-3 py-2.5">Details</th>
+          <th class="px-3 py-2.5">Meta</th>
           <th class="px-3 py-2.5">Nachricht</th>
         </tr>
       </thead>

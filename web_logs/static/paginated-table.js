@@ -239,11 +239,14 @@
     const next = root.querySelector("[data-page-next]");
     const pageSize = root.querySelector("[data-page-size]");
     const paginationEl = root.querySelector("[data-table-pagination]");
+    const tableContent = root.querySelector("[data-table-content]");
+    const tableFooter = root.querySelector("[data-table-footer]");
     const refreshMs =
       root.dataset.autoRefreshMs === undefined
         ? 15000
         : Number(root.dataset.autoRefreshMs || 0);
     const preserveEmptyRows = root.dataset.preserveEmptyRows !== "false";
+    const compactEmpty = root.dataset.compactEmpty === "true";
     let page = 1;
     let loading = false;
     let lastSignature = null;
@@ -331,6 +334,10 @@
         const html = rowsHtmlFor(items) + filler;
         if (body.innerHTML !== html) body.innerHTML = html;
         if (empty) empty.classList.toggle("hidden", items.length > 0);
+        if (compactEmpty) {
+          tableContent?.classList.toggle("hidden", items.length === 0);
+          tableFooter?.classList.toggle("hidden", items.length === 0);
+        }
         if (status)
           status.textContent = `${pagination.total} Einträge · Seite ${pagination.page} von ${pagination.pages || 1}`;
         if (prev) prev.disabled = pagination.page <= 1;

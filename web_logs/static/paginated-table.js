@@ -239,7 +239,10 @@
     const next = root.querySelector("[data-page-next]");
     const pageSize = root.querySelector("[data-page-size]");
     const paginationEl = root.querySelector("[data-table-pagination]");
-    const refreshMs = Number(root.dataset.autoRefreshMs || 0);
+    const refreshMs =
+      root.dataset.autoRefreshMs === undefined
+        ? 15000
+        : Number(root.dataset.autoRefreshMs || 0);
     let page = 1;
     let loading = false;
     let lastSignature = null;
@@ -300,6 +303,7 @@
         }
         const response = await fetch(`${endpoint}?${params.toString()}`, {
           headers: { Accept: "application/json" },
+          credentials: "same-origin",
         });
         const data = await response.json();
         const items = data.items || [];

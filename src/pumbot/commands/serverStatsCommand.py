@@ -16,6 +16,7 @@ STAT_DEFINITIONS: Dict[str, str] = {
     "members": "Mitglieder",
     "bots": "Bots",
     "channels": "Kanäle",
+    "log_channels": "Log-Kanäle",
     "roles": "Rollen",
 }
 
@@ -104,12 +105,25 @@ class ServerStatsCog(commands.Cog):
                 return
 
             if use_api:
+                log_channel_ids = set(
+                    (
+                        await self.api.get_all_log_channels(str(cached_guild.id))
+                    ).values()
+                )
                 # Frische Daten von Discord holen (für Loop/Start)
                 try:
                     channels = await cached_guild.fetch_channels()
-                    channels_count = len(channels)
+                    channels_count = len(
+                        [c for c in channels if str(c.id) not in log_channel_ids]
+                    )
                 except Exception:
-                    channels_count = len(cached_guild.channels)
+                    channels_count = len(
+                        [
+                            c
+                            for c in cached_guild.channels
+                            if str(c.id) not in log_channel_ids
+                        ]
+                    )
                 try:
                     roles = await cached_guild.fetch_roles()
                     roles_count = len(roles)
@@ -117,7 +131,14 @@ class ServerStatsCog(commands.Cog):
                     roles_count = len(cached_guild.roles)
             else:
                 # Cache nutzen (bei Events ist der Cache bereits aktualisiert)
-                channels_count = len(cached_guild.channels)
+                log_channel_ids = set(
+                    (
+                        await self.api.get_all_log_channels(str(cached_guild.id))
+                    ).values()
+                )
+                channels_count = len(
+                    [c for c in cached_guild.channels if str(c.id) not in log_channel_ids]
+                )
                 roles_count = len(cached_guild.roles)
 
             all_members = cached_guild.member_count or 0
@@ -129,6 +150,7 @@ class ServerStatsCog(commands.Cog):
                 "members": members,
                 "bots": bots,
                 "channels": channels_count,
+                "log_channels": len(log_channel_ids),
                 "roles": roles_count,
             }
 
@@ -229,6 +251,7 @@ class ServerStatsCog(commands.Cog):
             app_commands.Choice(name="Mitglieder", value="members"),
             app_commands.Choice(name="Bots", value="bots"),
             app_commands.Choice(name="Kanäle", value="channels"),
+            app_commands.Choice(name="Log-Kanäle", value="log_channels"),
             app_commands.Choice(name="Rollen", value="roles"),
         ]
     )

@@ -1149,9 +1149,23 @@ def roles_page():
     total_permissions_assigned = sum(
         len(role.get("permissions") or []) for role in roles
     )
-    selfrole_ids = get_selfrole_role_ids(DEFAULT_GUILD_ID)
+    selfrole_panels = get_all_selfrole_panels(DEFAULT_GUILD_ID)
+    selfrole_order: dict[str, tuple[int, int, str]] = {}
+    for panel_index, panel in enumerate(selfrole_panels):
+        mappings = panel.get("roles") or {}
+        for mapping_index, (emoji, role_id) in enumerate(mappings.items()):
+            selfrole_order.setdefault(
+                str(role_id),
+                (panel_index, mapping_index, str(emoji)),
+            )
+    selfrole_ids = set(selfrole_order) or get_selfrole_role_ids(DEFAULT_GUILD_ID)
     regular_server_roles = [r for r in server_roles if str(r["id"]) not in selfrole_ids]
-    selfrole_server_roles = [r for r in server_roles if str(r["id"]) in selfrole_ids]
+    selfrole_server_roles = sorted(
+        [r for r in server_roles if str(r["id"]) in selfrole_ids],
+        key=lambda r: selfrole_order.get(
+            str(r["id"]), (9999, 9999, str(r.get("name") or "").lower())
+        ),
+    )
     return render_template(
         "roles.html",
         roles=roles,
@@ -1731,22 +1745,22 @@ def user_discord_role_create(user_id: str):
     return redirect(url_for("user_detail_page", user_id=user_id, guild_id=guild_id))
 
 
-@app.get("/stats")
-@permission_required("users.view")
-def stats_page():
-    ctx = _ctx()
-    guild_id = _active_panel_guild_id()
-    q = request.args.get("q", "").strip()
-    user_id = request.args.get("user_id", "").strip()
-    channel_id = request.args.get("channel_id", "").strip()
-    overview = get_guild_message_overview(guild_id)
-    totals = _format_date_fields([overview.get("totals") or {}], "last_message_at")[0]
-    top_channels = _format_date_fields(
-        overview.get("top_channels") or [], "last_message_at"
-    )
-    filter_users = _format_stats_filter_users(list_message_filter_users(guild_id))
-    filter_channels = list_message_filter_channels(guild_id)
-    evaluated_stats = [
+def _log_message_channel_ids(guild_id: str) -> set[str]:
+    return {
+        str(channel_id)
+        for channel_id in get_all_log_channels(guild_id).values()
+        if channel_id
+    }
+
+
+def _message_evaluated_stats(
+    totals: dict,
+    overview: dict,
+    top_channels: list[dict],
+    filter_users: list[dict],
+    filter_channels: list[dict],
+) -> list[dict]:
+    return [
         {"label": "Nachrichten gesamt", "value": totals.get("message_count") or 0},
         {"label": "Schreibende User", "value": totals.get("active_writers") or 0},
         {"label": "Aktive Channels", "value": totals.get("active_channels") or 0},
@@ -1759,6 +1773,42 @@ def stats_page():
         {"label": "Nachrichtenfilter User", "value": len(filter_users)},
         {"label": "Nachrichtenfilter Channels", "value": len(filter_channels)},
     ]
+
+
+@app.get("/stats")
+@permission_required("users.view")
+def stats_page():
+    ctx = _ctx()
+    guild_id = _active_panel_guild_id()
+    q = request.args.get("q", "").strip()
+    user_id = request.args.get("user_id", "").strip()
+    channel_id = request.args.get("channel_id", "").strip()
+    log_channel_ids = _log_message_channel_ids(guild_id)
+    overview = get_guild_message_overview(
+        guild_id, exclude_channel_ids=log_channel_ids
+    )
+    log_overview = get_guild_message_overview(
+        guild_id, include_channel_ids=log_channel_ids
+    )
+    totals = _format_date_fields([overview.get("totals") or {}], "last_message_at")[0]
+    top_channels = _format_date_fields(
+        overview.get("top_channels") or [], "last_message_at"
+    )
+    log_top_channels = _format_date_fields(
+        log_overview.get("top_channels") or [], "last_message_at"
+    )
+    log_totals = _format_date_fields(
+        [log_overview.get("totals") or {}], "last_message_at"
+    )[0]
+    filter_users = _format_stats_filter_users(
+        list_message_filter_users(guild_id, exclude_channel_ids=log_channel_ids)
+    )
+    filter_channels = list_message_filter_channels(
+        guild_id, exclude_channel_ids=log_channel_ids
+    )
+    evaluated_stats = _message_evaluated_stats(
+        totals, overview, top_channels, filter_users, filter_channels
+    )
     return render_template(
         "stats.html",
         guild_id=guild_id,
@@ -1768,7 +1818,14 @@ def stats_page():
         filter_users=filter_users,
         filter_channels=filter_channels,
         evaluated_stats=evaluated_stats,
-        chart_data=get_guild_message_chart_data(guild_id),
+        chart_data=get_guild_message_chart_data(
+            guild_id, exclude_channel_ids=log_channel_ids
+        ),
+        log_stats={
+            "totals": log_totals,
+            "top_channels": log_top_channels,
+            "configured_channels": len(log_channel_ids),
+        },
         overview={
             **overview,
             "totals": totals,
@@ -1783,31 +1840,44 @@ def stats_page():
 @permission_required("users.view")
 def panel_api_stats_overview():
     guild_id = request.args.get("guild_id") or _active_panel_guild_id()
-    overview = get_guild_message_overview(guild_id)
+    log_channel_ids = _log_message_channel_ids(guild_id)
+    overview = get_guild_message_overview(
+        guild_id, exclude_channel_ids=log_channel_ids
+    )
+    log_overview = get_guild_message_overview(
+        guild_id, include_channel_ids=log_channel_ids
+    )
     totals = _format_date_fields([overview.get("totals") or {}], "last_message_at")[0]
     top_channels = _format_date_fields(
         overview.get("top_channels") or [], "last_message_at"
     )
-    filter_users = _format_stats_filter_users(list_message_filter_users(guild_id))
-    filter_channels = list_message_filter_channels(guild_id)
-    evaluated_stats = [
-        {"label": "Nachrichten gesamt", "value": totals.get("message_count") or 0},
-        {"label": "Schreibende User", "value": totals.get("active_writers") or 0},
-        {"label": "Aktive Channels", "value": totals.get("active_channels") or 0},
-        {"label": "Letzte Nachricht", "value": totals.get("last_message_at") or "-"},
-        {
-            "label": "Top-User ausgewertet",
-            "value": len(overview.get("top_users") or []),
-        },
-        {"label": "Top-Channels ausgewertet", "value": len(top_channels)},
-        {"label": "Nachrichtenfilter User", "value": len(filter_users)},
-        {"label": "Nachrichtenfilter Channels", "value": len(filter_channels)},
-    ]
+    log_top_channels = _format_date_fields(
+        log_overview.get("top_channels") or [], "last_message_at"
+    )
+    log_totals = _format_date_fields(
+        [log_overview.get("totals") or {}], "last_message_at"
+    )[0]
+    filter_users = _format_stats_filter_users(
+        list_message_filter_users(guild_id, exclude_channel_ids=log_channel_ids)
+    )
+    filter_channels = list_message_filter_channels(
+        guild_id, exclude_channel_ids=log_channel_ids
+    )
+    evaluated_stats = _message_evaluated_stats(
+        totals, overview, top_channels, filter_users, filter_channels
+    )
     return jsonify(
         {
             "totals": totals,
             "evaluated_stats": evaluated_stats,
-            "chart_data": get_guild_message_chart_data(guild_id),
+            "chart_data": get_guild_message_chart_data(
+                guild_id, exclude_channel_ids=log_channel_ids
+            ),
+            "log_stats": {
+                "totals": log_totals,
+                "top_channels": log_top_channels,
+                "configured_channels": len(log_channel_ids),
+            },
         }
     )
 
@@ -2178,11 +2248,30 @@ def discord_logs_page():
     guild_id = _active_panel_guild_id()
     _trigger_discord_log_sync(guild_id)
     channels = get_all_log_channels(guild_id)
+    log_type_labels = {
+        "voice_log": "Voice",
+        "user_log": "User",
+        "server_log": "Server",
+        "message_log": "Nachrichten",
+        "welcome_log": "Welcome",
+        "team_change_log": "Team",
+        "bot_change_log": "Bot",
+    }
+    seen_log_types: set[str] = set()
+    log_type_options = []
+    for log_type in LOG_TYPES:
+        if log_type not in channels or log_type in seen_log_types:
+            continue
+        seen_log_types.add(log_type)
+        log_type_options.append(
+            {"value": log_type, "label": log_type_labels.get(log_type, log_type)}
+        )
     overview = get_discord_log_overview(guild_id)
     return render_template(
         "discord_logs.html",
         guild_id=guild_id,
         channels=channels,
+        log_type_options=log_type_options,
         overview=_format_date_fields(
             [overview], "latest_created_at", "latest_synced_at"
         )[0],
@@ -2253,7 +2342,7 @@ def auto_publisher_delete(channel_id: str):
 def server_stats_page():
     ctx = _ctx()
     stats = get_server_stats(DEFAULT_GUILD_ID)
-    stat_types = ["all", "members", "bots", "channels", "roles"]
+    stat_types = ["all", "members", "bots", "channels", "log_channels", "roles"]
     ids = [stats.get(k) for k in stat_types if stats.get(k)]
     if stats.get("category_id"):
         ids.append(stats["category_id"])
@@ -2273,7 +2362,7 @@ def server_stats_page():
 def server_stats_save():
     category_id = (request.form.get("category_id") or "").strip() or None
     stats = {}
-    for key in ["all", "members", "bots", "channels", "roles"]:
+    for key in ["all", "members", "bots", "channels", "log_channels", "roles"]:
         channel_id = (request.form.get(f"stat_{key}") or "").strip()
         if channel_id:
             stats[key] = channel_id
@@ -2475,6 +2564,7 @@ def panel_api_messages():
     channel_id = request.args.get("channel_id", "").strip() or None
     q = request.args.get("q", "").strip()
     include_deleted = request.args.get("include_deleted", "1") != "0"
+    exclude_channel_ids = None if channel_id else _log_message_channel_ids(guild_id)
     page, page_size, offset = _pagination_args()
     rows = []
     for message in list_guild_messages(
@@ -2483,6 +2573,7 @@ def panel_api_messages():
         channel_id=channel_id,
         q=q,
         include_deleted=include_deleted,
+        exclude_channel_ids=exclude_channel_ids,
         limit=page_size,
         offset=offset,
     ):
@@ -2515,6 +2606,7 @@ def panel_api_messages():
             channel_id=channel_id,
             q=q,
             include_deleted=include_deleted,
+            exclude_channel_ids=exclude_channel_ids,
         ),
         page,
         page_size,

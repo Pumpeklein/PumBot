@@ -14,6 +14,7 @@
 
 {{ scrollspy_nav([
   {"id": "auswertung", "label": "Auswertung"},
+  {"id": "log-stats", "label": "Log-Stats"},
   {"id": "rankings", "label": "Rankings"},
   {"id": "messages", "label": "Nachrichten"}
 ]) }}
@@ -85,6 +86,46 @@
 </section>
 
 {# ════════════════ RANKINGS ════════════════ #}
+<section id="log-stats" class="scroll-mt-24 mb-10">
+  <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="text-sm font-semibold text-white">Log-Channel Statistiken</h2>
+        <p class="mt-0.5 text-xs text-slate-500">Welcome-, Voice- und andere Log-Channels getrennt von der allgemeinen Auswertung.</p>
+      </div>
+      <span class="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-xs text-slate-400"><span data-log-total="configured_channels">{{ log_stats.configured_channels }}</span> konfiguriert</span>
+    </div>
+    <div class="mb-5 grid gap-3 sm:grid-cols-3">
+      <div class="rounded-lg border border-white/[0.06] bg-black/20 p-4">
+        <div class="text-[11px] uppercase tracking-wider text-slate-500">Log-Nachrichten</div>
+        <div data-log-total="message_count" class="mt-1.5 text-lg font-bold text-white">{{ log_stats.totals.message_count or 0 }}</div>
+      </div>
+      <div class="rounded-lg border border-white/[0.06] bg-black/20 p-4">
+        <div class="text-[11px] uppercase tracking-wider text-slate-500">Aktive Log-Channels</div>
+        <div data-log-total="active_channels" class="mt-1.5 text-lg font-bold text-white">{{ log_stats.totals.active_channels or 0 }}</div>
+      </div>
+      <div class="rounded-lg border border-white/[0.06] bg-black/20 p-4">
+        <div class="text-[11px] uppercase tracking-wider text-slate-500">Letzter Log</div>
+        <div data-log-total="last_message_at" class="mt-1.5 truncate text-lg font-bold text-white">{{ log_stats.totals.last_message_at or "-" }}</div>
+      </div>
+    </div>
+    <div data-log-channels class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      {% for row in log_stats.top_channels %}
+      <a href="{{ url_for('stats_page', guild_id=guild_id, channel_id=row.channel_id) }}" class="rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2 transition hover:border-cyan-500/30 hover:bg-white/[0.04]">
+        <div class="truncate text-sm font-medium text-white">#{{ row.channel_name }}</div>
+        <div class="mt-1 flex items-center justify-between gap-2 text-xs text-slate-500">
+          <span>{{ row.message_count }} Nachrichten</span>
+          <span>{{ row.last_message_at or "-" }}</span>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    <div data-log-empty class="{% if log_stats.top_channels %}hidden{% endif %}">
+      {{ empty_state("Keine Log-Daten", "In den konfigurierten Log-Channels wurden noch keine Nachrichten synchronisiert.") }}
+    </div>
+  </div>
+</section>
+
 <section id="rankings" class="scroll-mt-24 mb-10">
   <h2 class="mb-4 text-base font-semibold text-white">Rankings</h2>
   <div class="grid gap-5 lg:grid-cols-2">
@@ -293,17 +334,53 @@
         </div>`).join("");
     };
 
+    const updateHeaderStats = (totals) => {
+      const values = [
+        totals?.message_count || 0,
+        totals?.active_writers || 0,
+        totals?.active_channels || 0,
+        totals?.last_message_at || "-",
+      ];
+      document.querySelectorAll(".mb-6.grid.gap-3 > div .text-2xl").forEach((el, index) => {
+        if (index < values.length) el.textContent = values[index];
+      });
+    };
+
+    const updateLogStats = (stats) => {
+      if (!stats) return;
+      const totals = stats.totals || {};
+      document.querySelectorAll("[data-log-total]").forEach((el) => {
+        const key = el.dataset.logTotal;
+        el.textContent = key === "configured_channels" ? (stats.configured_channels || 0) : (totals[key] || (key === "last_message_at" ? "-" : 0));
+      });
+      const wrap = document.querySelector("[data-log-channels]");
+      const empty = document.querySelector("[data-log-empty]");
+      const channels = stats.top_channels || [];
+      if (empty) empty.classList.toggle("hidden", channels.length > 0);
+      if (!wrap) return;
+      wrap.innerHTML = channels.map((row) => `
+        <a href="${escapeHtml(`{{ url_for('stats_page', guild_id=guild_id) }}&channel_id=${encodeURIComponent(row.channel_id)}`)}" class="rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2 transition hover:border-cyan-500/30 hover:bg-white/[0.04]">
+          <div class="truncate text-sm font-medium text-white">#${escapeHtml(row.channel_name || row.channel_id)}</div>
+          <div class="mt-1 flex items-center justify-between gap-2 text-xs text-slate-500">
+            <span>${escapeHtml(row.message_count || 0)} Nachrichten</span>
+            <span>${escapeHtml(row.last_message_at || "-")}</span>
+          </div>
+        </a>`).join("");
+    };
+
     const initialChartData = JSON.parse(document.querySelector("#stats-chart-data")?.textContent || "{}");
     renderCharts(initialChartData);
     window.addEventListener("resize", () => renderCharts(initialChartData));
 
     const refreshStats = async () => {
       const params = new URLSearchParams({ guild_id: "{{ guild_id }}" });
-      const response = await fetch(`{{ url_for('panel_api_stats_overview') }}?${params.toString()}`, { headers: { Accept: "application/json" } });
+      const response = await fetch(`{{ url_for('panel_api_stats_overview') }}?${params.toString()}`, { headers: { Accept: "application/json" }, credentials: "same-origin" });
       if (!response.ok) return;
       const data = await response.json();
       renderCharts(data.chart_data || {});
+      updateHeaderStats(data.totals || {});
       updateEvaluatedStats(data.evaluated_stats || []);
+      updateLogStats(data.log_stats);
     };
     window.setInterval(() => { if (!document.hidden) refreshStats(); }, 15000);
 

@@ -1013,12 +1013,35 @@ def mark_guild_message_deleted(guild_id: str, channel_id: str, message_id: str) 
         conn.commit()
 
 
+def _channel_filter_clause(
+    column: str,
+    include_channel_ids: set[str] | None = None,
+    exclude_channel_ids: set[str] | None = None,
+) -> tuple[list[str], list[Any]]:
+    clauses: list[str] = []
+    params: list[Any] = []
+    if include_channel_ids is not None:
+        ids = sorted(str(channel_id) for channel_id in include_channel_ids if channel_id)
+        if not ids:
+            clauses.append("1 = 0")
+        else:
+            clauses.append(f"{column} IN ({','.join('?' for _ in ids)})")
+            params.extend(ids)
+    if exclude_channel_ids:
+        ids = sorted(str(channel_id) for channel_id in exclude_channel_ids if channel_id)
+        if ids:
+            clauses.append(f"{column} NOT IN ({','.join('?' for _ in ids)})")
+            params.extend(ids)
+    return clauses, params
+
+
 def _guild_messages_where(
     guild_id: str,
     user_id: str | None = None,
     channel_id: str | None = None,
     q: str = "",
     include_deleted: bool = False,
+    exclude_channel_ids: set[str] | None = None,
 ) -> tuple[list[str], list[Any]]:
     clauses = ["gm.guild_id = ?"]
     params: list[Any] = [guild_id]
@@ -1028,6 +1051,12 @@ def _guild_messages_where(
     if channel_id:
         clauses.append("gm.channel_id = ?")
         params.append(channel_id)
+    elif exclude_channel_ids:
+        extra_clauses, extra_params = _channel_filter_clause(
+            "gm.channel_id", exclude_channel_ids=exclude_channel_ids
+        )
+        clauses.extend(extra_clauses)
+        params.extend(extra_params)
     if q:
         clauses.append(
             "(gm.content LIKE ? OR gm.original_content LIKE ? OR gm.channel_name LIKE ? OR m.display_name LIKE ?)"
@@ -1045,11 +1074,12 @@ def list_guild_messages(
     channel_id: str | None = None,
     q: str = "",
     include_deleted: bool = False,
+    exclude_channel_ids: set[str] | None = None,
     limit: int = 100,
     offset: int = 0,
 ) -> list[dict]:
     clauses, params = _guild_messages_where(
-        guild_id, user_id, channel_id, q, include_deleted
+        guild_id, user_id, channel_id, q, include_deleted, exclude_channel_ids
     )
     params.extend([limit, offset])
     with _connect() as conn:
@@ -1072,9 +1102,10 @@ def count_guild_messages(
     channel_id: str | None = None,
     q: str = "",
     include_deleted: bool = False,
+    exclude_channel_ids: set[str] | None = None,
 ) -> int:
     clauses, params = _guild_messages_where(
-        guild_id, user_id, channel_id, q, include_deleted
+        guild_id, user_id, channel_id, q, include_deleted, exclude_channel_ids
     )
     with _connect() as conn:
         row = conn.execute(
@@ -1177,7 +1208,22 @@ def get_user_channel_message_stats(guild_id: str, user_id: str) -> list[dict]:
         return [dict(r) for r in rows]
 
 
-def get_guild_message_overview(guild_id: str) -> dict:
+def get_guild_message_overview(
+    guild_id: str,
+    *,
+    include_channel_ids: set[str] | None = None,
+    exclude_channel_ids: set[str] | None = None,
+) -> dict:
+    channel_clauses, channel_params = _channel_filter_clause(
+        "channel_id",
+        include_channel_ids=include_channel_ids,
+        exclude_channel_ids=exclude_channel_ids,
+    )
+    gm_channel_clauses, gm_channel_params = _channel_filter_clause(
+        "gm.channel_id",
+        include_channel_ids=include_channel_ids,
+        exclude_channel_ids=exclude_channel_ids,
+    )
     with _connect() as conn:
         totals = conn.execute(
             """SELECT COUNT(*) AS message_count,
@@ -1185,8 +1231,9 @@ def get_guild_message_overview(guild_id: str) -> dict:
                       COUNT(DISTINCT channel_id) AS active_channels,
                       MAX(created_at) AS last_message_at
                FROM guild_messages
-               WHERE guild_id = ? AND deleted_at IS NULL""",
-            (guild_id,),
+               WHERE guild_id = ? AND deleted_at IS NULL"""
+            + (" AND " + " AND ".join(channel_clauses) if channel_clauses else ""),
+            [guild_id] + channel_params,
         ).fetchone()
         top_users = conn.execute(
             """SELECT gm.user_id, COUNT(*) AS message_count,
@@ -1196,22 +1243,26 @@ def get_guild_message_overview(guild_id: str) -> dict:
                FROM guild_messages gm
                LEFT JOIN guild_members m
                  ON m.guild_id = gm.guild_id AND m.user_id = gm.user_id
-               WHERE gm.guild_id = ? AND gm.deleted_at IS NULL
+               WHERE gm.guild_id = ? AND gm.deleted_at IS NULL"""
+            + (" AND " + " AND ".join(gm_channel_clauses) if gm_channel_clauses else "")
+            + """
                GROUP BY gm.user_id
                ORDER BY message_count DESC
                LIMIT 10""",
-            (guild_id,),
+            [guild_id] + gm_channel_params,
         ).fetchall()
         top_channels = conn.execute(
             """SELECT channel_id, COALESCE(MAX(channel_name), channel_id) AS channel_name,
                       COUNT(*) AS message_count,
                       MAX(created_at) AS last_message_at
                FROM guild_messages
-               WHERE guild_id = ? AND deleted_at IS NULL
+               WHERE guild_id = ? AND deleted_at IS NULL"""
+            + (" AND " + " AND ".join(channel_clauses) if channel_clauses else "")
+            + """
                GROUP BY channel_id
                ORDER BY message_count DESC
                LIMIT 10""",
-            (guild_id,),
+            [guild_id] + channel_params,
         ).fetchall()
         return {
             "totals": dict(totals) if totals else {},
@@ -1220,7 +1271,23 @@ def get_guild_message_overview(guild_id: str) -> dict:
         }
 
 
-def get_guild_message_chart_data(guild_id: str, limit: int = 8) -> dict:
+def get_guild_message_chart_data(
+    guild_id: str,
+    limit: int = 8,
+    *,
+    include_channel_ids: set[str] | None = None,
+    exclude_channel_ids: set[str] | None = None,
+) -> dict:
+    channel_clauses, channel_params = _channel_filter_clause(
+        "channel_id",
+        include_channel_ids=include_channel_ids,
+        exclude_channel_ids=exclude_channel_ids,
+    )
+    gm_channel_clauses, gm_channel_params = _channel_filter_clause(
+        "gm.channel_id",
+        include_channel_ids=include_channel_ids,
+        exclude_channel_ids=exclude_channel_ids,
+    )
     with _connect() as conn:
         top_users = conn.execute(
             """SELECT COALESCE(MAX(m.display_name), MAX(m.username), gm.user_id) AS label,
@@ -1228,27 +1295,32 @@ def get_guild_message_chart_data(guild_id: str, limit: int = 8) -> dict:
                FROM guild_messages gm
                LEFT JOIN guild_members m
                  ON m.guild_id = gm.guild_id AND m.user_id = gm.user_id
-               WHERE gm.guild_id = ? AND gm.deleted_at IS NULL
+               WHERE gm.guild_id = ? AND gm.deleted_at IS NULL"""
+            + (" AND " + " AND ".join(gm_channel_clauses) if gm_channel_clauses else "")
+            + """
                GROUP BY gm.user_id
                ORDER BY value DESC
                LIMIT ?""",
-            (guild_id, limit),
+            [guild_id] + gm_channel_params + [limit],
         ).fetchall()
         user_total = conn.execute(
             """SELECT COUNT(*) AS total
                FROM guild_messages
-               WHERE guild_id = ? AND deleted_at IS NULL""",
-            (guild_id,),
+               WHERE guild_id = ? AND deleted_at IS NULL"""
+            + (" AND " + " AND ".join(channel_clauses) if channel_clauses else ""),
+            [guild_id] + channel_params,
         ).fetchone()
         top_channels = conn.execute(
             """SELECT COALESCE(MAX(channel_name), channel_id) AS label,
                       COUNT(*) AS value
                FROM guild_messages
-               WHERE guild_id = ? AND deleted_at IS NULL
+               WHERE guild_id = ? AND deleted_at IS NULL"""
+            + (" AND " + " AND ".join(channel_clauses) if channel_clauses else "")
+            + """
                GROUP BY channel_id
                ORDER BY value DESC
                LIMIT ?""",
-            (guild_id, limit),
+            [guild_id] + channel_params + [limit],
         ).fetchall()
         status_rows = (
             conn.execute(
@@ -1257,8 +1329,13 @@ def get_guild_message_chart_data(guild_id: str, limit: int = 8) -> dict:
                  SUM(CASE WHEN deleted_at IS NULL AND edited_at IS NOT NULL AND COALESCE(original_content, '') <> COALESCE(content, '') THEN 1 ELSE 0 END) AS edited_count,
                  SUM(CASE WHEN deleted_at IS NULL AND NOT (edited_at IS NOT NULL AND COALESCE(original_content, '') <> COALESCE(content, '')) THEN 1 ELSE 0 END) AS original_count
                FROM guild_messages
-               WHERE guild_id = ?""",
-                (guild_id,),
+               WHERE guild_id = ?"""
+                + (
+                    " AND " + " AND ".join(channel_clauses)
+                    if channel_clauses
+                    else ""
+                ),
+                [guild_id] + channel_params,
             ).fetchone()
             or {}
         )
@@ -1286,7 +1363,15 @@ def get_guild_message_chart_data(guild_id: str, limit: int = 8) -> dict:
     }
 
 
-def list_message_filter_users(guild_id: str, limit: int = 500) -> list[dict]:
+def list_message_filter_users(
+    guild_id: str,
+    limit: int = 500,
+    *,
+    exclude_channel_ids: set[str] | None = None,
+) -> list[dict]:
+    channel_clauses, channel_params = _channel_filter_clause(
+        "gm.channel_id", exclude_channel_ids=exclude_channel_ids
+    )
     with _connect() as conn:
         rows = conn.execute(
             """SELECT gm.user_id,
@@ -1299,27 +1384,39 @@ def list_message_filter_users(guild_id: str, limit: int = 500) -> list[dict]:
                  ON m.guild_id = gm.guild_id AND m.user_id = gm.user_id
                LEFT JOIN users u
                  ON u.discord_id = gm.user_id
-               WHERE gm.guild_id = ? AND gm.deleted_at IS NULL
+               WHERE gm.guild_id = ? AND gm.deleted_at IS NULL"""
+            + (" AND " + " AND ".join(channel_clauses) if channel_clauses else "")
+            + """
                GROUP BY gm.user_id
                ORDER BY COALESCE(MAX(m.display_name), MAX(m.username), MAX(u.discord_username), gm.user_id) COLLATE NOCASE ASC
                LIMIT ?""",
-            (guild_id, limit),
+            [guild_id] + channel_params + [limit],
         ).fetchall()
         return [dict(r) for r in rows]
 
 
-def list_message_filter_channels(guild_id: str, limit: int = 500) -> list[dict]:
+def list_message_filter_channels(
+    guild_id: str,
+    limit: int = 500,
+    *,
+    exclude_channel_ids: set[str] | None = None,
+) -> list[dict]:
+    channel_clauses, channel_params = _channel_filter_clause(
+        "channel_id", exclude_channel_ids=exclude_channel_ids
+    )
     with _connect() as conn:
         rows = conn.execute(
             """SELECT channel_id,
                       COALESCE(MAX(channel_name), channel_id) AS channel_name,
                       COUNT(*) AS message_count
                FROM guild_messages
-               WHERE guild_id = ? AND deleted_at IS NULL
+               WHERE guild_id = ? AND deleted_at IS NULL"""
+            + (" AND " + " AND ".join(channel_clauses) if channel_clauses else "")
+            + """
                GROUP BY channel_id
                ORDER BY channel_name COLLATE NOCASE ASC
                LIMIT ?""",
-            (guild_id, limit),
+            [guild_id] + channel_params + [limit],
         ).fetchall()
         return [dict(r) for r in rows]
 
@@ -2134,7 +2231,7 @@ def get_selfrole_panel(message_id: str) -> dict | None:
             return None
         panel = dict(row)
         mappings = conn.execute(
-            "SELECT emoji, role_id FROM selfrole_mappings WHERE panel_id = ?",
+            "SELECT emoji, role_id FROM selfrole_mappings WHERE panel_id = ? ORDER BY id ASC",
             (panel["id"],),
         ).fetchall()
         panel["roles"] = {m["emoji"]: m["role_id"] for m in mappings}
@@ -2157,13 +2254,14 @@ def get_selfrole_role_ids(guild_id: str) -> set[str]:
 def get_all_selfrole_panels(guild_id: str) -> list[dict]:
     with _connect() as conn:
         rows = conn.execute(
-            "SELECT * FROM selfrole_panels WHERE guild_id = ?", (guild_id,)
+            "SELECT * FROM selfrole_panels WHERE guild_id = ? ORDER BY title COLLATE NOCASE ASC, id ASC",
+            (guild_id,),
         ).fetchall()
         panels = []
         for row in rows:
             panel = dict(row)
             mappings = conn.execute(
-                "SELECT emoji, role_id FROM selfrole_mappings WHERE panel_id = ?",
+                "SELECT emoji, role_id FROM selfrole_mappings WHERE panel_id = ? ORDER BY id ASC",
                 (panel["id"],),
             ).fetchall()
             panel["roles"] = {m["emoji"]: m["role_id"] for m in mappings}

@@ -16,9 +16,11 @@
       {# Avatar #}
       <div class="relative shrink-0">
         {% if member.avatar_url %}
-        <img src="{{ member.avatar_url }}" alt=""
-             class="h-28 w-28 rounded-full ring-4 ring-[#0d1320] sm:h-32 sm:w-32"
-             style="border:2px solid {{ accent }}55">
+        <button type="button" data-avatar-open="{{ member.avatar_url }}" class="block rounded-full focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-[#0d1320]" title="Profilbild öffnen">
+          <img src="{{ member.avatar_url }}" alt=""
+               class="h-28 w-28 rounded-full ring-4 ring-[#0d1320] transition hover:brightness-110 sm:h-32 sm:w-32"
+               style="border:2px solid {{ accent }}55">
+        </button>
         {% else %}
         <div class="flex h-28 w-28 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-violet-600 text-3xl font-bold text-white ring-4 ring-[#0d1320] sm:h-32 sm:w-32"
              style="border:2px solid {{ accent }}55">
@@ -376,6 +378,42 @@
 <script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
 <script>
   document.addEventListener("DOMContentLoaded", () => {
+    const avatarUrl = document.querySelector("[data-avatar-open]")?.dataset.avatarOpen;
+    document.querySelector("[data-avatar-open]")?.addEventListener("click", () => {
+      if (!avatarUrl) return;
+      let modal = document.querySelector("#avatar-modal");
+      if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "avatar-modal";
+        modal.className = "fixed inset-0 z-[200] hidden items-center justify-center bg-black/80 p-4 backdrop-blur-sm";
+        modal.innerHTML = `
+          <div class="relative max-h-[90vh] max-w-[90vw]">
+            <button type="button" data-avatar-close class="absolute right-0 top-0 z-10 -translate-y-12 rounded-lg border border-white/10 bg-white/10 px-3 py-1.5 text-sm text-white hover:bg-white/20">Schließen</button>
+            <img data-avatar-full alt="" class="max-h-[85vh] max-w-[90vw] rounded-xl border border-white/10 bg-[#0d1320] object-contain shadow-2xl">
+          </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener("click", (event) => {
+          if (event.target === modal || event.target.closest("[data-avatar-close]")) {
+            modal.classList.add("hidden");
+            modal.classList.remove("flex");
+            document.body.style.overflow = "";
+          }
+        });
+      }
+      modal.querySelector("[data-avatar-full]").src = avatarUrl;
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+      document.body.style.overflow = "hidden";
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      const modal = document.querySelector("#avatar-modal");
+      if (!modal || modal.classList.contains("hidden")) return;
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+      document.body.style.overflow = "";
+    });
+
     const scroller = document.querySelector("main");
     const form = document.querySelector("#messages-filter");
     const channelInput = form?.querySelector('input[name="channel_id"]');

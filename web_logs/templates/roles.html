@@ -217,7 +217,10 @@
       </div>
 
       <div class="mt-4 flex items-center justify-between border-t border-white/[0.04] pt-3 text-xs">
-        <span class="font-mono text-slate-500" title="{{ role.discord_role_id }}">{{ role.discord_role_id[:6] }}…{{ role.discord_role_id[-4:] }}</span>
+        {% set discord_role_id = role.discord_role_id|string if role.discord_role_id else "" %}
+        <span class="font-mono text-slate-500" title="{{ discord_role_id }}">
+          {% if discord_role_id|length > 10 %}{{ discord_role_id[:6] }}…{{ discord_role_id[-4:] }}{% elif discord_role_id %}{{ discord_role_id }}{% else %}Keine Discord-ID{% endif %}
+        </span>
         <button type="button" data-open-role-modal="{{ role.id }}"
           class="inline-flex items-center gap-1 rounded-md border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-1 text-cyan-300 transition hover:bg-cyan-500/20">
           Bearbeiten

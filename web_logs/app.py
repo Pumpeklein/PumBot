@@ -469,6 +469,18 @@ def _split_log_content(content: str | None) -> tuple[str | None, str | None]:
     return title or None, summary or None
 
 
+def _json_list(value) -> list:
+    if not value:
+        return []
+    if isinstance(value, list):
+        return value
+    try:
+        parsed = json.loads(value)
+    except (TypeError, ValueError):
+        return []
+    return parsed if isinstance(parsed, list) else []
+
+
 def _resolve_display_name(
     user_id: str | int | None,
     cache: dict[str, str | None] | None = None,
@@ -1707,6 +1719,12 @@ def user_detail_page(user_id: str):
     message_stats = get_user_message_stats(guild_id, user_id)
     channel_stats = get_user_channel_message_stats(guild_id, user_id)
     ticket_stats = get_ticket_stats_for_user(guild_id, user_id)
+    edited_message_count = count_guild_message_history(
+        guild_id, user_id=user_id, event_type="edit"
+    )
+    deleted_message_count = count_guild_message_history(
+        guild_id, user_id=user_id, event_type="delete"
+    )
     birthday = get_birthday(get_birthdays_panel_guild_id(DEFAULT_GUILD_ID), user_id)
     return render_template(
         "user_detail.html",
@@ -1742,6 +1760,8 @@ def user_detail_page(user_id: str):
         message_stats=_format_date_fields([message_stats], "last_message_at")[0],
         channel_stats=_format_date_fields(channel_stats, "last_message_at"),
         ticket_stats=_format_date_fields([ticket_stats], "last_ticket_at")[0],
+        edited_message_count=edited_message_count,
+        deleted_message_count=deleted_message_count,
         guild_id=guild_id,
         active_page="users",
         **ctx,
@@ -2675,6 +2695,7 @@ def panel_api_messages():
     channel_id = request.args.get("channel_id", "").strip() or None
     q = request.args.get("q", "").strip()
     include_deleted = request.args.get("include_deleted", "1") != "0"
+    include_changed = request.args.get("include_changed", "1") != "0"
     exclude_channel_ids = None if channel_id else _log_message_channel_ids(guild_id)
     page, page_size, offset = _pagination_args()
     rows = []
@@ -2684,11 +2705,13 @@ def panel_api_messages():
         channel_id=channel_id,
         q=q,
         include_deleted=include_deleted,
+        include_changed=include_changed,
         exclude_channel_ids=exclude_channel_ids,
         limit=page_size,
         offset=offset,
     ):
         item = dict(message)
+        item["attachment_urls"] = _json_list(item.get("attachment_urls_json"))
         is_deleted = bool(item.get("deleted_at"))
         is_edited = bool(item.get("edited_at")) and (
             (item.get("original_content") or "") != (item.get("content") or "")
@@ -2717,6 +2740,7 @@ def panel_api_messages():
             channel_id=channel_id,
             q=q,
             include_deleted=include_deleted,
+            include_changed=include_changed,
             exclude_channel_ids=exclude_channel_ids,
         ),
         page,
@@ -2742,6 +2766,7 @@ def panel_api_message_history():
         offset=offset,
     ):
         item = dict(event)
+        item["attachment_urls"] = _json_list(item.get("attachment_urls_json"))
         item["event_label"] = (
             "Bearbeitet" if item.get("event_type") == "edit" else "Gelöscht"
         )

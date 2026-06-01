@@ -251,7 +251,7 @@
       [
         {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},
         {"key":"content","type":"message","originalKey":"original_content","editedAtKey":"edited_at","deletedAtKey":"deleted_at","fallback":"-","class":"px-3 py-2.5"},
-        {"key":"message_status","type":"badge","variants":{"Gelöscht":"danger","Bearbeitet":"warning","Original":"default"},"class":"px-3 py-2.5"},
+        {"key":"attachment_urls","type":"attachments","class":"px-3 py-2.5"},
         {"key":"created_at","type":"date","class":"px-3 py-2.5 text-slate-500 whitespace-nowrap"}
       ]
     </script>
@@ -259,6 +259,8 @@
       <input type="hidden" name="guild_id" value="{{ guild_id }}">
       <input type="hidden" name="user_id" value="{{ member.user_id }}">
       <input type="hidden" name="channel_id" value="">
+      <input type="hidden" name="include_deleted" value="0">
+      <input type="hidden" name="include_changed" value="0">
     </form>
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
       <h3 class="text-sm font-semibold text-white">Letzte Nachrichten</h3>
@@ -266,7 +268,7 @@
     </div>
     <div data-table-content class="overflow-x-auto">
       <table class="w-full text-left text-sm">
-        <thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Inhalt</th><th class="px-3 py-2.5">Status</th><th class="px-3 py-2.5">Zeitpunkt</th></tr></thead>
+        <thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Inhalt</th><th class="px-3 py-2.5">Anhänge</th><th class="px-3 py-2.5">Zeitpunkt</th></tr></thead>
         <tbody data-table-body></tbody>
       </table>
     </div>
@@ -288,7 +290,7 @@
   <div class="mb-5 grid items-start gap-5 lg:grid-cols-2">
     <details data-independent-details data-collapsed-default data-paginated-table data-preserve-empty-rows="false" data-compact-empty="true" data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#edited-history-filter" data-page-size="10" class="group rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
       <summary class="mb-4 flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden">
-        <span>Bearbeitete Nachrichten</span>
+        <span class="flex items-center gap-2">Bearbeitete Nachrichten{% if edited_message_count %}<span class="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300">{{ edited_message_count }}</span>{% endif %}</span>
         <svg class="h-4 w-4 text-slate-500 transition group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
         </svg>
@@ -298,11 +300,12 @@
           {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},
           {"key":"old_content","fallback":"-","class":"px-3 py-2.5 text-slate-400"},
           {"key":"new_content","fallback":"-","class":"px-3 py-2.5 text-slate-200"},
+          {"key":"attachment_urls","type":"attachments","class":"px-3 py-2.5"},
           {"key":"event_at","type":"date","class":"px-3 py-2.5 text-slate-500 whitespace-nowrap"}
         ]
       </script>
       <form id="edited-history-filter"><input type="hidden" name="guild_id" value="{{ guild_id }}"><input type="hidden" name="user_id" value="{{ member.user_id }}"><input type="hidden" name="event_type" value="edit"></form>
-      <div data-table-content class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Vorher</th><th class="px-3 py-2.5">Nachher</th><th class="px-3 py-2.5">Zeitpunkt</th></tr></thead><tbody data-table-body></tbody></table></div>
+      <div data-table-content class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Vorher</th><th class="px-3 py-2.5">Nachher</th><th class="px-3 py-2.5">Anhänge</th><th class="px-3 py-2.5">Zeitpunkt</th></tr></thead><tbody data-table-body></tbody></table></div>
       <div data-table-empty class="hidden rounded-lg border border-white/[0.06] bg-black/10 px-4 py-3 text-sm text-slate-500">Keine bearbeiteten Nachrichten gespeichert.</div>
       <div data-table-footer class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
         <label class="flex items-center gap-2 text-xs text-slate-500">Pro Seite
@@ -314,7 +317,7 @@
 
     <details data-independent-details data-collapsed-default data-paginated-table data-preserve-empty-rows="false" data-compact-empty="true" data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#deleted-history-filter" data-page-size="10" class="group rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
       <summary class="mb-4 flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden">
-        <span>Gelöschte Nachrichten</span>
+        <span class="flex items-center gap-2">Gelöschte Nachrichten{% if deleted_message_count %}<span class="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-300">{{ deleted_message_count }}</span>{% endif %}</span>
         <svg class="h-4 w-4 text-slate-500 transition group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
         </svg>
@@ -323,11 +326,12 @@
         [
           {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},
           {"key":"old_content","fallback":"-","class":"px-3 py-2.5 text-slate-200"},
+          {"key":"attachment_urls","type":"attachments","class":"px-3 py-2.5"},
           {"key":"event_at","type":"date","class":"px-3 py-2.5 text-slate-500 whitespace-nowrap"}
         ]
       </script>
       <form id="deleted-history-filter"><input type="hidden" name="guild_id" value="{{ guild_id }}"><input type="hidden" name="user_id" value="{{ member.user_id }}"><input type="hidden" name="event_type" value="delete"></form>
-      <div data-table-content class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Gelöschter Inhalt</th><th class="px-3 py-2.5">Zeitpunkt</th></tr></thead><tbody data-table-body></tbody></table></div>
+      <div data-table-content class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Gelöschter Inhalt</th><th class="px-3 py-2.5">Anhänge</th><th class="px-3 py-2.5">Zeitpunkt</th></tr></thead><tbody data-table-body></tbody></table></div>
       <div data-table-empty class="hidden rounded-lg border border-white/[0.06] bg-black/10 px-4 py-3 text-sm text-slate-500">Keine gelöschten Nachrichten gespeichert.</div>
       <div data-table-footer class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
         <label class="flex items-center gap-2 text-xs text-slate-500">Pro Seite

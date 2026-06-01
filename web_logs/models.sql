@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS guild_messages (
   original_content TEXT,
   content TEXT,
   attachment_count INTEGER NOT NULL DEFAULT 0,
+  attachment_urls_json TEXT,
   jump_url TEXT,
   created_at TEXT NOT NULL,
   edited_at TEXT,
@@ -104,6 +105,7 @@ CREATE TABLE IF NOT EXISTS guild_message_history (
   old_content TEXT,
   new_content TEXT,
   attachment_count INTEGER NOT NULL DEFAULT 0,
+  attachment_urls_json TEXT,
   jump_url TEXT,
   event_at TEXT NOT NULL DEFAULT (datetime('now')),
   synced_at TEXT NOT NULL DEFAULT (datetime('now'))

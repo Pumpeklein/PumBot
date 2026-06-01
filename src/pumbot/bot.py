@@ -221,6 +221,9 @@ class PumpeBot(commands.Bot):
             "original_content": original_content,
             "content": message.content or "",
             "attachment_count": len(message.attachments),
+            "attachment_urls": [
+                attachment.url for attachment in message.attachments if attachment.url
+            ],
             "jump_url": message.jump_url,
             "created_at": message.created_at.isoformat() if message.created_at else None,
             "edited_at": message.edited_at.isoformat() if message.edited_at else None,

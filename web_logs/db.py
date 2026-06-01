@@ -160,6 +160,14 @@ def init_db() -> None:
                 "original_content": "TEXT",
                 "channel_type": "VARCHAR(32)",
                 "parent_channel_id": "VARCHAR(32)",
+                "attachment_urls_json": "LONGTEXT",
+            },
+        )
+        _ensure_columns(
+            conn,
+            "guild_message_history",
+            {
+                "attachment_urls_json": "LONGTEXT",
             },
         )
         _ensure_columns(
@@ -819,14 +827,16 @@ def _insert_message_history(
     old_content: str | None,
     new_content: str | None,
     attachment_count: int = 0,
+    attachment_urls_json: str | None = None,
     jump_url: str | None = None,
     event_at: str | None = None,
 ) -> None:
     conn.execute(
         """INSERT INTO guild_message_history (
              guild_id, channel_id, channel_name, message_id, user_id, event_type,
-             old_content, new_content, attachment_count, jump_url, event_at, synced_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), datetime('now'))""",
+             old_content, new_content, attachment_count, attachment_urls_json,
+             jump_url, event_at, synced_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime('now')), datetime('now'))""",
         (
             guild_id,
             channel_id,
@@ -837,16 +847,27 @@ def _insert_message_history(
             old_content,
             new_content,
             int(attachment_count or 0),
+            attachment_urls_json,
             jump_url,
             event_at,
         ),
     )
 
 
+def _attachment_urls_json(message: dict[str, Any]) -> str | None:
+    urls = message.get("attachment_urls")
+    if isinstance(urls, str):
+        return urls
+    if isinstance(urls, list):
+        return json.dumps([str(url) for url in urls if url], ensure_ascii=False)
+    return None
+
+
 def upsert_guild_message(guild_id: str, message: dict[str, Any]) -> dict:
     channel_id = str(message["channel_id"])
     message_id = str(message["message_id"])
     user_id = str(message["user_id"])
+    attachment_urls_json = _attachment_urls_json(message)
     with _connect() as conn:
         existing = conn.execute(
             """SELECT *
@@ -856,7 +877,15 @@ def upsert_guild_message(guild_id: str, message: dict[str, Any]) -> dict:
         ).fetchone()
         new_content = message.get("content")
         old_content = existing.get("content") if existing else None
-        if existing and (old_content or "") != (new_content or ""):
+        old_attachment_urls_json = existing.get("attachment_urls_json") if existing else None
+        attachments_changed = (
+            existing
+            and attachment_urls_json is not None
+            and (old_attachment_urls_json or "") != (attachment_urls_json or "")
+        )
+        if existing and (
+            (old_content or "") != (new_content or "") or attachments_changed
+        ):
             _insert_message_history(
                 conn,
                 guild_id=guild_id,
@@ -869,6 +898,8 @@ def upsert_guild_message(guild_id: str, message: dict[str, Any]) -> dict:
                 old_content=old_content,
                 new_content=new_content,
                 attachment_count=int(message.get("attachment_count") or 0),
+                attachment_urls_json=attachment_urls_json
+                or existing.get("attachment_urls_json"),
                 jump_url=message.get("jump_url") or existing.get("jump_url"),
                 event_at=message.get("edited_at"),
             )
@@ -876,8 +907,9 @@ def upsert_guild_message(guild_id: str, message: dict[str, Any]) -> dict:
             """INSERT INTO guild_messages (
                  guild_id, channel_id, channel_name, channel_type, parent_channel_id,
                  message_id, user_id, original_content, content,
-                 attachment_count, jump_url, created_at, edited_at, deleted_at, synced_at
-               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                 attachment_count, attachment_urls_json, jump_url, created_at,
+                 edited_at, deleted_at, synced_at
+               ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
                ON DUPLICATE KEY UPDATE
                  channel_name = VALUES(channel_name),
                  channel_type = COALESCE(VALUES(channel_type), channel_type),
@@ -886,6 +918,7 @@ def upsert_guild_message(guild_id: str, message: dict[str, Any]) -> dict:
                  original_content = COALESCE(original_content, VALUES(original_content), content),
                  content = VALUES(content),
                  attachment_count = VALUES(attachment_count),
+                 attachment_urls_json = COALESCE(VALUES(attachment_urls_json), attachment_urls_json),
                  jump_url = VALUES(jump_url),
                  created_at = VALUES(created_at),
                  edited_at = VALUES(edited_at),
@@ -902,6 +935,7 @@ def upsert_guild_message(guild_id: str, message: dict[str, Any]) -> dict:
                 message.get("original_content") or message.get("content"),
                 message.get("content"),
                 int(message.get("attachment_count") or 0),
+                attachment_urls_json,
                 message.get("jump_url"),
                 message.get("created_at"),
                 message.get("edited_at"),
@@ -933,6 +967,7 @@ def upsert_guild_messages(
             channel_id = str(message["channel_id"])
             message_id = str(message["message_id"])
             user_id = str(message["user_id"])
+            attachment_urls_json = _attachment_urls_json(message)
             existing = conn.execute(
                 """SELECT *
                    FROM guild_messages
@@ -944,7 +979,17 @@ def upsert_guild_messages(
                 continue
             new_content = message.get("content")
             old_content = existing.get("content") if existing else None
-            if existing and (old_content or "") != (new_content or ""):
+            old_attachment_urls_json = (
+                existing.get("attachment_urls_json") if existing else None
+            )
+            attachments_changed = (
+                existing
+                and attachment_urls_json is not None
+                and (old_attachment_urls_json or "") != (attachment_urls_json or "")
+            )
+            if existing and (
+                (old_content or "") != (new_content or "") or attachments_changed
+            ):
                 _insert_message_history(
                     conn,
                     guild_id=guild_id,
@@ -957,6 +1002,8 @@ def upsert_guild_messages(
                     old_content=old_content,
                     new_content=new_content,
                     attachment_count=int(message.get("attachment_count") or 0),
+                    attachment_urls_json=attachment_urls_json
+                    or existing.get("attachment_urls_json"),
                     jump_url=message.get("jump_url") or existing.get("jump_url"),
                     event_at=message.get("edited_at"),
                 )
@@ -970,6 +1017,7 @@ def upsert_guild_messages(
                      original_content = COALESCE(original_content, VALUES(original_content), content),
                      content = VALUES(content),
                      attachment_count = VALUES(attachment_count),
+                     attachment_urls_json = COALESCE(VALUES(attachment_urls_json), attachment_urls_json),
                      jump_url = VALUES(jump_url),
                      created_at = VALUES(created_at),
                      edited_at = VALUES(edited_at),
@@ -980,8 +1028,9 @@ def upsert_guild_messages(
                 f"""INSERT INTO guild_messages (
                       guild_id, channel_id, channel_name, channel_type, parent_channel_id,
                       message_id, user_id, original_content, content,
-                      attachment_count, jump_url, created_at, edited_at, deleted_at, synced_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                      attachment_count, attachment_urls_json, jump_url, created_at,
+                      edited_at, deleted_at, synced_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
                     ON DUPLICATE KEY UPDATE {duplicate_update}""",
                 (
                     guild_id,
@@ -994,6 +1043,7 @@ def upsert_guild_messages(
                     message.get("original_content") or message.get("content"),
                     message.get("content"),
                     int(message.get("attachment_count") or 0),
+                    attachment_urls_json,
                     message.get("jump_url"),
                     message.get("created_at"),
                     message.get("edited_at"),
@@ -1025,6 +1075,7 @@ def mark_guild_message_deleted(guild_id: str, channel_id: str, message_id: str) 
                 old_content=existing.get("content"),
                 new_content=None,
                 attachment_count=int(existing.get("attachment_count") or 0),
+                attachment_urls_json=existing.get("attachment_urls_json"),
                 jump_url=existing.get("jump_url"),
             )
         conn.execute(
@@ -1064,6 +1115,7 @@ def _guild_messages_where(
     channel_id: str | None = None,
     q: str = "",
     include_deleted: bool = False,
+    include_changed: bool = True,
     exclude_channel_ids: set[str] | None = None,
 ) -> tuple[list[str], list[Any]]:
     clauses = ["gm.guild_id = ?"]
@@ -1088,6 +1140,8 @@ def _guild_messages_where(
         params.extend([q_like, q_like, q_like, q_like])
     if not include_deleted:
         clauses.append("gm.deleted_at IS NULL")
+    if not include_changed:
+        clauses.append("gm.edited_at IS NULL")
     return clauses, params
 
 
@@ -1097,12 +1151,13 @@ def list_guild_messages(
     channel_id: str | None = None,
     q: str = "",
     include_deleted: bool = False,
+    include_changed: bool = True,
     exclude_channel_ids: set[str] | None = None,
     limit: int = 100,
     offset: int = 0,
 ) -> list[dict]:
     clauses, params = _guild_messages_where(
-        guild_id, user_id, channel_id, q, include_deleted, exclude_channel_ids
+        guild_id, user_id, channel_id, q, include_deleted, include_changed, exclude_channel_ids
     )
     params.extend([limit, offset])
     with _connect() as conn:
@@ -1125,10 +1180,11 @@ def count_guild_messages(
     channel_id: str | None = None,
     q: str = "",
     include_deleted: bool = False,
+    include_changed: bool = True,
     exclude_channel_ids: set[str] | None = None,
 ) -> int:
     clauses, params = _guild_messages_where(
-        guild_id, user_id, channel_id, q, include_deleted, exclude_channel_ids
+        guild_id, user_id, channel_id, q, include_deleted, include_changed, exclude_channel_ids
     )
     with _connect() as conn:
         row = conn.execute(

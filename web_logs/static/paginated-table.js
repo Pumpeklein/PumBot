@@ -97,6 +97,21 @@
         ? `<a href="${escapeHtml(url)}" class="hover:text-white">${body}</a>`
         : body;
     }
+    if (column.type === "attachments") {
+      const items = Array.isArray(value) ? value : [];
+      if (!items.length) return '<span class="text-slate-600">-</span>';
+      const isImage = (url) => /\.(png|jpe?g|gif|webp|bmp|avif)(?:[?#].*)?$/i.test(url);
+      return `<div class="flex max-w-xs flex-wrap gap-2">${items
+        .slice(0, 4)
+        .map((url, index) => {
+          const safeUrl = escapeHtml(url);
+          if (isImage(url)) {
+            return `<a href="${safeUrl}" target="_blank" rel="noopener" class="block overflow-hidden rounded border border-white/10 bg-black/20 hover:border-cyan-500/40"><img src="${safeUrl}" alt="Anhang ${index + 1}" loading="lazy" class="h-14 w-14 object-cover"></a>`;
+          }
+          return `<a href="${safeUrl}" target="_blank" rel="noopener" class="inline-flex h-7 items-center rounded border border-white/10 bg-white/5 px-2 text-xs text-cyan-300 hover:bg-white/10">Anhang ${index + 1}</a>`;
+        })
+        .join("")}${items.length > 4 ? `<span class="text-xs text-slate-500">+${items.length - 4}</span>` : ""}</div>`;
+    }
     if (column.type === "badge")
       return renderBadge(value || column.fallback, column.variants);
     if (column.type === "date")

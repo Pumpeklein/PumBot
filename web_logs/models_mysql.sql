@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS guild_messages (
   original_content LONGTEXT,
   content LONGTEXT,
   attachment_count INT NOT NULL DEFAULT 0,
+  attachment_urls_json LONGTEXT,
   jump_url TEXT,
   created_at DATETIME NOT NULL,
   edited_at DATETIME NULL,
@@ -98,6 +99,7 @@ CREATE TABLE IF NOT EXISTS guild_message_history (
   old_content LONGTEXT,
   new_content LONGTEXT,
   attachment_count INT NOT NULL DEFAULT 0,
+  attachment_urls_json LONGTEXT,
   jump_url TEXT,
   event_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   synced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP

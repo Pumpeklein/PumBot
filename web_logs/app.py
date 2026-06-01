@@ -2395,7 +2395,7 @@ def discord_logs_page():
     _trigger_discord_log_sync(guild_id)
     channels = get_all_log_channels(guild_id)
     log_type_labels = {
-        "voice_log": "Voice",
+        "voice_log": "Voice-Log",
         "user_log": "User",
         "server_log": "Server",
         "message_log": "Nachrichten",
@@ -2809,7 +2809,7 @@ def panel_api_discord_logs():
     q = request.args.get("q", "").strip()
     page, page_size, offset = _pagination_args(default_page_size=25)
     log_type_labels = {
-        "voice_log": "Voice",
+        "voice_log": "Voice-Log",
         "user_log": "User",
         "server_log": "Server",
         "message_log": "Nachrichten",

@@ -314,4 +314,3 @@ CREATE INDEX idx_guild_message_history_user ON guild_message_history(guild_id, u
 CREATE INDEX idx_guild_message_history_type ON guild_message_history(guild_id, event_type, event_at);
 CREATE INDEX idx_discord_log_entries_type_created ON discord_log_entries(guild_id, log_type, created_at);
 CREATE INDEX idx_discord_log_entries_author ON discord_log_entries(guild_id, author_id);
-CREATE INDEX idx_discord_log_entries_actor ON discord_log_entries(guild_id, actor_id);

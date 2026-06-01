@@ -98,7 +98,10 @@ class DatabaseConnection:
             try:
                 self.execute(statement)
             except pymysql.err.OperationalError as exc:
-                if exc.args and exc.args[0] in {1061}:  # duplicate key name
+                if exc.args and exc.args[0] in {
+                    1061,  # duplicate key name
+                    1072,  # key column does not exist yet; later _ensure_columns handles migrations
+                }:
                     continue
                 raise
 

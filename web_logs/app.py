@@ -453,6 +453,18 @@ def _format_date_fields(rows: list[dict], *fields: str) -> list[dict]:
     return formatted
 
 
+def _accent_color_hex(value) -> str | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, str) and value.startswith("#"):
+        return value
+    try:
+        color = int(value)
+    except (TypeError, ValueError):
+        return None
+    return f"#{color & 0xFFFFFF:06x}"
+
+
 def _extract_change_actor(content: str | None) -> str | None:
     if not content:
         return None
@@ -1688,21 +1700,24 @@ def user_detail_page(user_id: str):
         member["banner_url"] = member.get("banner_url") or oauth_user.get(
             "discord_banner"
         )
-        member["accent_color"] = member.get("accent_color") or oauth_user.get(
-            "accent_color"
-        )
+        if member.get("accent_color") is None:
+            member["accent_color"] = oauth_user.get("accent_color")
         member["locale"] = member.get("locale") or oauth_user.get("locale")
-    if not any(member.get(field) for field in ("banner_url", "accent_color", "locale")):
+    if (
+        not member.get("banner_url")
+        and member.get("accent_color") is None
+        and not member.get("locale")
+    ):
         profile, error = _run_bot_coro(_discord_fetch_user_profile(user_id))
         if profile:
             update_guild_member_profile_fields(guild_id, user_id, **profile)
             member["banner_url"] = member.get("banner_url") or profile.get("banner_url")
-            member["accent_color"] = member.get("accent_color") or profile.get(
-                "accent_color"
-            )
+            if member.get("accent_color") is None:
+                member["accent_color"] = profile.get("accent_color")
             member["locale"] = member.get("locale") or profile.get("locale")
         elif error and error != "Bot ist nicht verbunden.":
             app.logger.warning("Discord profile fetch failed: %s", error)
+    member["accent_color"] = _accent_color_hex(member.get("accent_color"))
     member_roles = parse_member_roles(member)
     web_roles_by_discord_id = {
         str(role["discord_role_id"]): role for role in list_roles(guild_id)

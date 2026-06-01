@@ -6,9 +6,11 @@
 {# ════════════════ HERO ════════════════ #}
 {% set accent = member.accent_color or "#22d3ee" %}
 <div class="relative mb-6 overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0d1320]">
-  <div class="relative h-40 sm:h-48 lg:h-56"
-       {% if member.banner_url %}style="background-image:linear-gradient(180deg, rgba(13,19,32,0.05) 0%, rgba(13,19,32,0.92) 100%), url('{{ member.banner_url }}'); background-size:cover; background-position:center;"
-       {% else %}style="background:radial-gradient(120% 100% at 0% 0%, {{ accent }}33 0%, transparent 60%), linear-gradient(135deg, #0c1424 0%, #0d1320 100%);"{% endif %}>
+  <div class="relative h-40 sm:h-48 lg:h-56" {% if member.banner_url
+    %}style="background-image:linear-gradient(180deg, rgba(13,19,32,0.05) 0%, rgba(13,19,32,0.92) 100%), url('{{ member.banner_url }}'); background-size:cover; background-position:center;"
+    {% else
+    %}style="background:radial-gradient(120% 100% at 0% 0%, {{ accent }}33 0%, transparent 60%), linear-gradient(135deg, #0c1424 0%, #0d1320 100%);"
+    {% endif %}>
   </div>
 
   <div class="px-5 pb-5 pt-0 sm:px-7">
@@ -16,34 +18,43 @@
       {# Avatar #}
       <div class="relative shrink-0">
         {% if member.avatar_url %}
-        <button type="button" data-avatar-open="{{ member.avatar_url }}" class="block rounded-full focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-[#0d1320]" title="Profilbild öffnen">
+        <button type="button" data-avatar-open="{{ member.avatar_url }}"
+          class="block rounded-full focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:ring-offset-2 focus:ring-offset-[#0d1320]"
+          title="Profilbild öffnen">
           <img src="{{ member.avatar_url }}" alt=""
-               class="h-28 w-28 rounded-full ring-4 ring-[#0d1320] transition hover:brightness-110 sm:h-32 sm:w-32"
-               style="border:2px solid {{ accent }}55">
+            class="h-28 w-28 rounded-full ring-4 ring-[#0d1320] transition hover:brightness-110 sm:h-32 sm:w-32"
+            style="border:2px solid {{ accent }}55">
         </button>
         {% else %}
-        <div class="flex h-28 w-28 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-violet-600 text-3xl font-bold text-white ring-4 ring-[#0d1320] sm:h-32 sm:w-32"
-             style="border:2px solid {{ accent }}55">
+        <div
+          class="flex h-28 w-28 items-center justify-center rounded-full bg-gradient-to-br from-cyan-500 to-violet-600 text-3xl font-bold text-white ring-4 ring-[#0d1320] sm:h-32 sm:w-32"
+          style="border:2px solid {{ accent }}55">
           {{ (member.display_name or member.username or "?")[:2]|upper }}
         </div>
         {% endif %}
         {% if member.presence_status == "online" %}
-        <span class="absolute bottom-1 right-1 h-5 w-5 rounded-full bg-emerald-400 ring-4 ring-[#0d1320]" title="Online"></span>
+        <span class="absolute bottom-1 right-1 h-5 w-5 rounded-full bg-emerald-400 ring-4 ring-[#0d1320]"
+          title="Online"></span>
         {% elif member.presence_status == "idle" %}
-        <span class="absolute bottom-1 right-1 h-5 w-5 rounded-full bg-amber-400 ring-4 ring-[#0d1320]" title="Abwesend"></span>
+        <span class="absolute bottom-1 right-1 h-5 w-5 rounded-full bg-amber-400 ring-4 ring-[#0d1320]"
+          title="Abwesend"></span>
         {% elif member.presence_status == "dnd" %}
-        <span class="absolute bottom-1 right-1 h-5 w-5 rounded-full bg-red-500 ring-4 ring-[#0d1320]" title="Nicht stören"></span>
+        <span class="absolute bottom-1 right-1 h-5 w-5 rounded-full bg-red-500 ring-4 ring-[#0d1320]"
+          title="Nicht stören"></span>
         {% else %}
-        <span class="absolute bottom-1 right-1 h-5 w-5 rounded-full bg-slate-600 ring-4 ring-[#0d1320]" title="Offline"></span>
+        <span class="absolute bottom-1 right-1 h-5 w-5 rounded-full bg-slate-600 ring-4 ring-[#0d1320]"
+          title="Offline"></span>
         {% endif %}
       </div>
 
       {# Identity #}
       <div class="flex min-w-0 flex-1 flex-col gap-2">
         <div class="flex flex-wrap items-center gap-2">
-          <h1 class="text-2xl font-bold text-white sm:text-3xl">{{ member.display_name or member.username or member.user_id }}</h1>
+          <h1 class="text-2xl font-bold text-white sm:text-3xl">{{ member.display_name or member.username or
+            member.user_id }}</h1>
           {% if member.is_bot %}
-          <span class="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-300">Bot</span>
+          <span
+            class="rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-300">Bot</span>
           {% endif %}
         </div>
         <div class="flex flex-wrap items-center gap-2 text-xs text-slate-500">
@@ -51,7 +62,10 @@
           <span class="text-slate-700">·</span>
           <button type="button" data-copy-user-id="{{ member.user_id }}"
             class="inline-flex items-center gap-1.5 rounded border border-white/10 bg-white/5 px-2 py-0.5 font-mono text-[11px] text-slate-400 transition hover:bg-white/10 hover:text-white">
-            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
             {{ member.user_id }}
           </button>
         </div>
@@ -65,13 +79,19 @@
           {% elif member.presence_status %}{{ badge(member.presence_status, "default") }}
           {% endif %}
           {% if member.activity_name %}
-          <span class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-0.5 text-xs text-slate-300">
+          <span
+            class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-0.5 text-xs text-slate-300">
             <span class="h-1.5 w-1.5 rounded-full bg-cyan-400"></span>{{ member.activity_name }}
           </span>
           {% endif %}
           {% for role in member_web_roles %}
-          <span class="inline-flex items-center gap-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-0.5 text-xs font-medium text-cyan-300" title="Web Rolle">
-            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0-1.66-1.34-3-3-3S6 9.34 6 11s1.34 3 3 3 3-1.34 3-3z"/></svg>
+          <span
+            class="inline-flex items-center gap-1 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-0.5 text-xs font-medium text-cyan-300"
+            title="Web Rolle">
+            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M12 11c0-1.66-1.34-3-3-3S6 9.34 6 11s1.34 3 3 3 3-1.34 3-3z" />
+            </svg>
             {{ role.role_name }}
           </span>
           {% endfor %}
@@ -94,7 +114,8 @@
         </div>
         <div class="rounded-lg border border-white/[0.06] bg-black/30 px-3 py-2 backdrop-blur">
           <div class="text-[10px] uppercase tracking-wider text-slate-500">Offen</div>
-          <div class="text-lg font-bold {{ 'text-amber-300' if (ticket_stats.open_tickets or 0) else 'text-white' }}">{{ ticket_stats.open_tickets or 0 }}</div>
+          <div class="text-lg font-bold {{ 'text-amber-300' if (ticket_stats.open_tickets or 0) else 'text-white' }}">{{
+            ticket_stats.open_tickets or 0 }}</div>
         </div>
       </div>
     </div>
@@ -102,11 +123,11 @@
 </div>
 
 {{ scrollspy_nav([
-  {"id": "profile", "label": "Profil"},
-  {"id": "roles", "label": "Rollen", "badge": member_web_roles|length + (discord_member_roles|length)},
-  {"id": "activity", "label": "Aktivität"},
-  {"id": "history", "label": "Historie"},
-  {"id": "tickets", "label": "Tickets", "badge": ticket_stats.ticket_count or 0}
+{"id": "profile", "label": "Profil"},
+{"id": "roles", "label": "Rollen", "badge": member_web_roles|length + (discord_member_roles|length)},
+{"id": "activity", "label": "Aktivität"},
+{"id": "history", "label": "Historie"},
+{"id": "tickets", "label": "Tickets", "badge": ticket_stats.ticket_count or 0}
 ]) }}
 
 {# ════════════════ PROFIL ════════════════ #}
@@ -114,17 +135,39 @@
   <h2 class="mb-4 text-base font-semibold text-white">Profil</h2>
   <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
     <dl class="grid gap-5 text-sm sm:grid-cols-2 lg:grid-cols-4">
-      <div><dt class="text-[11px] uppercase tracking-wider text-slate-500">Global Name</dt><dd class="mt-1 text-slate-200">{{ member.global_name or "—" }}</dd></div>
-      <div><dt class="text-[11px] uppercase tracking-wider text-slate-500">Locale</dt><dd class="mt-1 text-slate-200">{{ member.locale or "—" }}</dd></div>
-      <div><dt class="text-[11px] uppercase tracking-wider text-slate-500">Geburtstag</dt><dd class="mt-1 text-slate-200">{{ birthday_label or "—" }}</dd></div>
-      <div><dt class="text-[11px] uppercase tracking-wider text-slate-500">Beigetreten</dt><dd class="mt-1 text-slate-200">{{ member.joined_at or "—" }}</dd></div>
-      <div><dt class="text-[11px] uppercase tracking-wider text-slate-500">Letzte Nachricht</dt><dd class="mt-1 text-slate-200">{{ message_stats.last_message_at or "—" }}</dd></div>
-      <div><dt class="text-[11px] uppercase tracking-wider text-slate-500">Letztes Ticket</dt><dd class="mt-1 text-slate-200">{{ ticket_stats.last_ticket_at or "—" }}</dd></div>
-      <div><dt class="text-[11px] uppercase tracking-wider text-slate-500">Aktivität</dt><dd class="mt-1 text-slate-200">{{ member.activity_name or "—" }}</dd></div>
+      <div>
+        <dt class="text-[11px] uppercase tracking-wider text-slate-500">Global Name</dt>
+        <dd class="mt-1 text-slate-200">{{ member.global_name or "—" }}</dd>
+      </div>
+      <div>
+        <dt class="text-[11px] uppercase tracking-wider text-slate-500">Locale</dt>
+        <dd class="mt-1 text-slate-200">{{ member.locale or "—" }}</dd>
+      </div>
+      <div>
+        <dt class="text-[11px] uppercase tracking-wider text-slate-500">Geburtstag</dt>
+        <dd class="mt-1 text-slate-200">{{ birthday_label or "—" }}</dd>
+      </div>
+      <div>
+        <dt class="text-[11px] uppercase tracking-wider text-slate-500">Beigetreten</dt>
+        <dd class="mt-1 text-slate-200">{{ member.joined_at or "—" }}</dd>
+      </div>
+      <div>
+        <dt class="text-[11px] uppercase tracking-wider text-slate-500">Letzte Nachricht</dt>
+        <dd class="mt-1 text-slate-200">{{ message_stats.last_message_at or "—" }}</dd>
+      </div>
+      <div>
+        <dt class="text-[11px] uppercase tracking-wider text-slate-500">Letztes Ticket</dt>
+        <dd class="mt-1 text-slate-200">{{ ticket_stats.last_ticket_at or "—" }}</dd>
+      </div>
+      <div>
+        <dt class="text-[11px] uppercase tracking-wider text-slate-500">Aktivität</dt>
+        <dd class="mt-1 text-slate-200">{{ member.activity_name or "—" }}</dd>
+      </div>
       <div>
         <dt class="text-[11px] uppercase tracking-wider text-slate-500">Profilfarbe</dt>
         <dd class="mt-1 flex items-center gap-2 text-slate-200">
-          {% if member.accent_color %}<span class="h-3 w-3 rounded-full ring-1 ring-white/10" style="background:{{ member.accent_color }}"></span>{{ member.accent_color }}{% else %}—{% endif %}
+          {% if member.accent_color %}<span class="h-3 w-3 rounded-full ring-1 ring-white/10"
+            style="background:{{ member.accent_color }}"></span>{{ member.accent_color }}{% else %}—{% endif %}
         </dd>
       </div>
     </dl>
@@ -138,7 +181,8 @@
       <div class="rounded-lg border border-white/[0.06] bg-black/10 px-3 py-2">
         <div class="text-[10px] uppercase tracking-wider text-slate-500">{{ connection.connection_type }}</div>
         <div class="mt-1 font-medium text-slate-200">{{ connection.name }}</div>
-        <div class="mt-1 text-xs {{ 'text-emerald-400' if connection.verified else 'text-slate-500' }}">{% if connection.verified %}verifiziert{% else %}nicht verifiziert{% endif %}</div>
+        <div class="mt-1 text-xs {{ 'text-emerald-400' if connection.verified else 'text-slate-500' }}">{% if
+          connection.verified %}verifiziert{% else %}nicht verifiziert{% endif %}</div>
       </div>
       {% endfor %}
     </div>
@@ -155,7 +199,9 @@
     {% if member_web_roles %}
     <div class="rounded-xl border border-cyan-500/20 bg-cyan-500/[0.04] p-5">
       <div class="mb-4 flex items-center justify-between gap-3">
-        <h3 class="text-sm font-semibold text-white">Web Rollen <span class="ml-1 rounded-full bg-cyan-500/15 px-2 py-0.5 text-[10px] uppercase tracking-wide text-cyan-300">{{ member_web_roles|length }}</span></h3>
+        <h3 class="text-sm font-semibold text-white">Web Rollen <span
+            class="ml-1 rounded-full bg-cyan-500/15 px-2 py-0.5 text-[10px] uppercase tracking-wide text-cyan-300">{{
+            member_web_roles|length }}</span></h3>
         <span class="text-xs text-slate-500">Panel-Rechte aus diesen Rollen</span>
       </div>
       <div class="grid gap-3 sm:grid-cols-2">
@@ -164,13 +210,15 @@
           <div class="flex items-center justify-between gap-2">
             <div class="font-medium text-slate-100">{{ role.role_name }}</div>
             {% if "admin" in role.permissions %}
-            <span class="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">Admin</span>
+            <span
+              class="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">Admin</span>
             {% endif %}
           </div>
           <div class="mt-1 font-mono text-[11px] text-slate-500">{{ role.discord_role_id }}</div>
           <div class="mt-2 flex flex-wrap gap-1">
             {% for perm in role.permissions %}
-            <span class="rounded border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[11px] text-cyan-300" title="{{ perm }}">{{ perm|permission_label }}</span>
+            <span class="rounded border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[11px] text-cyan-300"
+              title="{{ perm }}">{{ perm|permission_label }}</span>
             {% endfor %}
           </div>
         </div>
@@ -184,8 +232,10 @@
       {% if discord_member_roles %}
       <div class="mb-4 flex flex-wrap gap-2">
         {% for role in discord_member_roles %}
-        <form method="post" action="{{ url_for('user_discord_role_remove', user_id=member.user_id, role_id=role.id, guild_id=guild_id) }}" onsubmit="return confirm('Discord Rolle wirklich entfernen?')">
-          <button type="submit" {% if not role.manageable %}disabled title="{{ role.blocked_reason }}"{% endif %}
+        <form method="post"
+          action="{{ url_for('user_discord_role_remove', user_id=member.user_id, role_id=role.id, guild_id=guild_id) }}"
+          onsubmit="return confirm('Discord Rolle wirklich entfernen?')">
+          <button type="submit" {% if not role.manageable %}disabled title="{{ role.blocked_reason }}" {% endif %}
             class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-200 transition hover:border-red-500/40 hover:bg-red-500/10 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:border-white/10 disabled:hover:bg-white/5 disabled:hover:text-slate-200">
             {{ role.name or role.id }}{% if role.is_web_role %} <span class="text-slate-500">Web</span>{% endif %}
           </button>
@@ -195,10 +245,12 @@
       {% else %}
       <div class="mb-4 text-sm text-slate-500">Keine Discord Rollen gespeichert.</div>
       {% endif %}
-      <form method="post" action="{{ url_for('user_discord_role_add', user_id=member.user_id, guild_id=guild_id) }}" class="mb-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
+      <form method="post" action="{{ url_for('user_discord_role_add', user_id=member.user_id, guild_id=guild_id) }}"
+        class="mb-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
         <div>
           <label for="role_id" class="mb-1.5 block text-sm font-medium text-slate-400">Rolle hinzufügen</label>
-          <select id="role_id" name="role_id" class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
+          <select id="role_id" name="role_id"
+            class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3.5 py-2.5 text-white outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40">
             {% if not assignable_discord_roles %}
             <option value="">Keine verwaltbaren Rollen verfügbar</option>
             {% endif %}
@@ -210,10 +262,12 @@
         <button type="submit" {% if not assignable_discord_roles %}disabled{% endif %}
           class="rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-45">Hinzufügen</button>
       </form>
-      <form method="post" action="{{ url_for('user_discord_role_create', user_id=member.user_id, guild_id=guild_id) }}" class="grid gap-3 sm:grid-cols-[1fr_120px_auto_auto] sm:items-end">
+      <form method="post" action="{{ url_for('user_discord_role_create', user_id=member.user_id, guild_id=guild_id) }}"
+        class="grid gap-3 sm:grid-cols-[1fr_120px_auto_auto] sm:items-end">
         {{ field("role_name", "Neue Discord Rolle", placeholder="Rollenname", required=false) }}
         {{ field("color", "Farbe", placeholder="#5865F2", required=false) }}
-        <label class="flex items-center gap-2 pb-3 text-sm text-slate-300"><input type="checkbox" name="assign_created" value="1" class="rounded border-white/10 bg-[#151c2c]"> zuweisen</label>
+        <label class="flex items-center gap-2 pb-3 text-sm text-slate-300"><input type="checkbox" name="assign_created"
+            value="1" class="rounded border-white/10 bg-[#151c2c]"> zuweisen</label>
         {{ btn("Erstellen") }}
       </form>
     </div>
@@ -229,12 +283,20 @@
     {% if channel_stats %}
     <div class="overflow-x-auto">
       <table class="w-full text-left text-sm">
-        <thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Nachrichten</th><th class="px-3 py-2.5">Letzte Nachricht</th></tr></thead>
+        <thead>
+          <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+            <th class="px-3 py-2.5">Channel</th>
+            <th class="px-3 py-2.5">Nachrichten</th>
+            <th class="px-3 py-2.5">Letzte Nachricht</th>
+          </tr>
+        </thead>
         <tbody>
           {% for row in channel_stats %}
           <tr class="border-b border-white/[0.04]">
-            <td class="px-3 py-2.5"><button type="button" class="font-medium text-white hover:text-cyan-300" data-channel-filter="{{ row.channel_id }}">#{{ row.channel_name }}</button></td>
-            <td class="px-3 py-2.5"><button type="button" class="text-cyan-300 hover:text-cyan-200" data-channel-filter="{{ row.channel_id }}">{{ row.message_count }}</button></td>
+            <td class="px-3 py-2.5"><button type="button" class="font-medium text-white hover:text-cyan-300"
+                data-channel-filter="{{ row.channel_id }}">#{{ row.channel_name }}</button></td>
+            <td class="px-3 py-2.5"><button type="button" class="text-cyan-300 hover:text-cyan-200"
+                data-channel-filter="{{ row.channel_id }}">{{ row.message_count }}</button></td>
             <td class="px-3 py-2.5 text-slate-500">{{ row.last_message_at or "—" }}</td>
           </tr>
           {% endfor %}
@@ -246,7 +308,9 @@
     {% endif %}
   </div>
 
-  <div data-paginated-table data-preserve-empty-rows="false" data-compact-empty="true" data-endpoint="{{ url_for('panel_api_messages') }}" data-form="#messages-filter" data-page-size="10" data-auto-refresh-ms="5000" class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+  <div data-paginated-table data-preserve-empty-rows="false" data-compact-empty="true"
+    data-endpoint="{{ url_for('panel_api_messages') }}" data-form="#messages-filter" data-page-size="10"
+    data-auto-refresh-ms="5000" class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
     <script type="application/json">
       [
         {"key":"channel_name","fallback":"-","class":"px-3 py-2.5 text-white"},
@@ -264,19 +328,36 @@
     </form>
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
       <h3 class="text-sm font-semibold text-white">Letzte Nachrichten</h3>
-      <button type="button" id="clear-channel-filter" class="hidden rounded border border-white/10 px-3 py-1 text-xs text-slate-300 transition hover:bg-white/10">Alle Channels</button>
+      <button type="button" id="clear-channel-filter"
+        class="hidden rounded border border-white/10 px-3 py-1 text-xs text-slate-300 transition hover:bg-white/10">Alle
+        Channels</button>
     </div>
     <div data-table-content class="overflow-x-auto">
       <table class="w-full text-left text-sm">
-        <thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Inhalt</th><th class="px-3 py-2.5">Anhänge</th><th class="px-3 py-2.5">Zeitpunkt</th></tr></thead>
+        <thead>
+          <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+            <th class="px-3 py-2.5">Channel</th>
+            <th class="px-3 py-2.5">Inhalt</th>
+            <th class="px-3 py-2.5">Anhänge</th>
+            <th class="px-3 py-2.5">Zeitpunkt</th>
+          </tr>
+        </thead>
         <tbody data-table-body></tbody>
       </table>
     </div>
-    <div data-table-empty class="hidden rounded-lg border border-white/[0.06] bg-black/10 px-4 py-3 text-sm text-slate-500">Keine Nachrichten gespeichert.</div>
-    <div data-table-footer class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
+    <div data-table-empty
+      class="hidden rounded-lg border border-white/[0.06] bg-black/10 px-4 py-3 text-sm text-slate-500">Keine
+      Nachrichten gespeichert.</div>
+    <div data-table-footer
+      class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
       <label class="flex items-center gap-2 text-xs text-slate-500">
         Pro Seite
-        <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+        <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white">
+          <option selected>10</option>
+          <option>25</option>
+          <option>50</option>
+          <option>100</option>
+        </select>
       </label>
       <div data-table-pagination class="flex-1"></div>
     </div>
@@ -288,11 +369,18 @@
   <h2 class="mb-4 text-base font-semibold text-white">Historie</h2>
 
   <div class="mb-5 grid items-start gap-5 lg:grid-cols-2">
-    <details data-independent-details data-collapsed-default data-paginated-table data-preserve-empty-rows="false" data-compact-empty="true" data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#edited-history-filter" data-page-size="10" class="group rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
-      <summary class="mb-4 flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden">
-        <span class="flex items-center gap-2">Bearbeitete Nachrichten{% if edited_message_count %}<span class="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300">{{ edited_message_count }}</span>{% endif %}</span>
-        <svg class="h-4 w-4 text-slate-500 transition group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+    <details data-independent-details data-collapsed-default data-paginated-table data-preserve-empty-rows="false"
+      data-compact-empty="true" data-endpoint="{{ url_for('panel_api_message_history') }}"
+      data-form="#edited-history-filter" data-page-size="10"
+      class="group rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+      <summary
+        class="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden">
+        <span class="flex items-center gap-2">Bearbeitete Nachrichten{% if edited_message_count %}<span
+            class="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300">{{
+            edited_message_count }}</span>{% endif %}</span>
+        <svg class="h-4 w-4 text-slate-500 transition group-open:rotate-90" fill="none" stroke="currentColor"
+          viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
         </svg>
       </summary>
       <script type="application/json">
@@ -304,22 +392,51 @@
           {"key":"event_at","type":"date","class":"px-3 py-2.5 text-slate-500 whitespace-nowrap"}
         ]
       </script>
-      <form id="edited-history-filter"><input type="hidden" name="guild_id" value="{{ guild_id }}"><input type="hidden" name="user_id" value="{{ member.user_id }}"><input type="hidden" name="event_type" value="edit"></form>
-      <div data-table-content class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Vorher</th><th class="px-3 py-2.5">Nachher</th><th class="px-3 py-2.5">Anhänge</th><th class="px-3 py-2.5">Zeitpunkt</th></tr></thead><tbody data-table-body></tbody></table></div>
-      <div data-table-empty class="hidden rounded-lg border border-white/[0.06] bg-black/10 px-4 py-3 text-sm text-slate-500">Keine bearbeiteten Nachrichten gespeichert.</div>
-      <div data-table-footer class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
+      <form id="edited-history-filter"><input type="hidden" name="guild_id" value="{{ guild_id }}"><input type="hidden"
+          name="user_id" value="{{ member.user_id }}"><input type="hidden" name="event_type" value="edit"></form>
+      <div data-table-content class="overflow-x-auto py-4">
+        <table class="w-full text-left text-sm">
+          <thead>
+            <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+              <th class="px-3 py-2.5">Channel</th>
+              <th class="px-3 py-2.5">Vorher</th>
+              <th class="px-3 py-2.5">Nachher</th>
+              <th class="px-3 py-2.5">Anhänge</th>
+              <th class="px-3 py-2.5">Zeitpunkt</th>
+            </tr>
+          </thead>
+          <tbody data-table-body></tbody>
+        </table>
+      </div>
+      <div data-table-empty
+        class="hidden rounded-lg border border-white/[0.06] bg-black/10 px-4 py-3 text-sm text-slate-500">Keine
+        bearbeiteten Nachrichten gespeichert.</div>
+      <div data-table-footer
+        class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
         <label class="flex items-center gap-2 text-xs text-slate-500">Pro Seite
-          <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+          <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white">
+            <option selected>10</option>
+            <option>25</option>
+            <option>50</option>
+            <option>100</option>
+          </select>
         </label>
         <div data-table-pagination class="flex-1"></div>
       </div>
     </details>
 
-    <details data-independent-details data-collapsed-default data-paginated-table data-preserve-empty-rows="false" data-compact-empty="true" data-endpoint="{{ url_for('panel_api_message_history') }}" data-form="#deleted-history-filter" data-page-size="10" class="group rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
-      <summary class="mb-4 flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden">
-        <span class="flex items-center gap-2">Gelöschte Nachrichten{% if deleted_message_count %}<span class="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-300">{{ deleted_message_count }}</span>{% endif %}</span>
-        <svg class="h-4 w-4 text-slate-500 transition group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+    <details data-independent-details data-collapsed-default data-paginated-table data-preserve-empty-rows="false"
+      data-compact-empty="true" data-endpoint="{{ url_for('panel_api_message_history') }}"
+      data-form="#deleted-history-filter" data-page-size="10"
+      class="group rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+      <summary
+        class="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden">
+        <span class="flex items-center gap-2">Gelöschte Nachrichten{% if deleted_message_count %}<span
+            class="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-semibold text-red-300">{{
+            deleted_message_count }}</span>{% endif %}</span>
+        <svg class="h-4 w-4 text-slate-500 transition group-open:rotate-90" fill="none" stroke="currentColor"
+          viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
         </svg>
       </summary>
       <script type="application/json">
@@ -330,12 +447,33 @@
           {"key":"event_at","type":"date","class":"px-3 py-2.5 text-slate-500 whitespace-nowrap"}
         ]
       </script>
-      <form id="deleted-history-filter"><input type="hidden" name="guild_id" value="{{ guild_id }}"><input type="hidden" name="user_id" value="{{ member.user_id }}"><input type="hidden" name="event_type" value="delete"></form>
-      <div data-table-content class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Channel</th><th class="px-3 py-2.5">Gelöschter Inhalt</th><th class="px-3 py-2.5">Anhänge</th><th class="px-3 py-2.5">Zeitpunkt</th></tr></thead><tbody data-table-body></tbody></table></div>
-      <div data-table-empty class="hidden rounded-lg border border-white/[0.06] bg-black/10 px-4 py-3 text-sm text-slate-500">Keine gelöschten Nachrichten gespeichert.</div>
-      <div data-table-footer class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
+      <form id="deleted-history-filter"><input type="hidden" name="guild_id" value="{{ guild_id }}"><input type="hidden"
+          name="user_id" value="{{ member.user_id }}"><input type="hidden" name="event_type" value="delete"></form>
+      <div data-table-content class="overflow-x-auto py-4">
+        <table class="w-full text-left text-sm">
+          <thead>
+            <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+              <th class="px-3 py-2.5">Channel</th>
+              <th class="px-3 py-2.5">Gelöschter Inhalt</th>
+              <th class="px-3 py-2.5">Anhänge</th>
+              <th class="px-3 py-2.5">Zeitpunkt</th>
+            </tr>
+          </thead>
+          <tbody data-table-body></tbody>
+        </table>
+      </div>
+      <div data-table-empty
+        class="hidden rounded-lg border border-white/[0.06] bg-black/10 px-4 py-3 text-sm text-slate-500">Keine
+        gelöschten Nachrichten gespeichert.</div>
+      <div data-table-footer
+        class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
         <label class="flex items-center gap-2 text-xs text-slate-500">Pro Seite
-          <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+          <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white">
+            <option selected>10</option>
+            <option>25</option>
+            <option>50</option>
+            <option>100</option>
+          </select>
         </label>
         <div data-table-pagination class="flex-1"></div>
       </div>
@@ -347,10 +485,27 @@
     {% if history %}
     <div class="overflow-x-auto">
       <table class="w-full text-left text-sm">
-        <thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-3 py-2.5">Zeitpunkt</th><th class="px-3 py-2.5">Alter Anzeigename</th><th class="px-3 py-2.5">Neuer Anzeigename</th><th class="px-3 py-2.5">Alter Username</th><th class="px-3 py-2.5">Neuer Username</th><th class="px-3 py-2.5">Geändert von</th></tr></thead>
+        <thead>
+          <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+            <th class="px-3 py-2.5">Zeitpunkt</th>
+            <th class="px-3 py-2.5">Alter Anzeigename</th>
+            <th class="px-3 py-2.5">Neuer Anzeigename</th>
+            <th class="px-3 py-2.5">Alter Username</th>
+            <th class="px-3 py-2.5">Neuer Username</th>
+            <th class="px-3 py-2.5">Geändert von</th>
+          </tr>
+        </thead>
         <tbody>
           {% for h in history %}
-          <tr class="cursor-pointer border-b border-white/[0.04] transition hover:bg-white/[0.04]" data-name-history='{{ h|tojson|forceescape }}'><td class="px-3 py-2.5 text-slate-400">{{ h.changed_at }}</td><td class="px-3 py-2.5 text-slate-300">{{ h.old_display_name or "—" }}</td><td class="px-3 py-2.5 text-white">{{ h.new_display_name or "—" }}</td><td class="px-3 py-2.5 text-slate-400">{{ h.old_username or "—" }}</td><td class="px-3 py-2.5 text-slate-300">{{ h.new_username or "—" }}</td><td class="px-3 py-2.5 text-cyan-300">{{ h.changed_by_name or "Nicht gespeichert" }}</td></tr>
+          <tr class="cursor-pointer border-b border-white/[0.04] transition hover:bg-white/[0.04]"
+            data-name-history='{{ h|tojson|forceescape }}'>
+            <td class="px-3 py-2.5 text-slate-400">{{ h.changed_at }}</td>
+            <td class="px-3 py-2.5 text-slate-300">{{ h.old_display_name or "—" }}</td>
+            <td class="px-3 py-2.5 text-white">{{ h.new_display_name or "—" }}</td>
+            <td class="px-3 py-2.5 text-slate-400">{{ h.old_username or "—" }}</td>
+            <td class="px-3 py-2.5 text-slate-300">{{ h.new_username or "—" }}</td>
+            <td class="px-3 py-2.5 text-cyan-300">{{ h.changed_by_name or "Nicht gespeichert" }}</td>
+          </tr>
           {% endfor %}
         </tbody>
       </table>
@@ -366,11 +521,15 @@
 {# ════════════════ TICKETS ════════════════ #}
 <section id="tickets" class="scroll-mt-24 mb-10">
   <h2 class="mb-4 text-base font-semibold text-white">Tickets</h2>
-  <details data-collapsed-default data-paginated-table data-preserve-empty-rows="false" data-compact-empty="true" data-endpoint="{{ url_for('panel_api_user_tickets', user_id=member.user_id, guild_id=guild_id) }}" data-page-size="10" class="group overflow-hidden rounded-xl border border-white/[0.06] bg-[#0d1320]">
-    <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden">
+  <details data-collapsed-default data-paginated-table data-preserve-empty-rows="false" data-compact-empty="true"
+    data-endpoint="{{ url_for('panel_api_user_tickets', user_id=member.user_id, guild_id=guild_id) }}"
+    data-page-size="10" class="group overflow-hidden rounded-xl border border-white/[0.06] bg-[#0d1320]">
+    <summary
+      class="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-semibold text-white [&::-webkit-details-marker]:hidden">
       <span>Tickets</span>
-      <svg class="h-4 w-4 text-slate-500 transition group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+      <svg class="h-4 w-4 text-slate-500 transition group-open:rotate-90" fill="none" stroke="currentColor"
+        viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
       </svg>
     </summary>
     <script type="application/json">
@@ -383,11 +542,33 @@
         {"key":"updated_at","type":"date","class":"whitespace-nowrap px-4 py-3 text-slate-500"}
       ]
     </script>
-    <div data-table-content class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500"><th class="px-4 py-3 font-medium">Ticket</th><th class="px-4 py-3 font-medium">Betreff</th><th class="px-4 py-3 font-medium">Status</th><th class="px-4 py-3 font-medium">Kategorie</th><th class="px-4 py-3 font-medium">Erstellt</th><th class="px-4 py-3 font-medium">Aktualisiert</th></tr></thead><tbody data-table-body class="divide-y divide-white/[0.04]"></tbody></table></div>
-    <div data-table-empty class="mx-5 mb-5 hidden rounded-lg border border-white/[0.06] bg-black/10 px-4 py-3 text-sm text-slate-500">Keine Tickets gespeichert.</div>
-    <div data-table-footer class="flex flex-col gap-3 border-t border-white/[0.06] px-4 py-3 sm:flex-row sm:items-center">
+    <div data-table-content class="overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead>
+          <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+            <th class="px-4 py-3 font-medium">Ticket</th>
+            <th class="px-4 py-3 font-medium">Betreff</th>
+            <th class="px-4 py-3 font-medium">Status</th>
+            <th class="px-4 py-3 font-medium">Kategorie</th>
+            <th class="px-4 py-3 font-medium">Erstellt</th>
+            <th class="px-4 py-3 font-medium">Aktualisiert</th>
+          </tr>
+        </thead>
+        <tbody data-table-body class="divide-y divide-white/[0.04]"></tbody>
+      </table>
+    </div>
+    <div data-table-empty
+      class="mx-5 mb-5 hidden rounded-lg border border-white/[0.06] bg-black/10 px-4 py-3 text-sm text-slate-500">Keine
+      Tickets gespeichert.</div>
+    <div data-table-footer
+      class="flex flex-col gap-3 border-t border-white/[0.06] px-4 py-3 sm:flex-row sm:items-center">
       <label class="flex items-center gap-2 text-xs text-slate-500">Pro Seite
-        <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option selected>10</option><option>25</option><option>50</option><option>100</option></select>
+        <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white">
+          <option selected>10</option>
+          <option>25</option>
+          <option>50</option>
+          <option>100</option>
+        </select>
       </label>
       <div data-table-pagination class="flex-1"></div>
     </div>

@@ -386,6 +386,21 @@ def _allowed_ticket_categories(permissions: set[str]) -> set[str] | None:
     }
 
 
+def permission_any_required(*required_permissions: str):
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            if not current_user():
+                return redirect(url_for("login"))
+            if not any(has_permission(permission) for permission in required_permissions):
+                abort(403)
+            return fn(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
 def _ticket_category_key(ticket: dict | None) -> str:
     value = str((ticket or {}).get("category") or "general").strip().lower()
     if "twitch" in value:
@@ -1574,7 +1589,7 @@ def close_reasons_delete(reason_id: int):
 
 
 @app.get("/counting")
-@permission_required("config.manage")
+@permission_any_required("counting.view", "counting.manage")
 def counting_page():
     ctx = _ctx()
     state = get_counting(DEFAULT_GUILD_ID) or {}
@@ -1595,7 +1610,7 @@ def counting_page():
 
 
 @app.post("/counting/set-channel")
-@permission_required("config.manage")
+@permission_required("counting.manage")
 def counting_set_channel():
     channel_id = (request.form.get("channel_id") or "").strip()
     if channel_id:
@@ -1604,7 +1619,7 @@ def counting_set_channel():
 
 
 @app.post("/counting/reset")
-@permission_required("config.manage")
+@permission_required("counting.manage")
 def counting_reset():
     set_counting(DEFAULT_GUILD_ID, last_number=0, last_user_id=None, highscore=0)
     return redirect(url_for("counting_page"))
@@ -1872,7 +1887,7 @@ def _message_evaluated_stats(
 
 
 @app.get("/stats")
-@permission_required("users.view")
+@permission_any_required("stats.view", "stats.manage")
 def stats_page():
     ctx = _ctx()
     guild_id = _active_panel_guild_id()
@@ -1933,7 +1948,7 @@ def stats_page():
 
 
 @app.get("/panel-api/stats/overview")
-@permission_required("users.view")
+@permission_any_required("stats.view", "stats.manage")
 def panel_api_stats_overview():
     guild_id = request.args.get("guild_id") or _active_panel_guild_id()
     log_channel_ids = _log_message_channel_ids(guild_id)
@@ -1982,7 +1997,7 @@ def panel_api_stats_overview():
 
 
 @app.get("/birthdays")
-@permission_required("config.manage")
+@permission_any_required("birthdays.view", "birthdays.manage")
 def birthdays_page():
     birthdays_guild_id = get_birthdays_panel_guild_id(DEFAULT_GUILD_ID)
     ctx = _ctx()
@@ -2056,7 +2071,7 @@ def _trigger_birthday_list_refresh(guild_id: str) -> None:
 
 
 @app.post("/birthdays/set-channel")
-@permission_required("config.manage")
+@permission_required("birthdays.manage")
 def birthdays_set_channel():
     birthdays_guild_id = get_birthdays_panel_guild_id(DEFAULT_GUILD_ID)
     channel_id = (request.form.get("channel_id") or "").strip()
@@ -2068,7 +2083,7 @@ def birthdays_set_channel():
 
 
 @app.post("/birthdays/<user_id>/set")
-@permission_required("config.manage")
+@permission_required("birthdays.manage")
 def birthdays_set(user_id: str):
     birthdays_guild_id = get_birthdays_panel_guild_id(DEFAULT_GUILD_ID)
     day = request.form.get("day", type=int)
@@ -2081,7 +2096,7 @@ def birthdays_set(user_id: str):
 
 
 @app.post("/birthdays/add")
-@permission_required("config.manage")
+@permission_required("birthdays.manage")
 def birthdays_add():
     birthdays_guild_id = get_birthdays_panel_guild_id(DEFAULT_GUILD_ID)
     user_id = (request.form.get("user_id") or "").strip()
@@ -2095,7 +2110,7 @@ def birthdays_add():
 
 
 @app.post("/birthdays/<user_id>/delete")
-@permission_required("config.manage")
+@permission_required("birthdays.manage")
 def birthdays_delete(user_id: str):
     birthdays_guild_id = get_birthdays_panel_guild_id(DEFAULT_GUILD_ID)
     delete_birthday(birthdays_guild_id, user_id)
@@ -2104,7 +2119,7 @@ def birthdays_delete(user_id: str):
 
 
 @app.post("/birthdays/messages/add")
-@permission_required("config.manage")
+@permission_required("birthdays.manage")
 def birthdays_add_message():
     birthdays_guild_id = get_birthdays_panel_guild_id(DEFAULT_GUILD_ID)
     message_id = (request.form.get("message_id") or "").strip()
@@ -2122,7 +2137,7 @@ def birthdays_add_message():
 
 
 @app.post("/birthdays/messages/<message_id>/delete")
-@permission_required("config.manage")
+@permission_required("birthdays.manage")
 def birthdays_delete_message(message_id: str):
     birthdays_guild_id = get_birthdays_panel_guild_id(DEFAULT_GUILD_ID)
     delete_bot_message(birthdays_guild_id, "birthday_list", message_id)
@@ -2134,7 +2149,7 @@ def birthdays_delete_message(message_id: str):
 
 
 @app.get("/warnings")
-@permission_required("users.warn")
+@permission_any_required("warnings.view", "warnings.manage", "users.warn")
 def warnings_page():
     ctx = _ctx()
     q_user = request.args.get("user_id", "").strip()
@@ -2155,7 +2170,7 @@ def warnings_page():
 
 
 @app.post("/warnings/<int:warning_id>/delete")
-@permission_required("users.warn")
+@permission_any_required("warnings.manage", "users.warn")
 def warnings_delete(warning_id: int):
     remove_warning(warning_id)
     return redirect(url_for("warnings_page"))
@@ -2875,7 +2890,7 @@ def panel_api_discord_logs_overview():
 
 
 @app.get("/panel-api/birthdays")
-@permission_required("config.manage")
+@permission_any_required("birthdays.view", "birthdays.manage")
 def panel_api_birthdays():
     guild_id = request.args.get("guild_id") or get_birthdays_panel_guild_id(
         DEFAULT_GUILD_ID
@@ -2914,7 +2929,7 @@ def panel_api_birthdays():
 
 
 @app.get("/panel-api/warnings")
-@permission_required("users.warn")
+@permission_any_required("warnings.view", "warnings.manage", "users.warn")
 def panel_api_warnings():
     guild_id = request.args.get("guild_id") or DEFAULT_GUILD_ID
     q_user = request.args.get("user_id", "").strip()
@@ -2951,7 +2966,7 @@ def panel_api_warnings():
 
 
 @app.get("/panel-api/counting/leaderboard")
-@permission_required("config.manage")
+@permission_any_required("counting.view", "counting.manage")
 def panel_api_counting_leaderboard():
     guild_id = request.args.get("guild_id") or DEFAULT_GUILD_ID
     page, page_size, offset = _pagination_args()

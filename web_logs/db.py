@@ -1608,7 +1608,6 @@ PERMISSION_GROUPS = [
             ("config.manage", "Konfiguration verwalten"),
             ("logs.view", "Logs ansehen"),
             ("logs.manage", "Logs verwalten"),
-            ("admin", "Vollzugriff"),
         ],
     },
 ]
@@ -1753,6 +1752,7 @@ PERMISSION_LABELS: dict[str, str] = {
     for group in (PERMISSION_GROUPS + COMMAND_PERMISSION_GROUPS)
     for perm, label in group["permissions"]
 }
+PERMISSION_LABELS["admin"] = "Vollzugriff"
 
 
 def permission_label(perm: str) -> str:

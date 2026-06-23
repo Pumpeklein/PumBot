@@ -15,7 +15,7 @@ from src.pumbot.utils.datetime_format import format_berlin_datetime
 
 
 TICKET_CATEGORY_NAME = "🎫 Tickets"
-TICKET_LOG_CHANNEL_ID = 1441186559486595142
+TICKET_LOG_CHANNEL_ID = 1441142684055113779
 ADMIN_TICKET_ROLE_ID = 1510385400173039629
 
 DISCORD_MOD_ROLES = {"Discord Moderator", "Discord Moderation"}

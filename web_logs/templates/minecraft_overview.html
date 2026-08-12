@@ -16,7 +16,7 @@
   {{ stat_tile("Spieler", "{:,}".format(overview.players).replace(",", "."), accent="cyan",
     sub="{} mit Spielzeit-Tracking".format(overview.playtime_players)) }}
   {{ stat_tile("Gesamte Spielzeit", total_playtime, accent="violet",
-    sub="Aktiv {} · AFK {}".format(active_playtime, afk_playtime)) }}
+    sub="Nicht AFK {} · Aktiv {} · AFK {}".format(nonafk_playtime, active_playtime, afk_playtime)) }}
   {{ stat_tile("Tode gesamt", "{:,}".format(overview.total_deaths).replace(",", "."), accent="amber",
     sub="{} Spieler mit Toden".format(overview.death_players)) }}
   {% if can_mc_moderation %}
@@ -48,7 +48,7 @@
         </div>
         <div class="shrink-0 text-right">
           <div class="text-sm font-semibold text-white">{{ player.playtime }}</div>
-          <div class="text-[10.5px] text-slate-500">aktiv {{ player.active_time }}</div>
+          <div class="text-[10.5px] text-slate-500">nicht AFK {{ player.nonafk_time }}</div>
         </div>
       </li>
       {% endfor %}

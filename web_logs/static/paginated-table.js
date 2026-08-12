@@ -36,6 +36,18 @@
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
 
+  // Kopier-Chip wie das id_chip-Makro im Panel: zeigt den Wert gekuerzt an,
+  // kopiert aber immer den vollstaendigen Wert (z. B. eine ganze UUID).
+  const renderCopyChip = (value, label) => {
+    const safe = escapeHtml(value);
+    const title = escapeHtml(`${label || "Wert"} kopieren: ${value}`);
+    return `<button type="button" data-copy="${safe}" title="${title}"
+      class="mt-0.5 inline-flex max-w-full items-center gap-1.5 rounded border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[10.5px] text-slate-400 transition hover:bg-white/10 hover:text-white">
+      <span class="max-w-[12ch] truncate">${safe}</span>
+      <svg class="h-3 w-3 shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+    </button>`;
+  };
+
   const renderBadge = (value, map) => {
     const variant = (map && map[value]) || "default";
     const styles = {
@@ -94,11 +106,23 @@
     if (column.type === "user") {
       const name = getValue(row, column.nameKey) || value || "-";
       const sub = getValue(row, column.subKey);
+      const copyValue = getValue(row, column.copyKey);
       const avatar = getValue(row, column.avatarKey);
       const url = getValue(row, column.urlKey);
       const avatarHtml = avatar
         ? `<img src="${escapeHtml(avatar)}" alt="" class="h-8 w-8 rounded-full">`
         : `<span class="flex h-8 w-8 items-center justify-center rounded-full bg-slate-700 text-xs font-semibold text-white">${initials(name)}</span>`;
+      // Der Kopier-Chip ist ein Button und darf nicht im Link stecken, deshalb
+      // sind Avatar und Name einzeln verlinkt statt die ganze Zelle.
+      if (copyValue) {
+        const avatarLink = url
+          ? `<a href="${escapeHtml(url)}" class="shrink-0">${avatarHtml}</a>`
+          : avatarHtml;
+        const nameHtml = url
+          ? `<a href="${escapeHtml(url)}" class="block truncate font-medium text-slate-200 hover:text-white">${escapeHtml(name)}</a>`
+          : `<span class="block truncate font-medium text-slate-200">${escapeHtml(name)}</span>`;
+        return `<span class="flex items-center gap-3">${avatarLink}<span class="min-w-0">${nameHtml}${renderCopyChip(copyValue, column.copyLabel)}</span></span>`;
+      }
       const body = `<span class="flex items-center gap-3">${avatarHtml}<span><span class="block font-medium text-slate-200">${escapeHtml(name)}</span>${sub ? `<span class="block text-xs text-slate-500">${escapeHtml(sub)}</span>` : ""}</span></span>`;
       return url
         ? `<a href="${escapeHtml(url)}" class="hover:text-white">${body}</a>`

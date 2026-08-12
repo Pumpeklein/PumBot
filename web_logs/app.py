@@ -3073,6 +3073,8 @@ def _mc_player_row(player: dict) -> dict:
     total_seconds = int(player.get("total_seconds") or 0)
     active_seconds = int(player.get("active_seconds") or 0)
     afk_seconds = int(player.get("afk_seconds") or 0)
+    # Online-Zeit ohne AFK – "aktiv" zählt nur Sekunden mit Bewegung/Interaktion.
+    nonafk_seconds = max(0, total_seconds - afk_seconds)
     banned = int(player.get("active_ban_count") or 0) > 0
     muted = bool(player.get("muted"))
     return {
@@ -3084,9 +3086,11 @@ def _mc_player_row(player: dict) -> dict:
             "minecraft_player_page", player_uuid=player["player_uuid"]
         ),
         "playtime": mc_db.format_duration(total_seconds, fallback="—"),
+        "nonafk_time": mc_db.format_duration(nonafk_seconds, fallback="—"),
         "active_time": mc_db.format_duration(active_seconds, fallback="—"),
         "afk_time": mc_db.format_duration(afk_seconds, fallback="—"),
         "total_seconds": total_seconds,
+        "nonafk_seconds": nonafk_seconds,
         "active_seconds": active_seconds,
         "afk_seconds": afk_seconds,
         "death_count": int(player.get("death_count") or 0),
@@ -3145,11 +3149,21 @@ def minecraft_page():
             overview["active_seconds"], fallback="—"
         ),
         afk_playtime=mc_db.format_duration(overview["afk_seconds"], fallback="—"),
+        nonafk_playtime=mc_db.format_duration(
+            overview["nonafk_seconds"], fallback="—"
+        ),
         top_playtime=[
             {
                 **player,
                 "playtime": mc_db.format_duration(player.get("total_seconds")),
                 "active_time": mc_db.format_duration(player.get("active_seconds")),
+                "nonafk_time": mc_db.format_duration(
+                    max(
+                        0,
+                        int(player.get("total_seconds") or 0)
+                        - int(player.get("afk_seconds") or 0),
+                    )
+                ),
                 "detail_url": url_for(
                     "minecraft_player_page", player_uuid=player["player_uuid"]
                 ),
@@ -3241,6 +3255,14 @@ def minecraft_player_page(player_uuid: str):
         playtime_total=mc_db.format_duration(playtime.get("total_seconds"), "—"),
         playtime_active=mc_db.format_duration(playtime.get("active_seconds"), "—"),
         playtime_afk=mc_db.format_duration(playtime.get("afk_seconds"), "—"),
+        playtime_nonafk=mc_db.format_duration(
+            max(
+                0,
+                int(playtime.get("total_seconds") or 0)
+                - int(playtime.get("afk_seconds") or 0),
+            ),
+            "—",
+        ),
         punishments=[
             {**_mc_moderation_row(row), "status": mc_db.ban_status(row)}
             for row in player.get("punishments", [])

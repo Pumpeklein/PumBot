@@ -41,7 +41,8 @@
 <div class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
   {{ stat_tile("Spielzeit", playtime_total, accent="cyan",
     sub=(player.playtime.updated_at|datetime_de if player.playtime else "Keine Daten")) }}
-  {{ stat_tile("Aktive Zeit", playtime_active, accent="emerald", sub="AFK " ~ playtime_afk) }}
+  {{ stat_tile("Nicht AFK", playtime_nonafk, accent="emerald",
+    sub="Aktiv (Bewegung) {} · AFK {}".format(playtime_active, playtime_afk)) }}
   {{ stat_tile("Tode", (player.deaths.death_count if player.deaths else 0), accent="amber",
     sub=(player.deaths.updated_at|datetime_de if player.deaths else "Keine Daten")) }}
   {% if show_moderation %}

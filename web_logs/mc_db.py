@@ -460,11 +460,16 @@ def get_overview() -> dict:
                 LIMIT 1"""
         )
 
+    total_seconds = int(playtime.get("total_seconds") or 0)
+    afk_seconds = int(playtime.get("afk_seconds") or 0)
     return {
         "players": int(players or 0),
-        "total_seconds": int(playtime.get("total_seconds") or 0),
+        "total_seconds": total_seconds,
         "active_seconds": int(playtime.get("active_seconds") or 0),
-        "afk_seconds": int(playtime.get("afk_seconds") or 0),
+        "afk_seconds": afk_seconds,
+        # Online-Zeit ohne AFK. "active_seconds" zählt nur Sekunden mit echter
+        # Aktion (Bewegung/Interaktion) und ist deshalb immer kleiner.
+        "nonafk_seconds": max(0, total_seconds - afk_seconds),
         "playtime_players": int(playtime.get("tracked_players") or 0),
         "playtime_last_update": playtime.get("last_update"),
         "total_deaths": int(deaths.get("total_deaths") or 0),
@@ -496,6 +501,10 @@ _PLAYER_UNIVERSE = """
 
 PLAYER_SORTS = {
     "playtime": "total_seconds DESC, death_count DESC",
+    "nonafk": (
+        "(COALESCE(pt.total_seconds, 0) - COALESCE(pt.afk_seconds, 0)) DESC,"
+        " total_seconds DESC"
+    ),
     "active": "active_seconds DESC, total_seconds DESC",
     "afk": "afk_seconds DESC, total_seconds DESC",
     "deaths": "death_count DESC, total_seconds DESC",

@@ -224,6 +224,27 @@ def _not_unmuted(alias: str = "") -> str:
     return f" AND {prefix}unmuted_at IS NULL" if lifecycle_supported() else ""
 
 
+# pc_players kommt mit Migration V4 und wird vom Skills-Plugin bei jedem Login
+# gepflegt. Sobald die Tabelle da ist, ersetzt sie die Mojang-Abfrage.
+_players_table_lock = threading.Lock()
+_players_table_supported: bool | None = None
+
+
+def players_table_supported() -> bool:
+    global _players_table_supported
+    if _players_table_supported is None:
+        with _players_table_lock:
+            if _players_table_supported is None:
+                with _connect() as conn:
+                    rows = conn.query(
+                        """SELECT TABLE_NAME
+                             FROM INFORMATION_SCHEMA.TABLES
+                            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pc_players'"""
+                    )
+                _players_table_supported = bool(rows)
+    return _players_table_supported
+
+
 # ══════════ Name resolution ══════════
 
 # The plugin only stores player names on moderation rows (reports, mutes,
@@ -317,7 +338,11 @@ def _mojang_names(uuids: list[str]) -> dict[str, str]:
 
 
 def known_names(conn: MinecraftConnection) -> dict[str, str]:
-    """Latest known in-game name per UUID, taken from the moderation tables."""
+    """
+    Bekannter Name je UUID. Basis sind die Moderations-Tabellen; die von den
+    Plugins gepflegte pc_players hat Vorrang, weil sie bei jedem Login
+    aktualisiert wird.
+    """
     rows = conn.query(
         f"""SELECT player_uuid, player_name, MAX(seen_at) AS seen_at
               FROM ({_NAME_UNION}) AS known
@@ -331,7 +356,16 @@ def known_names(conn: MinecraftConnection) -> dict[str, str]:
         current = latest.get(player_uuid)
         if current is None or seen_at >= current[0]:
             latest[player_uuid] = (seen_at, row["player_name"])
-    return {uuid: name for uuid, (_, name) in latest.items()}
+
+    names = {uuid: name for uuid, (_, name) in latest.items()}
+
+    if players_table_supported():
+        for row in conn.query(
+            "SELECT player_uuid, player_name FROM pc_players WHERE player_name <> ''"
+        ):
+            names[row["player_uuid"]] = row["player_name"]
+
+    return names
 
 
 def resolve_names(

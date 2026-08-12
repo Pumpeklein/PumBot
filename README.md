@@ -200,6 +200,11 @@ Der gesamte Zugriff liegt in [web_logs/mc_db.py](./web_logs/mc_db.py).
 Gelesene Tabellen: `pc_playtime`, `pc_death_counts`, `pc_reports`, `pc_mutes`,
 `pc_punishments`, `pc_warnings` und `flyway_schema_history` (Schema-Version).
 
+Aufgehobene Strafen (`/unban`, `/unmute` im Plugin) erscheinen als eigener Status
+„Aufgehoben" und sind separat filterbar. Die dafür nötigen Spalten kommen mit
+Migration V3 des Plugins; das Panel prüft einmalig, ob sie vorhanden sind, und
+läuft auch gegen eine noch nicht migrierte Datenbank.
+
 Hinweise zum Datenmodell:
 
 - Zeitstempel der Plugins sind Epoch-Millisekunden und werden serverseitig nach

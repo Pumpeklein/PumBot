@@ -3206,7 +3206,8 @@ def minecraft_player_page(player_uuid: str):
         playtime_active=mc_db.format_duration(playtime.get("active_seconds"), "—"),
         playtime_afk=mc_db.format_duration(playtime.get("afk_seconds"), "—"),
         punishments=[
-            _mc_moderation_row(row) for row in player.get("punishments", [])
+            {**_mc_moderation_row(row), "status": mc_db.ban_status(row)}
+            for row in player.get("punishments", [])
         ],
         warnings=[_mc_moderation_row(row) for row in player.get("warnings", [])],
         reports_against=[
@@ -3317,7 +3318,12 @@ def panel_api_minecraft_punishments():
     items = []
     for row in rows:
         item = _mc_moderation_row(row)
-        item["status"] = "Aktiv" if mc_db.is_ban_active(row) else "Abgelaufen"
+        item["status"] = mc_db.ban_status(row)
+        item["revoked_at_display"] = (
+            mc_db.format_epoch_millis(row.get("revoked_at"))
+            if row.get("revoked_at")
+            else "—"
+        )
         items.append(item)
     return _paginated_response(items, total, page, page_size)
 
@@ -3337,7 +3343,7 @@ def panel_api_minecraft_mutes():
     items = []
     for row in rows:
         item = _mc_moderation_row(row, time_field="muted_at")
-        item["status"] = "Aktiv" if mc_db.is_mute_active(row) else "Abgelaufen"
+        item["status"] = mc_db.mute_status(row)
         items.append(item)
     return _paginated_response(items, total, page, page_size)
 

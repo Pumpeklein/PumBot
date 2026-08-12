@@ -85,7 +85,8 @@
       {% for entry in punishments %}
       <div class="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
         <div class="flex flex-wrap items-center gap-2">
-          {{ mc_pill(entry.punishment_type, "danger") }}
+          {{ mc_pill(entry.punishment_type, "danger" if entry.status == "Aktiv" else "default") }}
+          {{ mc_pill(entry.status, "danger" if entry.status == "Aktiv" else "success" if entry.status == "Aufgehoben" else "default") }}
           <span class="font-mono text-[10.5px] text-slate-500">{{ entry.punishment_id }}</span>
           <span class="ml-auto text-[10.5px] text-slate-500">{{ entry.created_at_display }}</span>
         </div>
@@ -93,6 +94,7 @@
         <div class="mt-2 flex flex-wrap gap-x-4 text-[10.5px] text-slate-500">
           <span>Von {{ entry.staff_name }}</span>
           <span>Läuft ab: {{ entry.expires_at_display }}</span>
+          {% if entry.revoked_by %}<span>Aufgehoben von {{ entry.revoked_by }}</span>{% endif %}
         </div>
       </div>
       {% endfor %}

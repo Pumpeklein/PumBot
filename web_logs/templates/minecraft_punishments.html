@@ -33,7 +33,8 @@
         ("all", "Alle"),
         ("active", "Nur aktive"),
         ("expired", "Nur abgelaufene"),
-        ("permanent", "Nur permanente")
+        ("permanent", "Nur permanente"),
+        ("revoked", "Nur aufgehobene")
       ], request.args.get("status", "all")) }}
     {% if punishment_type_options|length > 1 %}
     {{ mc_select_filter("punishment_type", "Ban-Typ", punishment_type_options,
@@ -42,7 +43,8 @@
     {{ mc_select_filter("mute_status", "Mute-Status", [
         ("all", "Alle"),
         ("active", "Nur aktive"),
-        ("expired", "Nur abgelaufene")
+        ("expired", "Nur abgelaufene"),
+        ("lifted", "Nur aufgehobene")
       ], request.args.get("mute_status", "all")) }}
     <div class="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
       {{ btn("Suchen") }}
@@ -67,7 +69,7 @@
       {"key":"reason","fallback":"— Kein Grund angegeben —","type":"message","previewLength":90,"modalTitle":"Ban-Grund","class":"px-3 py-2.5"},
       {"key":"staff_name","class":"px-3 py-2.5 text-slate-300 whitespace-nowrap"},
       {"key":"expires_at_display","class":"px-3 py-2.5 text-xs text-slate-400 whitespace-nowrap w-40"},
-      {"key":"status","type":"badge","variants":{"Aktiv":"danger","Abgelaufen":"default"},"class":"px-3 py-2.5 w-28"},
+      {"key":"status","type":"badge","variants":{"Aktiv":"danger","Abgelaufen":"default","Aufgehoben":"success"},"class":"px-3 py-2.5 w-28"},
       {"key":"punishment_id","class":"px-3 py-2.5 font-mono text-[11px] text-slate-500 w-24"}
     ]
   </script>
@@ -117,7 +119,7 @@
       {"key":"reason","fallback":"— Kein Grund angegeben —","type":"message","previewLength":90,"modalTitle":"Mute-Grund","class":"px-3 py-2.5"},
       {"key":"staff_name","class":"px-3 py-2.5 text-slate-300 whitespace-nowrap"},
       {"key":"expires_at_display","class":"px-3 py-2.5 text-xs text-slate-400 whitespace-nowrap w-40"},
-      {"key":"status","type":"badge","variants":{"Aktiv":"warning","Abgelaufen":"default"},"class":"px-3 py-2.5 w-28"}
+      {"key":"status","type":"badge","variants":{"Aktiv":"warning","Abgelaufen":"default","Aufgehoben":"success"},"class":"px-3 py-2.5 w-28"}
     ]
   </script>
   <div class="mb-4 flex items-center justify-between">

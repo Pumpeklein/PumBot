@@ -156,6 +156,8 @@ def head_url(player_uuid: str | None, size: int = 64) -> str | None:
 
 
 def is_mute_active(row: dict) -> bool:
+    if row.get("unmuted_at"):
+        return False
     try:
         return int(row.get("expires_at") or 0) > now_ms()
     except (TypeError, ValueError):
@@ -163,6 +165,8 @@ def is_mute_active(row: dict) -> bool:
 
 
 def is_ban_active(row: dict) -> bool:
+    if row.get("revoked_at"):
+        return False
     expires_at = row.get("expires_at")
     if expires_at in (None, ""):
         return True  # permanent
@@ -170,6 +174,54 @@ def is_ban_active(row: dict) -> bool:
         return int(expires_at) > now_ms()
     except (TypeError, ValueError):
         return False
+
+
+def mute_status(row: dict) -> str:
+    if row.get("unmuted_at"):
+        return "Aufgehoben"
+    return "Aktiv" if is_mute_active(row) else "Abgelaufen"
+
+
+def ban_status(row: dict) -> str:
+    if row.get("revoked_at"):
+        return "Aufgehoben"
+    return "Aktiv" if is_ban_active(row) else "Abgelaufen"
+
+
+# ══════════ Schema-Erkennung ══════════
+
+# Die Lifecycle-Spalten kommen mit Migration V3 des Plugins. Panel und Plugin
+# werden getrennt deployt, deshalb wird ihr Vorhandensein einmalig geprüft
+# statt vorausgesetzt.
+_lifecycle_lock = threading.Lock()
+_lifecycle_supported: bool | None = None
+
+
+def lifecycle_supported() -> bool:
+    global _lifecycle_supported
+    if _lifecycle_supported is None:
+        with _lifecycle_lock:
+            if _lifecycle_supported is None:
+                with _connect() as conn:
+                    rows = conn.query(
+                        """SELECT TABLE_NAME
+                             FROM INFORMATION_SCHEMA.COLUMNS
+                            WHERE TABLE_SCHEMA = DATABASE()
+                              AND ((TABLE_NAME = 'pc_punishments' AND COLUMN_NAME = 'revoked_at')
+                                OR (TABLE_NAME = 'pc_mutes' AND COLUMN_NAME = 'unmuted_at'))"""
+                    )
+                _lifecycle_supported = len(rows) == 2
+    return _lifecycle_supported
+
+
+def _not_revoked(alias: str = "") -> str:
+    prefix = f"{alias}." if alias else ""
+    return f" AND {prefix}revoked_at IS NULL" if lifecycle_supported() else ""
+
+
+def _not_unmuted(alias: str = "") -> str:
+    prefix = f"{alias}." if alias else ""
+    return f" AND {prefix}unmuted_at IS NULL" if lifecycle_supported() else ""
 
 
 # ══════════ Name resolution ══════════
@@ -353,7 +405,7 @@ def get_overview() -> dict:
         )
         reports_total = conn.scalar("SELECT COUNT(*) AS total FROM pc_reports")
         mutes_active = conn.scalar(
-            "SELECT COUNT(*) AS total FROM pc_mutes WHERE expires_at > %s",
+            f"SELECT COUNT(*) AS total FROM pc_mutes WHERE expires_at > %s{_not_unmuted()}",
             (right_now,),
         )
         mutes_total = conn.scalar("SELECT COUNT(*) AS total FROM pc_mutes")
@@ -361,7 +413,7 @@ def get_overview() -> dict:
             f"""SELECT COUNT(*) AS total
                   FROM pc_punishments
                  WHERE punishment_type IN ({", ".join(["%s"] * len(BAN_TYPES))})
-                   AND (expires_at IS NULL OR expires_at > %s)""",
+                   AND (expires_at IS NULL OR expires_at > %s){_not_revoked()}""",
             (*BAN_TYPES, right_now),
         )
         bans_total = conn.scalar("SELECT COUNT(*) AS total FROM pc_punishments")
@@ -471,7 +523,7 @@ def list_players(
                COALESCE(pu.total, 0) AS punishment_count,
                COALESCE(rp.total, 0) AS report_count,
                COALESCE(ab.total, 0) AS active_ban_count,
-               CASE WHEN mu.expires_at > %s THEN 1 ELSE 0 END AS muted
+               CASE WHEN mu.expires_at > %s{_not_unmuted("mu")} THEN 1 ELSE 0 END AS muted
           FROM {scope_sql}
           LEFT JOIN pc_playtime pt ON pt.player_uuid = p.player_uuid
           LEFT JOIN pc_death_counts dc ON dc.player_uuid = p.player_uuid
@@ -485,7 +537,7 @@ def list_players(
           LEFT JOIN (SELECT target_uuid, COUNT(*) AS total
                        FROM pc_punishments
                       WHERE punishment_type IN ({ban_placeholders})
-                        AND (expires_at IS NULL OR expires_at > %s)
+                        AND (expires_at IS NULL OR expires_at > %s){_not_revoked()}
                       GROUP BY target_uuid) ab
                  ON ab.target_uuid = p.player_uuid
          ORDER BY {order_by}
@@ -632,13 +684,16 @@ def _punishments_where(
     clauses: list[str] = []
     params: list[Any] = []
     if status == "active":
-        clauses.append("(expires_at IS NULL OR expires_at > %s)")
+        clauses.append(f"(expires_at IS NULL OR expires_at > %s){_not_revoked()}")
         params.append(now_ms())
     elif status == "expired":
-        clauses.append("(expires_at IS NOT NULL AND expires_at <= %s)")
+        clauses.append(f"(expires_at IS NOT NULL AND expires_at <= %s){_not_revoked()}")
         params.append(now_ms())
     elif status == "permanent":
-        clauses.append("expires_at IS NULL")
+        clauses.append(f"expires_at IS NULL{_not_revoked()}")
+    elif status == "revoked":
+        # Ohne Migration V3 kann es keine aufgehobenen Bans geben.
+        clauses.append("revoked_at IS NOT NULL" if lifecycle_supported() else "1 = 0")
     if punishment_type:
         clauses.append("punishment_type = %s")
         params.append(punishment_type)
@@ -697,11 +752,14 @@ def _mutes_where(q: str = "", status: str = "all") -> tuple[str, list[Any]]:
     clauses: list[str] = []
     params: list[Any] = []
     if status == "active":
-        clauses.append("expires_at > %s")
+        clauses.append(f"expires_at > %s{_not_unmuted()}")
         params.append(now_ms())
     elif status == "expired":
-        clauses.append("expires_at <= %s")
+        clauses.append(f"expires_at <= %s{_not_unmuted()}")
         params.append(now_ms())
+    elif status == "lifted":
+        # Ohne Migration V3 kann es keine aufgehobenen Mutes geben.
+        clauses.append("unmuted_at IS NOT NULL" if lifecycle_supported() else "1 = 0")
     if q:
         like = f"%{q}%"
         clauses.append(

@@ -144,6 +144,7 @@ try:
         permission_required,
         refresh_current_user_permissions,
     )
+    from . import mc_db
     from .token_utils import verify_transcript_token
     from .datetime_format import format_berlin_date, format_berlin_datetime
 except ImportError:
@@ -265,6 +266,7 @@ except ImportError:
         permission_required,
         refresh_current_user_permissions,
     )
+    import mc_db
     from token_utils import verify_transcript_token
     from datetime_format import format_berlin_date, format_berlin_datetime
 
@@ -2981,6 +2983,406 @@ def panel_api_counting_leaderboard():
     return _paginated_response(
         rows, count_counting_leaderboard(guild_id), page, page_size
     )
+
+
+# --------------------------------------------------------
+#  MINECRAFT (PumpeCraft Plugin – eigene Datenbank)
+# --------------------------------------------------------
+
+MINECRAFT_PERMISSIONS = (
+    "minecraft.view",
+    "minecraft.players.view",
+    "minecraft.moderation.view",
+)
+MINECRAFT_PLAYER_PERMISSIONS = ("minecraft.view", "minecraft.players.view")
+MINECRAFT_MODERATION_PERMISSIONS = ("minecraft.view", "minecraft.moderation.view")
+
+
+def _mc_ctx() -> dict:
+    return {
+        "mc_server_name": Config.MC_SERVER_NAME or "Minecraft",
+        "mc_server_address": Config.MC_SERVER_ADDRESS or None,
+        "mc_can_players": any(
+            has_permission(permission) for permission in MINECRAFT_PLAYER_PERMISSIONS
+        ),
+        "mc_can_moderation": any(
+            has_permission(permission)
+            for permission in MINECRAFT_MODERATION_PERMISSIONS
+        ),
+    }
+
+
+def _mc_unavailable_page(template: str, message: str, active_page: str, **extra):
+    return (
+        render_template(
+            template,
+            active_page=active_page,
+            mc_error=message,
+            **_mc_ctx(),
+            **extra,
+            **_ctx(),
+        ),
+        503,
+    )
+
+
+def _mc_unavailable_api(exc: Exception, page: int, page_size: int):
+    return (
+        jsonify(
+            {
+                "items": [],
+                "pagination": {
+                    "page": page,
+                    "page_size": page_size,
+                    "total": 0,
+                    "pages": 1,
+                },
+                "error": str(exc),
+            }
+        ),
+        503,
+    )
+
+
+def _mc_player_row(player: dict) -> dict:
+    """Shape a player row for the paginated table."""
+    total_seconds = int(player.get("total_seconds") or 0)
+    active_seconds = int(player.get("active_seconds") or 0)
+    afk_seconds = int(player.get("afk_seconds") or 0)
+    banned = int(player.get("active_ban_count") or 0) > 0
+    muted = bool(player.get("muted"))
+    return {
+        "player_uuid": player["player_uuid"],
+        "player_name": player.get("player_name") or player["player_uuid"],
+        "player_head_url": player.get("player_head_url"),
+        "player_uuid_short": str(player["player_uuid"])[:8],
+        "detail_url": url_for(
+            "minecraft_player_page", player_uuid=player["player_uuid"]
+        ),
+        "playtime": mc_db.format_duration(total_seconds, fallback="—"),
+        "active_time": mc_db.format_duration(active_seconds, fallback="—"),
+        "afk_time": mc_db.format_duration(afk_seconds, fallback="—"),
+        "total_seconds": total_seconds,
+        "active_seconds": active_seconds,
+        "afk_seconds": afk_seconds,
+        "death_count": int(player.get("death_count") or 0),
+        "warning_count": int(player.get("warning_count") or 0),
+        "punishment_count": int(player.get("punishment_count") or 0),
+        "report_count": int(player.get("report_count") or 0),
+        "status": "Gebannt" if banned else "Gemutet" if muted else "Aktiv",
+        "last_seen": format_berlin_datetime(
+            player.get("playtime_updated_at"), fallback="—"
+        ),
+    }
+
+
+def _mc_moderation_row(row: dict, *, time_field: str = "created_at") -> dict:
+    item = dict(row)
+    item["created_at_display"] = mc_db.format_epoch_millis(item.get(time_field))
+    if "expires_at" in item:
+        item["expires_at_display"] = (
+            "Permanent"
+            if item["expires_at"] in (None, "")
+            else mc_db.format_epoch_millis(item["expires_at"])
+        )
+    target_uuid = item.get("target_uuid")
+    item["target_head_url"] = mc_db.head_url(target_uuid)
+    item["target_uuid_short"] = str(target_uuid or "")[:8]
+    item["target_detail_url"] = (
+        url_for("minecraft_player_page", player_uuid=target_uuid)
+        if target_uuid
+        else None
+    )
+    return item
+
+
+# -- Minecraft: Übersicht --
+
+
+@app.get("/minecraft")
+@permission_any_required(*MINECRAFT_PERMISSIONS)
+def minecraft_page():
+    try:
+        overview = mc_db.get_overview()
+        top_playtime = mc_db.get_top_playtime(5)
+        top_deaths = mc_db.get_top_deaths(5)
+        recent_moderation = mc_db.get_recent_moderation(6)
+        recent_reports = mc_db.get_recent_reports(5)
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return _mc_unavailable_page(
+            "minecraft_overview.html", str(exc), "minecraft"
+        )
+
+    return render_template(
+        "minecraft_overview.html",
+        overview=overview,
+        total_playtime=mc_db.format_duration(overview["total_seconds"], fallback="—"),
+        active_playtime=mc_db.format_duration(
+            overview["active_seconds"], fallback="—"
+        ),
+        afk_playtime=mc_db.format_duration(overview["afk_seconds"], fallback="—"),
+        top_playtime=[
+            {
+                **player,
+                "playtime": mc_db.format_duration(player.get("total_seconds")),
+                "active_time": mc_db.format_duration(player.get("active_seconds")),
+                "detail_url": url_for(
+                    "minecraft_player_page", player_uuid=player["player_uuid"]
+                ),
+            }
+            for player in top_playtime
+        ],
+        top_deaths=[
+            {
+                **player,
+                "detail_url": url_for(
+                    "minecraft_player_page", player_uuid=player["player_uuid"]
+                ),
+            }
+            for player in top_deaths
+        ],
+        recent_moderation=[
+            _mc_moderation_row(entry) for entry in recent_moderation
+        ],
+        recent_reports=[
+            {
+                **_mc_moderation_row(entry),
+                "reporter_detail_url": url_for(
+                    "minecraft_player_page", player_uuid=entry["reporter_uuid"]
+                ),
+            }
+            for entry in recent_reports
+        ],
+        active_page="minecraft",
+        **_mc_ctx(),
+        **_ctx(),
+    )
+
+
+# -- Minecraft: Spieler --
+
+
+@app.get("/minecraft/spieler")
+@permission_any_required(*MINECRAFT_PLAYER_PERMISSIONS)
+def minecraft_players_page():
+    try:
+        player_count = mc_db.count_players()
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return _mc_unavailable_page(
+            "minecraft_players.html", str(exc), "minecraft_players", player_count=0
+        )
+    return render_template(
+        "minecraft_players.html",
+        player_count=player_count,
+        active_page="minecraft_players",
+        **_mc_ctx(),
+        **_ctx(),
+    )
+
+
+@app.get("/minecraft/spieler/<player_uuid>")
+@permission_any_required(*MINECRAFT_PLAYER_PERMISSIONS)
+def minecraft_player_page(player_uuid: str):
+    try:
+        player = mc_db.get_player(player_uuid)
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return _mc_unavailable_page(
+            "minecraft_player.html",
+            str(exc),
+            "minecraft_players",
+            player=None,
+        )
+    if not player:
+        abort(404)
+
+    playtime = player.get("playtime") or {}
+    show_moderation = any(
+        has_permission(permission) for permission in MINECRAFT_MODERATION_PERMISSIONS
+    )
+    return render_template(
+        "minecraft_player.html",
+        player=player,
+        playtime_total=mc_db.format_duration(playtime.get("total_seconds"), "—"),
+        playtime_active=mc_db.format_duration(playtime.get("active_seconds"), "—"),
+        playtime_afk=mc_db.format_duration(playtime.get("afk_seconds"), "—"),
+        punishments=[
+            _mc_moderation_row(row) for row in player.get("punishments", [])
+        ],
+        warnings=[_mc_moderation_row(row) for row in player.get("warnings", [])],
+        reports_against=[
+            _mc_moderation_row(row) for row in player.get("reports_against", [])
+        ],
+        reports_by=[_mc_moderation_row(row) for row in player.get("reports_by", [])],
+        mute=(
+            _mc_moderation_row(player["mute"], time_field="muted_at")
+            if player.get("mute")
+            else None
+        ),
+        show_moderation=show_moderation,
+        active_page="minecraft_players",
+        **_mc_ctx(),
+        **_ctx(),
+    )
+
+
+# -- Minecraft: Strafen --
+
+
+@app.get("/minecraft/strafen")
+@permission_any_required(*MINECRAFT_MODERATION_PERMISSIONS)
+def minecraft_punishments_page():
+    try:
+        overview = mc_db.get_overview()
+        punishment_types = mc_db.list_punishment_types()
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return _mc_unavailable_page(
+            "minecraft_punishments.html",
+            str(exc),
+            "minecraft_punishments",
+            overview={},
+            punishment_type_options=[("", "Alle Typen")],
+        )
+    return render_template(
+        "minecraft_punishments.html",
+        overview=overview,
+        punishment_type_options=[("", "Alle Typen")]
+        + [(value, value) for value in punishment_types],
+        active_page="minecraft_punishments",
+        **_mc_ctx(),
+        **_ctx(),
+    )
+
+
+# -- Minecraft: Reports --
+
+
+@app.get("/minecraft/reports")
+@permission_any_required(*MINECRAFT_MODERATION_PERMISSIONS)
+def minecraft_reports_page():
+    try:
+        overview = mc_db.get_overview()
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return _mc_unavailable_page(
+            "minecraft_reports.html", str(exc), "minecraft_reports", overview={}
+        )
+    return render_template(
+        "minecraft_reports.html",
+        overview=overview,
+        active_page="minecraft_reports",
+        **_mc_ctx(),
+        **_ctx(),
+    )
+
+
+# -- Minecraft: Panel-API --
+
+
+@app.get("/panel-api/minecraft/players")
+@permission_any_required(*MINECRAFT_PLAYER_PERMISSIONS)
+def panel_api_minecraft_players():
+    page, page_size, offset = _pagination_args()
+    q = request.args.get("q", "").strip()
+    sort = request.args.get("sort", mc_db.DEFAULT_PLAYER_SORT).strip()
+    try:
+        players = mc_db.list_players(q=q, sort=sort, limit=page_size, offset=offset)
+        total = mc_db.count_players(q=q)
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return _mc_unavailable_api(exc, page, page_size)
+    return _paginated_response(
+        [_mc_player_row(player) for player in players], total, page, page_size
+    )
+
+
+@app.get("/panel-api/minecraft/punishments")
+@permission_any_required(*MINECRAFT_MODERATION_PERMISSIONS)
+def panel_api_minecraft_punishments():
+    page, page_size, offset = _pagination_args()
+    q = request.args.get("q", "").strip()
+    status = request.args.get("status", "all").strip()
+    punishment_type = request.args.get("punishment_type", "").strip()
+    try:
+        rows = mc_db.list_punishments(
+            q=q,
+            status=status,
+            punishment_type=punishment_type,
+            limit=page_size,
+            offset=offset,
+        )
+        total = mc_db.count_punishments(
+            q=q, status=status, punishment_type=punishment_type
+        )
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return _mc_unavailable_api(exc, page, page_size)
+
+    items = []
+    for row in rows:
+        item = _mc_moderation_row(row)
+        item["status"] = "Aktiv" if mc_db.is_ban_active(row) else "Abgelaufen"
+        items.append(item)
+    return _paginated_response(items, total, page, page_size)
+
+
+@app.get("/panel-api/minecraft/mutes")
+@permission_any_required(*MINECRAFT_MODERATION_PERMISSIONS)
+def panel_api_minecraft_mutes():
+    page, page_size, offset = _pagination_args()
+    q = request.args.get("q", "").strip()
+    status = request.args.get("mute_status", "all").strip()
+    try:
+        rows = mc_db.list_mutes(q=q, status=status, limit=page_size, offset=offset)
+        total = mc_db.count_mutes(q=q, status=status)
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return _mc_unavailable_api(exc, page, page_size)
+
+    items = []
+    for row in rows:
+        item = _mc_moderation_row(row, time_field="muted_at")
+        item["status"] = "Aktiv" if mc_db.is_mute_active(row) else "Abgelaufen"
+        items.append(item)
+    return _paginated_response(items, total, page, page_size)
+
+
+@app.get("/panel-api/minecraft/warnings")
+@permission_any_required(*MINECRAFT_MODERATION_PERMISSIONS)
+def panel_api_minecraft_warnings():
+    page, page_size, offset = _pagination_args()
+    q = request.args.get("q", "").strip()
+    try:
+        rows = mc_db.list_warnings(q=q, limit=page_size, offset=offset)
+        total = mc_db.count_warnings(q=q)
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return _mc_unavailable_api(exc, page, page_size)
+    return _paginated_response(
+        [_mc_moderation_row(row) for row in rows], total, page, page_size
+    )
+
+
+@app.get("/panel-api/minecraft/reports")
+@permission_any_required(*MINECRAFT_MODERATION_PERMISSIONS)
+def panel_api_minecraft_reports():
+    page, page_size, offset = _pagination_args()
+    q = request.args.get("q", "").strip()
+    status = request.args.get("status", "all").strip()
+    try:
+        rows = mc_db.list_reports(q=q, status=status, limit=page_size, offset=offset)
+        total = mc_db.count_reports(q=q, status=status)
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return _mc_unavailable_api(exc, page, page_size)
+
+    items = []
+    for row in rows:
+        item = _mc_moderation_row(row)
+        item["status"] = "Offen" if row.get("is_open") else "Geschlossen"
+        item["reporter_head_url"] = mc_db.head_url(row.get("reporter_uuid"))
+        item["reporter_uuid_short"] = str(row.get("reporter_uuid") or "")[:8]
+        item["reporter_detail_url"] = (
+            url_for("minecraft_player_page", player_uuid=row["reporter_uuid"])
+            if row.get("reporter_uuid")
+            else None
+        )
+        item["report_label"] = f"#{row.get('id')}"
+        items.append(item)
+    return _paginated_response(items, total, page, page_size)
 
 
 # --------------------------------------------------------

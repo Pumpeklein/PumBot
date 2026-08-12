@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header, stat_tile, btn, empty_state %}
+{% from "_mc_macros.html" import mc_error_card, mc_search_field, mc_select_filter %}
+
+{% block content %}
+{{ page_header("Minecraft", "Spieler", "Alle bekannten Spieler mit Spielzeit, Toden und Moderations-Historie.") }}
+
+{% if mc_error %}
+{{ mc_error_card(mc_error) }}
+{% else %}
+
+<div class="mb-6 grid gap-3 sm:grid-cols-3">
+  {{ stat_tile("Bekannte Spieler", player_count, accent="cyan", sub="Aus Spielzeit, Toden und Moderation") }}
+  {{ stat_tile("Server", mc_server_name, accent="violet", sub=mc_server_address or "PumpeCraft Plugin-Datenbank") }}
+  {{ stat_tile("Sortierung", "Frei wählbar", accent="slate", sub="Standard: höchste Spielzeit") }}
+</div>
+
+<div class="mb-6 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+  <form id="mc-players-filter" method="get" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    {{ mc_search_field("q", "Spieler suchen", "Name oder UUID") }}
+    {{ mc_select_filter("sort", "Sortieren nach", [
+        ("playtime", "Spielzeit (gesamt)"),
+        ("active", "Aktive Spielzeit"),
+        ("afk", "AFK-Zeit"),
+        ("deaths", "Tode"),
+        ("punishments", "Strafen"),
+        ("recent", "Zuletzt gesehen"),
+        ("name", "Name (A–Z)")
+      ], request.args.get("sort", "playtime")) }}
+    <div class="flex items-end gap-2 sm:col-span-2">
+      {{ btn("Suchen") }}
+      <a href="{{ url_for('minecraft_players_page') }}"
+        class="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/10">
+        Zurücksetzen
+      </a>
+    </div>
+  </form>
+</div>
+
+<div data-paginated-table data-endpoint="{{ url_for('panel_api_minecraft_players') }}" data-form="#mc-players-filter"
+  data-page-size="25" data-auto-refresh-ms="30000"
+  class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+  <script type="application/json">
+    [
+      {"type":"user","nameKey":"player_name","subKey":"player_uuid_short","avatarKey":"player_head_url","urlKey":"detail_url","class":"px-3 py-2.5"},
+      {"key":"playtime","class":"px-3 py-2.5 font-medium text-white whitespace-nowrap"},
+      {"key":"active_time","class":"px-3 py-2.5 text-slate-400 whitespace-nowrap"},
+      {"key":"afk_time","class":"px-3 py-2.5 text-slate-400 whitespace-nowrap"},
+      {"key":"death_count","class":"px-3 py-2.5 text-right text-slate-200 w-16"},
+      {"key":"warning_count","class":"px-3 py-2.5 text-right text-slate-200 w-16"},
+      {"key":"punishment_count","class":"px-3 py-2.5 text-right text-slate-200 w-16"},
+      {"key":"report_count","class":"px-3 py-2.5 text-right text-slate-200 w-16"},
+      {"key":"status","type":"badge","variants":{"Aktiv":"success","Gemutet":"warning","Gebannt":"danger"},"class":"px-3 py-2.5"},
+      {"key":"last_seen","class":"px-3 py-2.5 text-xs text-slate-500 whitespace-nowrap"}
+    ]
+  </script>
+  <div class="mb-4 flex items-center justify-between">
+    <h2 class="text-sm font-semibold text-white">Spielerliste</h2>
+    <span class="text-xs text-slate-500">Aktualisiert sich automatisch</span>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead>
+        <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+          <th class="px-3 py-2.5">Spieler</th>
+          <th class="px-3 py-2.5">Spielzeit</th>
+          <th class="px-3 py-2.5">Aktiv</th>
+          <th class="px-3 py-2.5">AFK</th>
+          <th class="px-3 py-2.5 text-right">Tode</th>
+          <th class="px-3 py-2.5 text-right">Verw.</th>
+          <th class="px-3 py-2.5 text-right">Strafen</th>
+          <th class="px-3 py-2.5 text-right">Reports</th>
+          <th class="px-3 py-2.5">Status</th>
+          <th class="px-3 py-2.5">Zuletzt</th>
+        </tr>
+      </thead>
+      <tbody data-table-body></tbody>
+    </table>
+  </div>
+  <div data-table-empty class="hidden">{{ empty_state("Keine Spieler gefunden", "Passe die Suche an oder warte, bis Spieler den Server betreten.") }}</div>
+  <div class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
+    <label class="flex items-center gap-2 text-xs text-slate-500">
+      Pro Seite
+      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white">
+        <option>10</option>
+        <option selected>25</option>
+        <option>50</option>
+        <option>100</option>
+      </select>
+    </label>
+    <div data-table-pagination class="flex-1"></div>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
+{% endblock %}

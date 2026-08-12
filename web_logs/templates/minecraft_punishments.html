@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header, stat_tile, btn, empty_state, scrollspy_nav %}
+{% from "_mc_macros.html" import mc_error_card, mc_search_field, mc_select_filter %}
+
+{% block content %}
+{{ page_header("Minecraft", "Strafen", "Bans, Mutes und Verwarnungen aus der PumpeCraft-Datenbank.") }}
+
+{% if mc_error %}
+{{ mc_error_card(mc_error) }}
+{% else %}
+
+<div class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+  {{ stat_tile("Aktive Bans", overview.bans_active, accent=("red" if overview.bans_active else "slate"),
+    sub="{} insgesamt".format(overview.bans_total)) }}
+  {{ stat_tile("Aktive Mutes", overview.mutes_active, accent=("amber" if overview.mutes_active else "slate"),
+    sub="{} insgesamt".format(overview.mutes_total)) }}
+  {{ stat_tile("Verwarnungen", overview.warnings_total, accent=("violet" if overview.warnings_total else "slate"),
+    sub="Gesamt erfasst") }}
+  {{ stat_tile("Offene Reports", overview.reports_open, accent=("cyan" if overview.reports_open else "slate"),
+    sub="{} insgesamt".format(overview.reports_total)) }}
+</div>
+
+{{ scrollspy_nav([
+  {"id": "bans", "label": "Bans"},
+  {"id": "mutes", "label": "Mutes"},
+  {"id": "warns", "label": "Verwarnungen"}
+]) }}
+
+<div class="mb-6 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+  <form id="mc-mod-filter" method="get" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    {{ mc_search_field("q", "Suche", "Spieler, Team, Grund oder ID") }}
+    {{ mc_select_filter("status", "Ban-Status", [
+        ("all", "Alle"),
+        ("active", "Nur aktive"),
+        ("expired", "Nur abgelaufene"),
+        ("permanent", "Nur permanente")
+      ], request.args.get("status", "all")) }}
+    {% if punishment_type_options|length > 1 %}
+    {{ mc_select_filter("punishment_type", "Ban-Typ", punishment_type_options,
+        request.args.get("punishment_type", "")) }}
+    {% endif %}
+    {{ mc_select_filter("mute_status", "Mute-Status", [
+        ("all", "Alle"),
+        ("active", "Nur aktive"),
+        ("expired", "Nur abgelaufene")
+      ], request.args.get("mute_status", "all")) }}
+    <div class="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
+      {{ btn("Suchen") }}
+      <a href="{{ url_for('minecraft_punishments_page') }}"
+        class="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/10">
+        Zurücksetzen
+      </a>
+      <span class="text-xs text-slate-500">Die Suche gilt für alle drei Tabellen.</span>
+    </div>
+  </form>
+</div>
+
+{# ── Bans ── #}
+<div id="bans" data-paginated-table data-endpoint="{{ url_for('panel_api_minecraft_punishments') }}"
+  data-form="#mc-mod-filter" data-page-size="10" data-auto-refresh-ms="30000"
+  class="mb-6 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+  <script type="application/json">
+    [
+      {"key":"created_at_display","class":"px-3 py-2.5 text-xs text-slate-400 whitespace-nowrap w-40"},
+      {"type":"user","nameKey":"target_name","subKey":"target_uuid_short","avatarKey":"target_head_url","urlKey":"target_detail_url","class":"px-3 py-2.5"},
+      {"key":"punishment_type","type":"badge","variants":{"BAN":"danger","TEMPBAN":"warning","KICK":"warning"},"class":"px-3 py-2.5 w-24"},
+      {"key":"reason","fallback":"— Kein Grund angegeben —","type":"message","previewLength":90,"modalTitle":"Ban-Grund","class":"px-3 py-2.5"},
+      {"key":"staff_name","class":"px-3 py-2.5 text-slate-300 whitespace-nowrap"},
+      {"key":"expires_at_display","class":"px-3 py-2.5 text-xs text-slate-400 whitespace-nowrap w-40"},
+      {"key":"status","type":"badge","variants":{"Aktiv":"danger","Abgelaufen":"default"},"class":"px-3 py-2.5 w-28"},
+      {"key":"punishment_id","class":"px-3 py-2.5 font-mono text-[11px] text-slate-500 w-24"}
+    ]
+  </script>
+  <div class="mb-4 flex items-center justify-between">
+    <h2 class="text-sm font-semibold text-white">Bans</h2>
+    <span class="text-xs text-slate-500">Neueste zuerst</span>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead>
+        <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+          <th class="px-3 py-2.5">Datum</th>
+          <th class="px-3 py-2.5">Spieler</th>
+          <th class="px-3 py-2.5">Typ</th>
+          <th class="px-3 py-2.5">Grund</th>
+          <th class="px-3 py-2.5">Team</th>
+          <th class="px-3 py-2.5">Läuft ab</th>
+          <th class="px-3 py-2.5">Status</th>
+          <th class="px-3 py-2.5">ID</th>
+        </tr>
+      </thead>
+      <tbody data-table-body></tbody>
+    </table>
+  </div>
+  <div data-table-empty class="hidden">{{ empty_state("Keine Bans gefunden", "Es wurde noch niemand gebannt.") }}</div>
+  <div class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
+    <label class="flex items-center gap-2 text-xs text-slate-500">
+      Pro Seite
+      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white">
+        <option selected>10</option>
+        <option>25</option>
+        <option>50</option>
+      </select>
+    </label>
+    <div data-table-pagination class="flex-1"></div>
+  </div>
+</div>
+
+{# ── Mutes ── #}
+<div id="mutes" data-paginated-table data-endpoint="{{ url_for('panel_api_minecraft_mutes') }}"
+  data-form="#mc-mod-filter" data-page-size="10" data-auto-refresh-ms="30000"
+  class="mb-6 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+  <script type="application/json">
+    [
+      {"key":"created_at_display","class":"px-3 py-2.5 text-xs text-slate-400 whitespace-nowrap w-40"},
+      {"type":"user","nameKey":"target_name","subKey":"target_uuid_short","avatarKey":"target_head_url","urlKey":"target_detail_url","class":"px-3 py-2.5"},
+      {"key":"reason","fallback":"— Kein Grund angegeben —","type":"message","previewLength":90,"modalTitle":"Mute-Grund","class":"px-3 py-2.5"},
+      {"key":"staff_name","class":"px-3 py-2.5 text-slate-300 whitespace-nowrap"},
+      {"key":"expires_at_display","class":"px-3 py-2.5 text-xs text-slate-400 whitespace-nowrap w-40"},
+      {"key":"status","type":"badge","variants":{"Aktiv":"warning","Abgelaufen":"default"},"class":"px-3 py-2.5 w-28"}
+    ]
+  </script>
+  <div class="mb-4 flex items-center justify-between">
+    <h2 class="text-sm font-semibold text-white">Mutes</h2>
+    <span class="text-xs text-slate-500">Ein aktiver Mute pro Spieler</span>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead>
+        <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+          <th class="px-3 py-2.5">Gemutet am</th>
+          <th class="px-3 py-2.5">Spieler</th>
+          <th class="px-3 py-2.5">Grund</th>
+          <th class="px-3 py-2.5">Team</th>
+          <th class="px-3 py-2.5">Läuft ab</th>
+          <th class="px-3 py-2.5">Status</th>
+        </tr>
+      </thead>
+      <tbody data-table-body></tbody>
+    </table>
+  </div>
+  <div data-table-empty class="hidden">{{ empty_state("Keine Mutes gefunden", "Aktuell ist niemand stummgeschaltet.") }}</div>
+  <div class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
+    <label class="flex items-center gap-2 text-xs text-slate-500">
+      Pro Seite
+      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white">
+        <option selected>10</option>
+        <option>25</option>
+        <option>50</option>
+      </select>
+    </label>
+    <div data-table-pagination class="flex-1"></div>
+  </div>
+</div>
+
+{# ── Verwarnungen ── #}
+<div id="warns" data-paginated-table data-endpoint="{{ url_for('panel_api_minecraft_warnings') }}"
+  data-form="#mc-mod-filter" data-page-size="10" data-auto-refresh-ms="30000"
+  class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+  <script type="application/json">
+    [
+      {"key":"created_at_display","class":"px-3 py-2.5 text-xs text-slate-400 whitespace-nowrap w-40"},
+      {"type":"user","nameKey":"target_name","subKey":"target_uuid_short","avatarKey":"target_head_url","urlKey":"target_detail_url","class":"px-3 py-2.5"},
+      {"key":"reason","fallback":"— Kein Grund angegeben —","type":"message","previewLength":110,"modalTitle":"Verwarnungs-Grund","class":"px-3 py-2.5"},
+      {"key":"staff_name","class":"px-3 py-2.5 text-slate-300 whitespace-nowrap"},
+      {"key":"id","class":"px-3 py-2.5 font-mono text-[11px] text-slate-500 w-16"}
+    ]
+  </script>
+  <div class="mb-4 flex items-center justify-between">
+    <h2 class="text-sm font-semibold text-white">Verwarnungen</h2>
+    <span class="text-xs text-slate-500">Neueste zuerst</span>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead>
+        <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+          <th class="px-3 py-2.5">Datum</th>
+          <th class="px-3 py-2.5">Spieler</th>
+          <th class="px-3 py-2.5">Grund</th>
+          <th class="px-3 py-2.5">Team</th>
+          <th class="px-3 py-2.5">ID</th>
+        </tr>
+      </thead>
+      <tbody data-table-body></tbody>
+    </table>
+  </div>
+  <div data-table-empty class="hidden">{{ empty_state("Keine Verwarnungen gefunden", "Auf dem Server wurde noch niemand verwarnt.") }}</div>
+  <div class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
+    <label class="flex items-center gap-2 text-xs text-slate-500">
+      Pro Seite
+      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white">
+        <option selected>10</option>
+        <option>25</option>
+        <option>50</option>
+      </select>
+    </label>
+    <div data-table-pagination class="flex-1"></div>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
+{% endblock %}

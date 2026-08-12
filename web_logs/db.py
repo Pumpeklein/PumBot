@@ -1527,6 +1527,9 @@ ALL_PERMISSIONS = [
     "stats.manage",
     "warnings.view",
     "warnings.manage",
+    "minecraft.view",
+    "minecraft.players.view",
+    "minecraft.moderation.view",
     "roles.manage",
     "config.manage",
     "logs.view",
@@ -1598,6 +1601,15 @@ PERMISSION_GROUPS = [
             ("stats.manage", "Statistiken verwalten"),
             ("warnings.view", "Verwarnungen ansehen"),
             ("warnings.manage", "Verwarnungen verwalten"),
+        ],
+    },
+    {
+        "key": "minecraft",
+        "label": "Minecraft",
+        "permissions": [
+            ("minecraft.view", "Voller Lesezugriff"),
+            ("minecraft.players.view", "Nur Spieler & Statistiken"),
+            ("minecraft.moderation.view", "Nur Strafen & Reports"),
         ],
     },
     {

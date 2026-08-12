@@ -97,6 +97,9 @@
         {% set can_birthdays = "birthdays.view" in permissions or "birthdays.manage" in permissions or "admin" in permissions %}
         {% set can_config = "config.manage" in permissions or "admin" in permissions %}
         {% set can_logs = "logs.view" in permissions or "logs.manage" in permissions or "admin" in permissions %}
+        {% set can_mc_players = "minecraft.view" in permissions or "minecraft.players.view" in permissions or "admin" in permissions %}
+        {% set can_mc_moderation = "minecraft.view" in permissions or "minecraft.moderation.view" in permissions or "admin" in permissions %}
+        {% set can_minecraft = can_mc_players or can_mc_moderation %}
         {% macro navlink(endpoint, label, page_key, icon_path, active) %}
           <a href="{{ url_for(endpoint) }}"
              class="group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition
@@ -158,6 +161,22 @@
         {% if can_birthdays %}
         {{ navlink("birthdays_page", "Geburtstage", "birthdays",
           "<path stroke-linecap='round' stroke-linejoin='round' stroke-width='1.7' d='M5 13l4 4L19 7M5 21h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z'/>", active_page) }}
+        {% endif %}
+        {% endif %}
+
+        {% if can_minecraft %}
+        {{ navsection("Minecraft") }}
+        {{ navlink("minecraft_page", "Übersicht", "minecraft",
+          "<path stroke-linecap='round' stroke-linejoin='round' stroke-width='1.7' d='M4 7.5l8-4 8 4v9l-8 4-8-4v-9z'/><path stroke-linecap='round' stroke-linejoin='round' stroke-width='1.7' d='M4 7.5l8 4m0 0l8-4m-8 4v9'/>", active_page) }}
+        {% if can_mc_players %}
+        {{ navlink("minecraft_players_page", "Spieler", "minecraft_players",
+          "<path stroke-linecap='round' stroke-linejoin='round' stroke-width='1.7' d='M12 14a4 4 0 100-8 4 4 0 000 8zm0 0c-3.314 0-6 2.239-6 5v1h12v-1c0-2.761-2.686-5-6-5z'/>", active_page) }}
+        {% endif %}
+        {% if can_mc_moderation %}
+        {{ navlink("minecraft_punishments_page", "Strafen", "minecraft_punishments",
+          "<path stroke-linecap='round' stroke-linejoin='round' stroke-width='1.7' d='M12 3l7 4v5c0 4.418-2.99 7.94-7 9-4.01-1.06-7-4.582-7-9V7l7-4z'/><path stroke-linecap='round' stroke-linejoin='round' stroke-width='1.7' d='M9.5 12.5l1.8 1.8 3.7-3.9'/>", active_page) }}
+        {{ navlink("minecraft_reports_page", "Reports", "minecraft_reports",
+          "<path stroke-linecap='round' stroke-linejoin='round' stroke-width='1.7' d='M4 4h11l-1.5 4L15 12H4m0 0v8m0-8V4'/>", active_page) }}
         {% endif %}
         {% endif %}
 

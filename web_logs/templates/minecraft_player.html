@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header, stat_tile, empty_state, section_heading, id_chip %}
+{% from "_mc_macros.html" import mc_error_card, mc_pill %}
+
+{% block content %}
+{% if mc_error %}
+{{ page_header("Minecraft", "Spieler", "") }}
+{{ mc_error_card(mc_error) }}
+{% else %}
+
+<div class="mb-6">
+  <a href="{{ url_for('minecraft_players_page') }}"
+    class="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 transition hover:text-white">
+    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+    </svg>
+    Zurück zur Spielerliste
+  </a>
+
+  <div class="flex flex-wrap items-center gap-4 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    {% if player.player_head_url %}
+    <img src="{{ player.player_head_url }}" alt="" class="h-16 w-16 rounded-lg ring-1 ring-white/10">
+    {% else %}
+    <div class="flex h-16 w-16 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-cyan-600 text-lg font-bold text-white">
+      {{ player.player_name[:2]|upper }}
+    </div>
+    {% endif %}
+    <div class="min-w-0 flex-1">
+      <h1 class="truncate text-2xl font-bold text-white">{{ player.player_name }}</h1>
+      <div class="mt-2 flex flex-wrap items-center gap-2">
+        {{ id_chip(player.player_uuid, "UUID") }}
+        {% if player.active_bans %}{{ mc_pill("Gebannt", "danger") }}{% endif %}
+        {% if player.mute %}{{ mc_pill("Gemutet", "warning") }}{% endif %}
+        {% if not player.active_bans and not player.mute %}{{ mc_pill("Keine aktiven Strafen", "success") }}{% endif %}
+        {% if player.playtime_rank %}{{ mc_pill("Spielzeit-Rang #" ~ player.playtime_rank, "info") }}{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+  {{ stat_tile("Spielzeit", playtime_total, accent="cyan",
+    sub=(player.playtime.updated_at|datetime_de if player.playtime else "Keine Daten")) }}
+  {{ stat_tile("Aktive Zeit", playtime_active, accent="emerald", sub="AFK " ~ playtime_afk) }}
+  {{ stat_tile("Tode", (player.deaths.death_count if player.deaths else 0), accent="amber",
+    sub=(player.deaths.updated_at|datetime_de if player.deaths else "Keine Daten")) }}
+  {% if show_moderation %}
+  {{ stat_tile("Strafen", punishments|length + warnings|length,
+    accent=("red" if (punishments or warnings) else "slate"),
+    sub="{} Bans · {} Verwarnungen".format(punishments|length, warnings|length)) }}
+  {% else %}
+  {{ stat_tile("Reports", reports_against|length, accent="slate", sub="Gegen diesen Spieler") }}
+  {% endif %}
+</div>
+
+{% if show_moderation %}
+
+{% if player.mute %}
+<div class="mb-6 rounded-xl border border-amber-500/25 bg-amber-500/[0.07] p-5">
+  {{ section_heading("Aktiver Mute", "Der Spieler kann aktuell nicht schreiben") }}
+  <div class="grid gap-3 text-sm sm:grid-cols-3">
+    <div>
+      <div class="text-[11px] uppercase tracking-wider text-amber-200/50">Grund</div>
+      <div class="mt-0.5 text-amber-100">{{ mute.reason }}</div>
+    </div>
+    <div>
+      <div class="text-[11px] uppercase tracking-wider text-amber-200/50">Von</div>
+      <div class="mt-0.5 text-amber-100">{{ mute.staff_name }}</div>
+    </div>
+    <div>
+      <div class="text-[11px] uppercase tracking-wider text-amber-200/50">Läuft ab</div>
+      <div class="mt-0.5 text-amber-100">{{ mute.expires_at_display }}</div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="grid gap-4 lg:grid-cols-2">
+
+  {# ── Bans ── #}
+  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    {{ section_heading("Bans", "{} Einträge".format(punishments|length)) }}
+    {% if punishments %}
+    <div class="space-y-2">
+      {% for entry in punishments %}
+      <div class="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+        <div class="flex flex-wrap items-center gap-2">
+          {{ mc_pill(entry.punishment_type, "danger") }}
+          <span class="font-mono text-[10.5px] text-slate-500">{{ entry.punishment_id }}</span>
+          <span class="ml-auto text-[10.5px] text-slate-500">{{ entry.created_at_display }}</span>
+        </div>
+        <p class="mt-2 break-words text-sm text-slate-200">{{ entry.reason }}</p>
+        <div class="mt-2 flex flex-wrap gap-x-4 text-[10.5px] text-slate-500">
+          <span>Von {{ entry.staff_name }}</span>
+          <span>Läuft ab: {{ entry.expires_at_display }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    {{ empty_state("Keine Bans", "Dieser Spieler wurde nie gebannt.") }}
+    {% endif %}
+  </div>
+
+  {# ── Verwarnungen ── #}
+  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    {{ section_heading("Verwarnungen", "{} Einträge".format(warnings|length)) }}
+    {% if warnings %}
+    <div class="space-y-2">
+      {% for entry in warnings %}
+      <div class="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+        <div class="flex flex-wrap items-center gap-2">
+          {{ mc_pill("WARN", "info") }}
+          <span class="ml-auto text-[10.5px] text-slate-500">{{ entry.created_at_display }}</span>
+        </div>
+        <p class="mt-2 break-words text-sm text-slate-200">{{ entry.reason }}</p>
+        <div class="mt-2 text-[10.5px] text-slate-500">Von {{ entry.staff_name }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    {{ empty_state("Keine Verwarnungen", "Dieser Spieler wurde nie verwarnt.") }}
+    {% endif %}
+  </div>
+
+  {# ── Reports gegen den Spieler ── #}
+  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    {{ section_heading("Gemeldet worden", "{} Reports gegen diesen Spieler".format(reports_against|length)) }}
+    {% if reports_against %}
+    <div class="space-y-2">
+      {% for entry in reports_against %}
+      <div class="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+        <div class="flex flex-wrap items-center gap-2">
+          {{ mc_pill("Offen" if entry.is_open else "Geschlossen", "danger" if entry.is_open else "success") }}
+          <span class="text-[10.5px] text-slate-500">von {{ entry.reporter_name }}</span>
+          <span class="ml-auto text-[10.5px] text-slate-500">{{ entry.created_at_display }}</span>
+        </div>
+        <p class="mt-2 break-words text-sm text-slate-200">{{ entry.reason }}</p>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    {{ empty_state("Keine Reports", "Dieser Spieler wurde nie gemeldet.") }}
+    {% endif %}
+  </div>
+
+  {# ── Eigene Reports ── #}
+  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    {{ section_heading("Eigene Meldungen", "{} Reports von diesem Spieler".format(reports_by|length)) }}
+    {% if reports_by %}
+    <div class="space-y-2">
+      {% for entry in reports_by %}
+      <div class="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+        <div class="flex flex-wrap items-center gap-2">
+          {{ mc_pill("Offen" if entry.is_open else "Geschlossen", "danger" if entry.is_open else "success") }}
+          <span class="text-[10.5px] text-slate-500">gegen {{ entry.target_name }}</span>
+          <span class="ml-auto text-[10.5px] text-slate-500">{{ entry.created_at_display }}</span>
+        </div>
+        <p class="mt-2 break-words text-sm text-slate-200">{{ entry.reason }}</p>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    {{ empty_state("Keine Meldungen", "Dieser Spieler hat noch niemanden gemeldet.") }}
+    {% endif %}
+  </div>
+</div>
+
+{% else %}
+<div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 text-sm text-slate-400">
+  Für Strafen und Reports fehlt dir die Berechtigung
+  <span class="font-mono text-slate-300">minecraft.moderation.view</span>.
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

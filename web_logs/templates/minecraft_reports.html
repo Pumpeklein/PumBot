@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header, stat_tile, btn, empty_state %}
+{% from "_mc_macros.html" import mc_error_card, mc_search_field, mc_select_filter %}
+
+{% block content %}
+{{ page_header("Minecraft", "Reports", "Spielermeldungen vom Server – offen und bereits bearbeitet.") }}
+
+{% if mc_error %}
+{{ mc_error_card(mc_error) }}
+{% else %}
+
+<div class="mb-6 grid gap-3 sm:grid-cols-3">
+  {{ stat_tile("Offene Reports", overview.reports_open, accent=("red" if overview.reports_open else "emerald"),
+    sub=("Warten auf Bearbeitung" if overview.reports_open else "Alles abgearbeitet")) }}
+  {{ stat_tile("Reports gesamt", overview.reports_total, accent="cyan", sub="Seit Start des Servers") }}
+  {{ stat_tile("Geschlossen", overview.reports_total - overview.reports_open, accent="slate", sub="Bereits bearbeitet") }}
+</div>
+
+<div class="mb-6 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+  <form id="mc-reports-filter" method="get" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    {{ mc_search_field("q", "Suche", "Spieler, Melder oder Grund") }}
+    {{ mc_select_filter("status", "Status", [
+        ("all", "Alle"),
+        ("open", "Nur offene"),
+        ("closed", "Nur geschlossene")
+      ], request.args.get("status", "all")) }}
+    <div class="flex items-end gap-2 sm:col-span-2">
+      {{ btn("Suchen") }}
+      <a href="{{ url_for('minecraft_reports_page') }}"
+        class="rounded-lg border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/10">
+        Zurücksetzen
+      </a>
+    </div>
+  </form>
+</div>
+
+<div data-paginated-table data-endpoint="{{ url_for('panel_api_minecraft_reports') }}" data-form="#mc-reports-filter"
+  data-page-size="25" data-auto-refresh-ms="30000"
+  class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+  <script type="application/json">
+    [
+      {"key":"report_label","class":"px-3 py-2.5 font-mono text-[11px] text-slate-500 w-14"},
+      {"key":"created_at_display","class":"px-3 py-2.5 text-xs text-slate-400 whitespace-nowrap w-40"},
+      {"type":"user","nameKey":"reporter_name","subKey":"reporter_uuid_short","avatarKey":"reporter_head_url","urlKey":"reporter_detail_url","class":"px-3 py-2.5"},
+      {"type":"user","nameKey":"target_name","subKey":"target_uuid_short","avatarKey":"target_head_url","urlKey":"target_detail_url","class":"px-3 py-2.5"},
+      {"key":"reason","fallback":"— Kein Grund angegeben —","type":"message","previewLength":120,"modalTitle":"Report-Grund","class":"px-3 py-2.5"},
+      {"key":"status","type":"badge","variants":{"Offen":"danger","Geschlossen":"success"},"class":"px-3 py-2.5 w-32"}
+    ]
+  </script>
+  <div class="mb-4 flex items-center justify-between">
+    <h2 class="text-sm font-semibold text-white">Reports</h2>
+    <span class="text-xs text-slate-500">Offene zuerst</span>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-left text-sm">
+      <thead>
+        <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+          <th class="px-3 py-2.5">#</th>
+          <th class="px-3 py-2.5">Datum</th>
+          <th class="px-3 py-2.5">Melder</th>
+          <th class="px-3 py-2.5">Gemeldet</th>
+          <th class="px-3 py-2.5">Grund</th>
+          <th class="px-3 py-2.5">Status</th>
+        </tr>
+      </thead>
+      <tbody data-table-body></tbody>
+    </table>
+  </div>
+  <div data-table-empty class="hidden">{{ empty_state("Keine Reports gefunden", "Es wurden noch keine Spieler gemeldet.") }}</div>
+  <div class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
+    <label class="flex items-center gap-2 text-xs text-slate-500">
+      Pro Seite
+      <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white">
+        <option>10</option>
+        <option selected>25</option>
+        <option>50</option>
+        <option>100</option>
+      </select>
+    </label>
+    <div data-table-pagination class="flex-1"></div>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
+{% endblock %}

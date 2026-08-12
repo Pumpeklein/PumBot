@@ -35,6 +35,29 @@ class Config:
     DB_PASSWORD: str = os.getenv("DB_PASSWORD", "")
     DB_CHARSET: str = os.getenv("DB_CHARSET", "utf8mb4")
 
+    # Minecraft-Server (PumpeCraft Plugin) – eigene Datenbank
+    MC_DB_HOST: str = os.getenv("MC_DB_HOST", "")
+    MC_DB_PORT: int = int(os.getenv("MC_DB_PORT", "3306"))
+    MC_DB_NAME: str = os.getenv("MC_DB_NAME", "")
+    MC_DB_USER: str = os.getenv("MC_DB_USER", "")
+    MC_DB_PASSWORD: str = os.getenv("MC_DB_PASSWORD", "")
+    MC_DB_CHARSET: str = os.getenv("MC_DB_CHARSET", "utf8mb4")
+    MC_DB_CONNECT_TIMEOUT: int = int(os.getenv("MC_DB_CONNECT_TIMEOUT", "10"))
+    MC_DB_READ_TIMEOUT: int = int(os.getenv("MC_DB_READ_TIMEOUT", "20"))
+    MC_SERVER_NAME: str = os.getenv("MC_SERVER_NAME", "PumpeCraft")
+    MC_SERVER_ADDRESS: str = os.getenv("MC_SERVER_ADDRESS", "")
+    # Skin-Köpfe (externer Renderer) – leer lassen um Avatare zu deaktivieren
+    MC_HEAD_BASE_URL: str = os.getenv("MC_HEAD_BASE_URL", "https://mc-heads.net/avatar")
+    # Namensauflösung über die Mojang-API für Spieler ohne Moderations-Eintrag
+    MC_NAME_LOOKUP: bool = os.getenv("MC_NAME_LOOKUP", "1").strip().lower() not in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }
+    MC_NAME_LOOKUP_TIMEOUT: float = float(os.getenv("MC_NAME_LOOKUP_TIMEOUT", "2.5"))
+    MC_NAME_LOOKUP_MAX: int = int(os.getenv("MC_NAME_LOOKUP_MAX", "25"))
+
     DATA_DIR = DATA_DIR
     TRANSCRIPTS_DIR = TRANSCRIPTS_DIR
 

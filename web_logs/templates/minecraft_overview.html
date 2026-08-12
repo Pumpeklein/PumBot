@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header, stat_tile, empty_state, section_heading %}
+{% from "_mc_macros.html" import mc_error_card, mc_player_chip, mc_pill %}
+
+{% set can_mc_moderation = "minecraft.view" in permissions or "minecraft.moderation.view" in permissions or "admin" in permissions %}
+{% set can_mc_players = "minecraft.view" in permissions or "minecraft.players.view" in permissions or "admin" in permissions %}
+
+{% block content %}
+{{ page_header("Minecraft", mc_server_name, "Live-Daten aus der PumpeCraft-Plugin-Datenbank – Spielzeit, Tode, Strafen und Reports.") }}
+
+{% if mc_error %}
+{{ mc_error_card(mc_error) }}
+{% else %}
+
+<div class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+  {{ stat_tile("Spieler", "{:,}".format(overview.players).replace(",", "."), accent="cyan",
+    sub="{} mit Spielzeit-Tracking".format(overview.playtime_players)) }}
+  {{ stat_tile("Gesamte Spielzeit", total_playtime, accent="violet",
+    sub="Aktiv {} · AFK {}".format(active_playtime, afk_playtime)) }}
+  {{ stat_tile("Tode gesamt", "{:,}".format(overview.total_deaths).replace(",", "."), accent="amber",
+    sub="{} Spieler mit Toden".format(overview.death_players)) }}
+  {% if can_mc_moderation %}
+  {{ stat_tile("Offene Reports", overview.reports_open, accent=("red" if overview.reports_open else "slate"),
+    sub="{} insgesamt".format(overview.reports_total)) }}
+  {{ stat_tile("Aktive Bans", overview.bans_active, accent=("red" if overview.bans_active else "slate"),
+    sub="{} insgesamt".format(overview.bans_total)) }}
+  {{ stat_tile("Aktive Mutes", overview.mutes_active, accent=("amber" if overview.mutes_active else "slate"),
+    sub="{} Verwarnungen insgesamt".format(overview.warnings_total)) }}
+  {% endif %}
+</div>
+
+<div class="grid gap-4 lg:grid-cols-2">
+
+  {# ── Top Spielzeit ── #}
+  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    {{ section_heading("Top Spielzeit", "Die fleißigsten Spieler auf dem Server") }}
+    {% if top_playtime %}
+    <ul class="space-y-1">
+      {% for player in top_playtime %}
+      <li class="flex items-center gap-3 rounded-lg px-2 py-2 transition hover:bg-white/[0.03]">
+        <span class="w-6 shrink-0 text-center text-xs font-bold
+          {{ 'text-yellow-400' if loop.index == 1 else 'text-slate-300' if loop.index == 2 else 'text-amber-600' if loop.index == 3 else 'text-slate-600' }}">
+          #{{ loop.index }}
+        </span>
+        <div class="min-w-0 flex-1">
+          {{ mc_player_chip(player.player_name, player.player_uuid, player.player_head_url,
+             player.detail_url if can_mc_players else "") }}
+        </div>
+        <div class="shrink-0 text-right">
+          <div class="text-sm font-semibold text-white">{{ player.playtime }}</div>
+          <div class="text-[10.5px] text-slate-500">aktiv {{ player.active_time }}</div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    {{ empty_state("Keine Spielzeit erfasst", "Sobald Spieler online sind, erscheinen sie hier.") }}
+    {% endif %}
+  </div>
+
+  {# ── Meiste Tode ── #}
+  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    {{ section_heading("Meiste Tode", "Wer am häufigsten das Zeitliche segnet") }}
+    {% if top_deaths %}
+    <ul class="space-y-1">
+      {% for player in top_deaths %}
+      <li class="flex items-center gap-3 rounded-lg px-2 py-2 transition hover:bg-white/[0.03]">
+        <span class="w-6 shrink-0 text-center text-xs font-bold
+          {{ 'text-red-400' if loop.index == 1 else 'text-slate-600' }}">#{{ loop.index }}</span>
+        <div class="min-w-0 flex-1">
+          {{ mc_player_chip(player.player_name, player.player_uuid, player.player_head_url,
+             player.detail_url if can_mc_players else "") }}
+        </div>
+        <div class="shrink-0 text-right">
+          <div class="text-sm font-semibold text-white">{{ player.death_count }}</div>
+          <div class="text-[10.5px] text-slate-500">Tode</div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    {{ empty_state("Keine Tode erfasst", "Noch ist niemand gestorben.") }}
+    {% endif %}
+  </div>
+
+  {% if can_mc_moderation %}
+  {# ── Letzte Moderationsaktionen ── #}
+  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    {{ section_heading("Letzte Strafen", "Bans, Mutes und Verwarnungen") }}
+    {% if recent_moderation %}
+    <ul class="space-y-1">
+      {% for entry in recent_moderation %}
+      <li class="flex items-start gap-3 rounded-lg px-2 py-2 transition hover:bg-white/[0.03]">
+        <div class="mt-0.5 shrink-0">
+          {{ mc_pill(entry.kind_label,
+             "danger" if entry.kind == "ban" else "warning" if entry.kind == "mute" else "info") }}
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="truncate text-[13px] font-medium text-slate-200">
+            {{ entry.target_name or entry.target_uuid_short }}
+          </div>
+          <div class="truncate text-xs text-slate-500">{{ entry.reason or "Kein Grund angegeben" }}</div>
+        </div>
+        <div class="shrink-0 text-right text-[10.5px] text-slate-500">
+          <div>{{ entry.created_at_display }}</div>
+          <div>von {{ entry.staff_name }}</div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    {{ empty_state("Keine Strafen", "Bisher wurde niemand bestraft.") }}
+    {% endif %}
+  </div>
+
+  {# ── Letzte Reports ── #}
+  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    {{ section_heading("Letzte Reports", "Meldungen von Spielern") }}
+    {% if recent_reports %}
+    <ul class="space-y-1">
+      {% for report in recent_reports %}
+      <li class="flex items-start gap-3 rounded-lg px-2 py-2 transition hover:bg-white/[0.03]">
+        <div class="mt-0.5 shrink-0">
+          {{ mc_pill("Offen" if report.is_open else "Erledigt", "danger" if report.is_open else "default") }}
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="truncate text-[13px] text-slate-200">
+            <span class="font-medium">{{ report.reporter_name }}</span>
+            <span class="text-slate-500">meldet</span>
+            <span class="font-medium">{{ report.target_name }}</span>
+          </div>
+          <div class="truncate text-xs text-slate-500">{{ report.reason }}</div>
+        </div>
+        <div class="shrink-0 text-[10.5px] text-slate-500">{{ report.created_at_display }}</div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    {{ empty_state("Keine Reports", "Es wurden noch keine Spieler gemeldet.") }}
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="mt-6 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-[11px] text-slate-500">
+  <span>Datenbank <span class="font-mono text-slate-400">{{ overview.schema_version and "Schema v" ~ overview.schema_version or "—" }}</span></span>
+  {% if overview.schema_description %}<span>{{ overview.schema_description }}</span>{% endif %}
+  {% if overview.playtime_last_update %}
+  <span>Letzte Spielzeit-Aktualisierung: {{ overview.playtime_last_update|datetime_de }}</span>
+  {% endif %}
+  {% if mc_server_address %}<span class="font-mono text-slate-400">{{ mc_server_address }}</span>{% endif %}
+</div>
+
+{% endif %}
+{% endblock %}

@@ -177,8 +177,41 @@ Wichtige Eigenschaften:
 - `Auto Publisher`
 - `Server Stats`
 - `Schließungsgründe`
+- `Minecraft` → `Übersicht`, `Spieler`, `Strafen`, `Reports`
 
 Die Navigation dafür liegt in [web_logs/templates/base.html](./web_logs/templates/base.html).
+
+### Minecraft-Server (PumpeCraft)
+
+Der Minecraft-Server nutzt eine **eigene Datenbank**, die von den PumpeCraft-Plugins
+beschrieben wird. Das Panel liest diese Datenbank ausschließlich lesend und über eine
+getrennte Verbindung (`MC_DB_*` in der `.env`) – die Panel-Datenbank bleibt unberührt.
+
+Der gesamte Zugriff liegt in [web_logs/mc_db.py](./web_logs/mc_db.py).
+
+| Seite | Route | Inhalt |
+| --- | --- | --- |
+| Übersicht | `/minecraft` | Kennzahlen (Spieler, Spielzeit, Tode, offene Reports, aktive Bans/Mutes), Top-Spielzeit, Top-Tode, letzte Strafen und Reports |
+| Spieler | `/minecraft/spieler` | Durchsuch- und sortierbare Spielerliste mit Spielzeit (gesamt/aktiv/AFK), Toden, Verwarnungen, Strafen, Reports und Status |
+| Spieler-Detail | `/minecraft/spieler/<uuid>` | Vollständiges Profil inkl. Spielzeit-Rang, aktivem Mute, Ban-Historie, Verwarnungen und Reports |
+| Strafen | `/minecraft/strafen` | Bans, Mutes und Verwarnungen als drei filterbare Tabellen mit gemeinsamer Suche |
+| Reports | `/minecraft/reports` | Spielermeldungen, filterbar nach offen/geschlossen |
+
+Gelesene Tabellen: `pc_playtime`, `pc_death_counts`, `pc_reports`, `pc_mutes`,
+`pc_punishments`, `pc_warnings` und `flyway_schema_history` (Schema-Version).
+
+Hinweise zum Datenmodell:
+
+- Zeitstempel der Plugins sind Epoch-Millisekunden und werden serverseitig nach
+  Europe/Berlin formatiert.
+- Spielernamen speichert das Plugin nur auf Moderations-Zeilen. Für Spieler ohne
+  solchen Eintrag löst das Panel den Namen optional über die Mojang-API auf
+  (`MC_NAME_LOOKUP`, In-Memory-Cache). Schlägt das fehl, wird die UUID angezeigt.
+- Spielerköpfe kommen von einem externen Renderer (`MC_HEAD_BASE_URL`); leer lassen
+  deaktiviert die Avatare.
+- Ist die Minecraft-Datenbank nicht konfiguriert oder nicht erreichbar, liefern die
+  Seiten einen Hinweis mit HTTP 503 statt eines Fehlers – der Rest des Panels bleibt
+  nutzbar.
 
 ## Berechtigungskonzept
 
@@ -212,6 +245,9 @@ Die Rechteprüfung erfolgt in [web_logs/auth.py](./web_logs/auth.py) und [web_lo
 | `config.manage` | Darf serverweite Feature-Konfigurationen ändern. | Das zentrale Konfigurationsrecht für Counting, Geburtstage, Log-Channels, Auto Publisher, Server Stats und Schließungsgründe. Blendet mehrere Seiten im Panel ein und schützt deren Änderungsrouten. |
 | `logs.view` | Darf Logs lesen. | Aktuell als vorbereitetes Recht im Modell vorhanden, aber noch nicht als eigenes Lese-Gate im Web-Panel genutzt. |
 | `logs.manage` | Darf Log-Konfigurationen oder Log-bezogene Verwaltungsaktionen durchführen. | Ebenfalls vorbereitet. Derzeit werden die Log-Channel-Seiten über `config.manage` geschützt, nicht über `logs.manage`. |
+| `minecraft.view` | Voller Lesezugriff auf die Minecraft-Kategorie. | Schaltet alle Minecraft-Seiten frei (Übersicht, Spieler, Strafen, Reports) und schützt die zugehörigen `/panel-api/minecraft/*`-Endpunkte. |
+| `minecraft.players.view` | Darf nur Spieler und Statistiken sehen. | Schaltet Übersicht, Spielerliste und Spieler-Detail frei. Strafen und Reports bleiben gesperrt – auch die Moderationsblöcke auf der Detailseite. |
+| `minecraft.moderation.view` | Darf nur Strafen und Reports sehen. | Schaltet Übersicht, Strafen-Seite und Reports-Seite frei. Die Spielerliste bleibt gesperrt. |
 
 ### Praktische Zuordnung
 
@@ -223,6 +259,7 @@ Ein pragmatisches Setup für Rollen könnte so aussehen:
 | Support-Team | `tickets.view`, `tickets.reply`, `tickets.close` |
 | Moderation | `users.warn`, optional `users.ban`, `users.timeout` |
 | Konfig-Team | `config.manage`, optional `roles.manage` |
+| Minecraft-Team | `minecraft.view` bzw. nur `minecraft.moderation.view` für reine MC-Moderation |
 | Audit / Einsicht | später z. B. `tickets.view`, `logs.view`, `users.view` ohne Schreibrechte |
 
 ### Wichtig für die Weiterentwicklung
@@ -285,6 +322,7 @@ PumBot/
    ├─ auth.py
    ├─ config.py
    ├─ db.py
+   ├─ mc_db.py
    ├─ models_mysql.sql
    ├─ templates/
    ├─ static/
@@ -368,6 +406,17 @@ Die wichtigsten Variablen stehen in [.env.example](./.env.example).
 - `TWITCH_CLIENT_ID`
 - `TWITCH_AUTH_TOKEN`
 - `TWITCH_USER_LOGIN`
+
+### Minecraft-Datenbank optional
+
+Eigene, getrennte Datenbank des Minecraft-Servers. Bleiben `MC_DB_NAME` und
+`MC_DB_USER` leer, zeigen die Minecraft-Seiten einen Hinweis statt Daten.
+
+- `MC_DB_HOST`, `MC_DB_PORT`, `MC_DB_NAME`, `MC_DB_USER`, `MC_DB_PASSWORD`, `MC_DB_CHARSET`
+- `MC_SERVER_NAME`, `MC_SERVER_ADDRESS` – Anzeigename und Adresse im Panel
+- `MC_HEAD_BASE_URL` – Renderer für Spielerköpfe, leer deaktiviert Avatare
+- `MC_NAME_LOOKUP` – `0` deaktiviert die Mojang-Namensauflösung
+- `MC_NAME_LOOKUP_TIMEOUT`, `MC_NAME_LOOKUP_MAX` – Timeout und maximale Lookups pro Anfrage
 
 ## Starten
 

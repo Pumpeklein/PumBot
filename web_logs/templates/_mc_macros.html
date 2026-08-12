@@ -1,0 +1,72 @@
+{# ── Minecraft panel components ── #}
+
+{% macro mc_error_card(message) %}
+<div class="mb-6 rounded-xl border border-amber-500/25 bg-amber-500/[0.07] p-5">
+  <div class="flex items-start gap-3">
+    <svg class="mt-0.5 h-5 w-5 shrink-0 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7"
+        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+    </svg>
+    <div class="min-w-0">
+      <h2 class="text-sm font-semibold text-amber-200">Minecraft-Datenbank nicht verfügbar</h2>
+      <p class="mt-1 break-words text-sm text-amber-200/70">{{ message }}</p>
+      <p class="mt-2 text-xs text-amber-200/50">
+        Prüfe die <code class="rounded bg-black/30 px-1 py-0.5">MC_DB_*</code>-Werte in der <code
+          class="rounded bg-black/30 px-1 py-0.5">.env</code>.
+      </p>
+    </div>
+  </div>
+</div>
+{% endmacro %}
+
+{# Spieler-Chip mit Kopf-Avatar #}
+{% macro mc_player_chip(name, uuid, head_url="", url="", sub="") %}
+{% set body %}
+<span class="flex min-w-0 items-center gap-2.5">
+  {% if head_url %}
+  <img src="{{ head_url }}" alt="" loading="lazy" class="h-8 w-8 shrink-0 rounded ring-1 ring-white/10">
+  {% else %}
+  <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-slate-700 text-[11px] font-semibold text-white">{{ (name or "?")[:2]|upper }}</span>
+  {% endif %}
+  <span class="min-w-0">
+    <span class="block truncate text-[13px] font-medium text-slate-200">{{ name or "—" }}</span>
+    <span class="block truncate font-mono text-[10.5px] text-slate-500">{{ sub or (uuid or "")[:8] }}</span>
+  </span>
+</span>
+{% endset %}
+{% if url %}<a href="{{ url }}" class="block min-w-0 hover:text-white">{{ body }}</a>{% else %}{{ body }}{% endif %}
+{% endmacro %}
+
+{# Kleines Status-Pill #}
+{% macro mc_pill(text, variant="default") %}
+{% set colors = {
+"success": "border-emerald-500/25 bg-emerald-500/10 text-emerald-300",
+"warning": "border-amber-500/25 bg-amber-500/10 text-amber-300",
+"danger": "border-red-500/25 bg-red-500/10 text-red-300",
+"info": "border-cyan-500/25 bg-cyan-500/10 text-cyan-300",
+"default": "border-white/10 bg-white/5 text-slate-400"
+} %}
+<span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[10.5px] font-medium {{ colors.get(variant, colors['default']) }}">{{ text }}</span>
+{% endmacro %}
+
+{# Suchfeld + Filterleiste für die Minecraft-Tabellen #}
+{% macro mc_search_field(name="q", label="Suche", placeholder="Name oder UUID") %}
+<div>
+  <label class="mb-1 block text-xs font-medium text-slate-400">{{ label }}</label>
+  <input type="search" name="{{ name }}" value="{{ request.args.get(name, '') }}" data-live-search
+    placeholder="{{ placeholder }}"
+    class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-slate-500 focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30">
+</div>
+{% endmacro %}
+
+{% macro mc_select_filter(name, label, options, selected="") %}
+<div>
+  <label class="mb-1 block text-xs font-medium text-slate-400">{{ label }}</label>
+  <select name="{{ name }}" data-live-search
+    class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3 py-2 text-sm text-white focus:border-cyan-500/50 focus:outline-none focus:ring-1 focus:ring-cyan-500/30">
+    {% for value, text in options %}
+    <option value="{{ value }}" {% if value==selected %}selected{% endif %}>{{ text }}</option>
+    {% endfor %}
+  </select>
+</div>
+{% endmacro %}

@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% from "_macros.html" import stat_tile, empty_state, section_heading %}
+{% from "_mc_macros.html" import mc_error_card, skill_icon, skills_pending_card %}
+
+{% block content %}
+
+{# ── Kopf mit Skill-Identität ── #}
+<div class="mb-6">
+  <a href="{{ url_for('minecraft_skills_page') }}"
+    class="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 transition hover:text-white">
+    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+    </svg>
+    Alle Skills
+  </a>
+
+  <div class="flex flex-wrap items-center gap-4 overflow-hidden rounded-2xl p-5"
+    style="background: linear-gradient(155deg, {{ skill.color|hex_alpha(0.12) }}, rgba(13,19,32,0) 65%), #0d1320;
+           box-shadow: inset 0 0 0 1px {{ skill.color|hex_alpha(0.22) }}">
+    {{ skill_icon(skill, size="h-14 w-14", text="text-2xl") }}
+    <div class="min-w-0 flex-1">
+      <h1 class="text-2xl font-bold text-white">{{ skill.name }}</h1>
+      <p class="mt-1 text-sm text-slate-400">{{ skill.description }}</p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      {% for other in mc_skills %}
+      {% if other.id != skill.id %}
+      <a href="{{ url_for('minecraft_skill_page', skill_id=other.id) }}" title="{{ other.name }}"
+        class="flex h-9 w-9 items-center justify-center rounded-lg text-base transition hover:scale-110"
+        style="background: {{ other.color|hex_alpha(0.1) }}; box-shadow: inset 0 0 0 1px {{ other.color|hex_alpha(0.22) }}">
+        {{ other.icon }}
+      </a>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{% if mc_error %}
+{{ mc_error_card(mc_error) }}
+{% elif skills_pending %}
+{{ skills_pending_card() }}
+{% else %}
+
+<div class="mb-6 grid gap-3 sm:grid-cols-2">
+  {{ stat_tile("Spieler mit Punkten", player_count, accent="cyan",
+     sub=("in diesem Skill" if player_count else "noch niemand dabei")) }}
+  {{ stat_tile("Levelkurve", "50 · (Lv−1)²", accent="slate", sub="Level 2 ab 50, Level 10 ab 4.050") }}
+</div>
+
+<div class="grid gap-4 lg:grid-cols-3">
+
+  {# ── Bestenliste ── #}
+  {# preserve-empty-rows=false: bei wenigen Spielern soll die Karte nicht mit
+     Leerzeilen aufgeblasen werden. #}
+  <div class="lg:col-span-2" data-paginated-table
+    data-endpoint="{{ url_for('panel_api_minecraft_skill_leaderboard', skill_id=skill.id) }}"
+    data-page-size="10" data-preserve-empty-rows="false" data-auto-refresh-ms="30000">
+    <script type="application/json">
+      [
+        {"key":"rank","type":"rank","class":"px-3 py-2.5 w-14"},
+        {"type":"user","nameKey":"player_name","subKey":"player_uuid_short","avatarKey":"player_head_url","urlKey":"detail_url","class":"px-3 py-2.5"},
+        {"key":"level_label","class":"px-3 py-2.5 whitespace-nowrap text-slate-300 w-16"},
+        {"type":"meter","percentKey":"bar_percent","colorKey":"bar_color","labelKey":"score_label","class":"px-3 py-2.5 w-64"}
+      ]
+    </script>
+    <div class="rounded-2xl border border-white/[0.06] bg-[#0d1320] p-5">
+      <div class="mb-4 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-white">Bestenliste</h2>
+        <span class="text-xs text-slate-500">Punkte, höchste zuerst</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm">
+          <thead>
+            <tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+              <th class="px-3 py-2.5">Platz</th>
+              <th class="px-3 py-2.5">Spieler</th>
+              <th class="px-3 py-2.5">Level</th>
+              <th class="px-3 py-2.5">Punkte</th>
+            </tr>
+          </thead>
+          <tbody data-table-body></tbody>
+        </table>
+      </div>
+      <div data-table-empty class="hidden">
+        {{ empty_state("Noch keine Punkte", "Sobald jemand in " ~ skill.name ~ " Punkte sammelt, erscheint er hier.") }}
+      </div>
+      <div class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
+        <label class="flex items-center gap-2 text-xs text-slate-500">
+          Pro Seite
+          <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white">
+            <option selected>10</option>
+            <option>25</option>
+            <option>50</option>
+            <option>100</option>
+          </select>
+        </label>
+        <div data-table-pagination class="flex-1"></div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Serverweite Top-Einträge ── #}
+  <div class="rounded-2xl border border-white/[0.06] bg-[#0d1320] p-5">
+    {{ section_heading(top_label or "Top-Einträge", "Über alle Spieler zusammengezählt") }}
+    {% if top_stats %}
+    {% set highest = top_stats[0].total %}
+    <ul class="space-y-3">
+      {% for entry in top_stats %}
+      <li>
+        <div class="mb-1.5 flex items-baseline justify-between gap-3">
+          <span class="min-w-0 truncate text-[13px] text-slate-200">{{ entry.label }}</span>
+          <span class="shrink-0 text-xs font-medium tabular-nums text-slate-400">{{ entry.total|number_de }}</span>
+        </div>
+        <span class="relative block h-2 w-full overflow-hidden rounded-full"
+          style="background: {{ skill.color|hex_alpha(0.16) }}"
+          title="{{ entry.label }}: {{ entry.total|number_de }}">
+          <span class="absolute inset-y-0 left-0 rounded-r-full"
+            style="width: {{ (entry.total / highest * 100)|round(1) if highest else 0 }}%; background: {{ skill.color }}"></span>
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    {{ empty_state("Noch keine Daten", "Hier erscheinen die häufigsten Einträge, sobald gespielt wird.") }}
+    {% endif %}
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
+{% endblock %}

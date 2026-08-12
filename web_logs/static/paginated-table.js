@@ -29,6 +29,13 @@
     return escapeHtml(text.slice(0, 2).toUpperCase());
   };
 
+  const hexAlpha = (hex, alpha) => {
+    const text = String(hex || "").trim().replace(/^#/, "");
+    if (!/^[0-9a-f]{6}$/i.test(text)) return `rgba(148, 163, 184, ${alpha})`;
+    const [r, g, b] = [0, 2, 4].map((i) => parseInt(text.slice(i, i + 2), 16));
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
+
   const renderBadge = (value, map) => {
     const variant = (map && map[value]) || "default";
     const styles = {
@@ -111,6 +118,19 @@
           return `<a href="${safeUrl}" target="_blank" rel="noopener" class="inline-flex h-7 items-center rounded border border-white/10 bg-white/5 px-2 text-xs text-cyan-300 hover:bg-white/10">Anhang ${index + 1}</a>`;
         })
         .join("")}${items.length > 4 ? `<span class="text-xs text-slate-500">+${items.length - 4}</span>` : ""}</div>`;
+    }
+    if (column.type === "meter") {
+      const percent = Math.max(0, Math.min(100, Number(getValue(row, column.percentKey) || 0)));
+      const color = getValue(row, column.colorKey) || "#38bdf8";
+      const label = getValue(row, column.labelKey);
+      const title = label ? ` title="${escapeHtml(label)}"` : "";
+      // Spur in derselben Farbe, Füllung mit abgerundetem Datenende.
+      return `<div class="flex items-center gap-2.5"${title}>
+        <span class="relative block h-2 flex-1 overflow-hidden rounded-full" style="background:${escapeHtml(hexAlpha(color, 0.16))}">
+          <span class="absolute inset-y-0 left-0 rounded-r-full" style="width:${percent}%;background:${escapeHtml(color)}"></span>
+        </span>
+        ${label ? `<span class="w-16 shrink-0 text-right text-xs font-medium tabular-nums text-slate-200">${escapeHtml(label)}</span>` : ""}
+      </div>`;
     }
     if (column.type === "badge")
       return renderBadge(value || column.fallback, column.variants);
@@ -342,10 +362,12 @@
         }
         lastSignature = signature;
 
-        const filler =
-          preserveEmptyRows || items.length > 0
-            ? fillerRowsHtml(Math.max(0, size - items.length))
-            : "";
+        // Fuellzeilen halten die Tabellenhoehe stabil. Tabellen mit
+        // data-preserve-empty-rows="false" wollen stattdessen auf die
+        // tatsaechliche Zeilenzahl schrumpfen.
+        const filler = preserveEmptyRows
+          ? fillerRowsHtml(Math.max(0, size - items.length))
+          : "";
         const html = rowsHtmlFor(items) + filler;
         if (body.innerHTML !== html) body.innerHTML = html;
         if (empty) empty.classList.toggle("hidden", items.length > 0);

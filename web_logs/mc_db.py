@@ -925,3 +925,417 @@ def get_recent_reports(limit: int = 6) -> list[dict]:
             """SELECT * FROM pc_reports ORDER BY is_open DESC, created_at DESC LIMIT %s""",
             (limit,),
         )
+
+
+# ══════════ Skills ══════════
+
+# Reihenfolge und Farben spiegeln das PumpeSkills-Plugin. Die Hex-Werte sind auf
+# der Panel-Kartenfläche (#0d1320) validiert: benachbarte Paare halten
+# CVD ΔE 13.0 (Ziel 8) und Normalsicht ΔE 19.3 (Floor 15) ein.
+SKILLS: list[dict] = [
+    {
+        "id": "fischer",
+        "name": "Fischer",
+        "color": "#199e70",
+        "icon": "🎣",
+        "description": "Angeln und seltene Fänge",
+    },
+    {
+        "id": "miner",
+        "name": "Miner",
+        "color": "#3987e5",
+        "icon": "⛏️",
+        "description": "Stein und Erze abbauen",
+    },
+    {
+        "id": "mobs",
+        "name": "Mobs",
+        "color": "#e66767",
+        "icon": "⚔️",
+        "description": "Monster und Tiere besiegen",
+    },
+    {
+        "id": "builder",
+        "name": "Builder",
+        "color": "#9085e9",
+        "icon": "🧱",
+        "description": "Blöcke platzieren",
+    },
+    {
+        "id": "dorf",
+        "name": "Dorf",
+        "color": "#008300",
+        "icon": "🏡",
+        "description": "Handeln mit Villagern",
+    },
+    {
+        "id": "tierfreund",
+        "name": "Tierfreund",
+        "color": "#d55181",
+        "icon": "🐾",
+        "description": "Tiere zähmen",
+    },
+    {
+        "id": "farmer",
+        "name": "Farmer",
+        "color": "#c98500",
+        "icon": "🌾",
+        "description": "Ernten, Holz, Erde und Ackerland",
+    },
+]
+
+SKILLS_BY_ID = {skill["id"]: skill for skill in SKILLS}
+
+SKILL_SCORE_KEY = "score"
+SKILL_MAX_LEVEL = 100
+_SKILL_LEVEL_BASE = 50
+
+# Detailzähler je Skill – Beschriftung, Schlüssel und das Präfix, aus dem die
+# Top-Einträge kommen. Deckungsgleich mit SkillsCommand im Plugin.
+SKILL_DETAILS: dict[str, dict] = {
+    "fischer": {
+        "top_prefix": "item.",
+        "top_label": "Häufigste Fänge",
+        "lines": [
+            ("Fänge gesamt", "caught"),
+            ("Fische", "fish"),
+            ("Schätze", "treasure"),
+            ("Müll", "junk"),
+        ],
+    },
+    "miner": {
+        "top_prefix": "ore.",
+        "top_label": "Meiste Erze",
+        "lines": [
+            ("Blöcke abgebaut", "blocks"),
+            ("Stein", "stone"),
+            ("Erze", "ore"),
+        ],
+    },
+    "mobs": {
+        "top_prefix": "mob.",
+        "top_label": "Meiste Kills",
+        "lines": [
+            ("Kills gesamt", "kills"),
+            ("Monster", "monster"),
+            ("Tiere", "animal"),
+            ("Bosse", "boss"),
+        ],
+    },
+    "builder": {
+        "top_prefix": "block.",
+        "top_label": "Meistgenutzte Blöcke",
+        "lines": [("Blöcke platziert", "placed")],
+    },
+    "dorf": {
+        "top_prefix": "trade.",
+        "top_label": "Häufigste Trades",
+        "lines": [
+            ("Handel", "trades"),
+            ("Villager", "villagers"),
+            ("Smaragde gezahlt", "emeralds"),
+            ("Günstigster Handel", "best_price"),
+        ],
+    },
+    "tierfreund": {
+        "top_prefix": "pet.",
+        "top_label": "Meiste Tiere",
+        "lines": [("Gezähmt", "tamed")],
+    },
+    "farmer": {
+        "top_prefix": "crop.",
+        "top_label": "Meiste Ernte",
+        "lines": [
+            ("Ernten", "crops"),
+            ("Abgepflückt", "harvested"),
+            ("Holz", "logs"),
+            ("Erde", "dirt"),
+            ("Ackerland", "farmland"),
+        ],
+    },
+}
+
+_skills_lock = threading.Lock()
+_skills_supported: bool | None = None
+
+
+def skills_supported() -> bool:
+    """pc_skill_stats kommt mit Migration V4 des Plugins."""
+    global _skills_supported
+    if _skills_supported is None:
+        with _skills_lock:
+            if _skills_supported is None:
+                with _connect() as conn:
+                    rows = conn.query(
+                        """SELECT TABLE_NAME
+                             FROM INFORMATION_SCHEMA.TABLES
+                            WHERE TABLE_SCHEMA = DATABASE()
+                              AND TABLE_NAME = 'pc_skill_stats'"""
+                    )
+                _skills_supported = bool(rows)
+    return _skills_supported
+
+
+# ── Levelkurve (identisch zu SkillLevel.java) ──
+
+
+def skill_level(score: Any) -> int:
+    value = int(score or 0)
+    if value < _SKILL_LEVEL_BASE:
+        return 1
+    level = int((value / _SKILL_LEVEL_BASE) ** 0.5) + 1
+    return max(1, min(SKILL_MAX_LEVEL, level))
+
+
+def skill_score_for_level(level: int) -> int:
+    steps = max(0, level - 1)
+    return _SKILL_LEVEL_BASE * steps * steps
+
+
+def skill_score_to_next(score: Any) -> int:
+    value = int(score or 0)
+    level = skill_level(value)
+    if level >= SKILL_MAX_LEVEL:
+        return 0
+    return max(0, skill_score_for_level(level + 1) - value)
+
+
+def skill_progress(score: Any) -> float:
+    value = int(score or 0)
+    level = skill_level(value)
+    if level >= SKILL_MAX_LEVEL:
+        return 1.0
+    start = skill_score_for_level(level)
+    end = skill_score_for_level(level + 1)
+    if end <= start:
+        return 1.0
+    return max(0.0, min(1.0, (value - start) / (end - start)))
+
+
+# ── Abfragen ──
+
+
+def get_skills_overview() -> dict:
+    """Serverweite Kennzahlen plus Spitzenreiter je Skill."""
+    with _connect() as conn:
+        totals = conn.query(
+            """SELECT skill,
+                      SUM(amount) AS total_score,
+                      COUNT(*) AS players,
+                      MAX(amount) AS best_score
+                 FROM pc_skill_stats
+                WHERE stat_key = %s AND amount > 0
+                GROUP BY skill""",
+            (SKILL_SCORE_KEY,),
+        )
+        leaders = conn.query(
+            """SELECT skill, player_uuid, player_name, amount
+                 FROM (
+                     SELECT s.skill,
+                            s.player_uuid,
+                            p.player_name,
+                            s.amount,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY s.skill ORDER BY s.amount DESC, s.player_uuid ASC
+                            ) AS position
+                       FROM pc_skill_stats s
+                       LEFT JOIN pc_players p ON p.player_uuid = s.player_uuid
+                      WHERE s.stat_key = %s AND s.amount > 0
+                 ) ranked
+                WHERE position = 1""",
+            (SKILL_SCORE_KEY,),
+        )
+        tracked_players = conn.scalar(
+            """SELECT COUNT(DISTINCT player_uuid) AS total
+                 FROM pc_skill_stats
+                WHERE stat_key = %s AND amount > 0""",
+            (SKILL_SCORE_KEY,),
+        )
+
+    totals_by_skill = {row["skill"]: row for row in totals}
+    leaders_by_skill = {row["skill"]: row for row in leaders}
+
+    cards = []
+    total_score = 0
+    for skill in SKILLS:
+        row = totals_by_skill.get(skill["id"]) or {}
+        leader = leaders_by_skill.get(skill["id"]) or {}
+        score = int(row.get("total_score") or 0)
+        total_score += score
+        best = int(leader.get("amount") or 0)
+        cards.append(
+            {
+                **skill,
+                "total_score": score,
+                "players": int(row.get("players") or 0),
+                "leader_name": leader.get("player_name")
+                or (str(leader.get("player_uuid") or "")[:8] or None),
+                "leader_uuid": leader.get("player_uuid"),
+                "leader_score": best,
+                "leader_level": skill_level(best),
+                "leader_progress": skill_progress(best),
+            }
+        )
+
+    return {
+        "cards": cards,
+        "total_score": total_score,
+        "tracked_players": int(tracked_players or 0),
+        "top_skill": max(cards, key=lambda card: card["total_score"]) if cards else None,
+    }
+
+
+def count_skill_leaderboard(skill_id: str) -> int:
+    with _connect() as conn:
+        return int(
+            conn.scalar(
+                """SELECT COUNT(*) AS total
+                     FROM pc_skill_stats
+                    WHERE skill = %s AND stat_key = %s AND amount > 0""",
+                (skill_id, SKILL_SCORE_KEY),
+            )
+            or 0
+        )
+
+
+def list_skill_leaderboard(skill_id: str, limit: int = 25, offset: int = 0) -> list[dict]:
+    with _connect() as conn:
+        rows = conn.query(
+            """SELECT s.player_uuid, s.amount, p.player_name
+                 FROM pc_skill_stats s
+                 LEFT JOIN pc_players p ON p.player_uuid = s.player_uuid
+                WHERE s.skill = %s AND s.stat_key = %s AND s.amount > 0
+                ORDER BY s.amount DESC, p.player_name ASC
+                LIMIT %s OFFSET %s""",
+            (skill_id, SKILL_SCORE_KEY, limit, offset),
+        )
+        names = resolve_names(
+            conn, [row["player_uuid"] for row in rows if not row.get("player_name")]
+        )
+
+    result = []
+    for index, row in enumerate(rows, start=offset + 1):
+        score = int(row["amount"] or 0)
+        result.append(
+            {
+                "rank": index,
+                "player_uuid": row["player_uuid"],
+                "player_name": row.get("player_name")
+                or names.get(row["player_uuid"])
+                or str(row["player_uuid"])[:8],
+                "player_head_url": head_url(row["player_uuid"]),
+                "score": score,
+                "level": skill_level(score),
+                "progress": skill_progress(score),
+            }
+        )
+    return result
+
+
+def get_skill_top_stats(skill_id: str, limit: int = 8) -> list[dict]:
+    """Serverweit häufigste Detaileinträge eines Skills, z. B. meistabgebaute Erze."""
+    detail = SKILL_DETAILS.get(skill_id)
+    if not detail:
+        return []
+    with _connect() as conn:
+        rows = conn.query(
+            """SELECT stat_key, SUM(amount) AS total
+                 FROM pc_skill_stats
+                WHERE skill = %s AND stat_key LIKE %s AND amount > 0
+                GROUP BY stat_key
+                ORDER BY total DESC
+                LIMIT %s""",
+            (skill_id, detail["top_prefix"] + "%", limit),
+        )
+    return [
+        {
+            "key": row["stat_key"],
+            "label": _stat_label(detail["top_prefix"], row["stat_key"]),
+            "total": int(row["total"] or 0),
+        }
+        for row in rows
+    ]
+
+
+def get_player_skills(player_uuid: str) -> list[dict]:
+    """Alle Skills eines Spielers mit Level, Fortschritt und Platzierung."""
+    with _connect() as conn:
+        rows = conn.query(
+            """SELECT skill, amount
+                 FROM pc_skill_stats
+                WHERE player_uuid = %s AND stat_key = %s""",
+            (player_uuid, SKILL_SCORE_KEY),
+        )
+        scores = {row["skill"]: int(row["amount"] or 0) for row in rows}
+        ranks = conn.query(
+            """SELECT s.skill,
+                      (SELECT COUNT(*) + 1
+                         FROM pc_skill_stats o
+                        WHERE o.skill = s.skill
+                          AND o.stat_key = s.stat_key
+                          AND o.amount > s.amount) AS position
+                 FROM pc_skill_stats s
+                WHERE s.player_uuid = %s AND s.stat_key = %s AND s.amount > 0""",
+            (player_uuid, SKILL_SCORE_KEY),
+        )
+    ranks_by_skill = {row["skill"]: int(row["position"] or 0) for row in ranks}
+
+    result = []
+    for skill in SKILLS:
+        score = scores.get(skill["id"], 0)
+        result.append(
+            {
+                **skill,
+                "score": score,
+                "level": skill_level(score),
+                "progress": skill_progress(score),
+                "to_next": skill_score_to_next(score),
+                "rank": ranks_by_skill.get(skill["id"]) or None,
+            }
+        )
+    return result
+
+
+def get_player_skill_stats(player_uuid: str, skill_id: str) -> dict:
+    """Detailzähler eines Spielers in einem Skill inklusive Top-Einträgen."""
+    detail = SKILL_DETAILS.get(skill_id)
+    if not detail:
+        return {"lines": [], "top": []}
+
+    with _connect() as conn:
+        rows = conn.query(
+            """SELECT stat_key, amount
+                 FROM pc_skill_stats
+                WHERE player_uuid = %s AND skill = %s""",
+            (player_uuid, skill_id),
+        )
+    values = {row["stat_key"]: int(row["amount"] or 0) for row in rows}
+
+    top = sorted(
+        (
+            {
+                "key": key,
+                "label": _stat_label(detail["top_prefix"], key),
+                "total": amount,
+            }
+            for key, amount in values.items()
+            if key.startswith(detail["top_prefix"]) and amount > 0
+        ),
+        key=lambda entry: entry["total"],
+        reverse=True,
+    )[:5]
+
+    return {
+        "lines": [
+            {"label": label, "value": values.get(key, 0)}
+            for label, key in detail["lines"]
+        ],
+        "top": top,
+        "top_label": detail["top_label"],
+    }
+
+
+def _stat_label(prefix: str, stat_key: str) -> str:
+    """Macht aus 'ore.deepslate_diamond_ore' ein lesbares 'Deepslate Diamond Ore'."""
+    suffix = stat_key[len(prefix):] if stat_key.startswith(prefix) else stat_key
+    return suffix.replace("_", " ").title()

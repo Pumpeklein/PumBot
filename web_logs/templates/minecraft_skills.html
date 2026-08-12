@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header, stat_tile, section_heading %}
+{% from "_mc_macros.html" import mc_error_card, skill_card, hero_figure, skills_pending_card, skill_icon %}
+
+{% block content %}
+{{ page_header("Minecraft", "Skills", "Sieben Skills, die sich beim Spielen von selbst füllen – mit Leveln, Punkten und Bestenlisten.") }}
+
+{% if mc_error %}
+{{ mc_error_card(mc_error) }}
+{% elif skills_pending %}
+{{ skills_pending_card() }}
+{% else %}
+
+{# ── Kopfzahlen: eine Hero-Zahl plus zwei Kacheln ── #}
+<div class="mb-6 grid gap-3 lg:grid-cols-3">
+  <div class="lg:col-span-1">
+    {{ hero_figure("Punkte auf dem Server", overview.total_score|number_de,
+       "über alle sieben Skills", "#38bdf8") }}
+  </div>
+  <div class="grid gap-3 sm:grid-cols-2 lg:col-span-2">
+    {{ stat_tile("Aktive Spieler", overview.tracked_players, accent="violet",
+       sub=("mit gesammelten Punkten" if overview.tracked_players else "noch niemand dabei")) }}
+    {% if overview.top_skill and overview.top_skill.total_score %}
+    {{ stat_tile("Stärkster Skill", overview.top_skill.name, accent="emerald",
+       sub="{} Punkte".format(overview.top_skill.total_score|number_de)) }}
+    {% else %}
+    {{ stat_tile("Stärkster Skill", "—", accent="slate", sub="noch keine Punkte") }}
+    {% endif %}
+  </div>
+</div>
+
+{# ── Die sieben Skill-Karten ── #}
+<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+  {% for card in overview.cards %}
+  {{ skill_card(card, url_for("minecraft_skill_page", skill_id=card.id)) }}
+  {% endfor %}
+</div>
+
+{# ── Punkteverteilung als eine Leiste ── #}
+{% if overview.total_score %}
+<div class="mt-6 rounded-2xl border border-white/[0.06] bg-[#0d1320] p-5">
+  {{ section_heading("Wo die Punkte liegen", "Anteil der Skills an allen Punkten des Servers") }}
+  <div class="flex h-3 w-full gap-[2px] overflow-hidden rounded-full">
+    {% for card in overview.cards %}
+    {% if card.total_score %}
+    <span class="block h-full first:rounded-l-full last:rounded-r-full"
+      style="width: {{ (card.total_score / overview.total_score * 100)|round(2) }}%; background: {{ card.color }}"
+      title="{{ card.name }}: {{ card.total_score|number_de }} Punkte"></span>
+    {% endif %}
+    {% endfor %}
+  </div>
+  <div class="mt-4 flex flex-wrap gap-x-5 gap-y-2">
+    {% for card in overview.cards %}
+    {% if card.total_score %}
+    <span class="inline-flex items-center gap-2 text-[11px] text-slate-400">
+      <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background: {{ card.color }}"></span>
+      <span class="text-slate-300">{{ card.name }}</span>
+      <span class="tabular-nums text-slate-500">{{ (card.total_score / overview.total_score * 100)|round(1) }} %</span>
+    </span>
+    {% endif %}
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<p class="mt-6 text-[11px] leading-relaxed text-slate-600">
+  Die Punkte werden vom Plugin alle 30 Sekunden gespeichert – bei Spielern, die gerade
+  online sind, kann diese Ansicht also kurz hinterherhängen.
+</p>
+
+{% endif %}
+{% endblock %}

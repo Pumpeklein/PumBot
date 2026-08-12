@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_macros.html" import page_header, stat_tile, empty_state, section_heading, id_chip %}
-{% from "_mc_macros.html" import mc_error_card, mc_pill %}
+{% from "_mc_macros.html" import mc_error_card, mc_pill, skill_icon, skill_meter, skill_level_badge %}
 
 {% block content %}
 {% if mc_error %}
@@ -52,6 +52,32 @@
   {{ stat_tile("Reports", reports_against|length, accent="slate", sub="Gegen diesen Spieler") }}
   {% endif %}
 </div>
+
+{# ── Skills ── #}
+{% if skills %}
+<div class="mb-6 rounded-2xl border border-white/[0.06] bg-[#0d1320] p-5">
+  {{ section_heading("Skills", "{} Punkte über alle Skills".format(skills_total|number_de)) }}
+  <div class="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+    {% for entry in skills %}
+    <a href="{{ url_for('minecraft_skill_page', skill_id=entry.id) }}"
+      class="group flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-white/[0.03]">
+      {{ skill_icon(entry, size="h-9 w-9", text="text-base") }}
+      <div class="min-w-0 flex-1">
+        <div class="flex items-baseline justify-between gap-2">
+          <span class="truncate text-[13px] font-medium text-slate-200">{{ entry.name }}</span>
+          <span class="shrink-0 text-[11px] tabular-nums text-slate-500">
+            {{ entry.score|number_de }}
+            {% if entry.rank %}<span class="text-slate-600"> · #{{ entry.rank }}</span>{% endif %}
+          </span>
+        </div>
+        <div class="mt-1.5">{{ skill_meter(entry.progress, entry.color, "h-1.5") }}</div>
+      </div>
+      {{ skill_level_badge(entry.level, entry.color) }}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
 
 {% if show_moderation %}
 

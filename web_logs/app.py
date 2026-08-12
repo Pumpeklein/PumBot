@@ -277,6 +277,29 @@ app.secret_key = Config.FLASK_SECRET_KEY
 app.jinja_env.filters["date_de"] = format_berlin_date
 app.jinja_env.filters["datetime_de"] = format_berlin_datetime
 app.jinja_env.filters["permission_label"] = permission_label
+
+
+def _hex_alpha(value, alpha: float = 0.16) -> str:
+    """#rrggbb -> rgba(...), damit Skill-Farben als Flächen und Ringe nutzbar sind."""
+    text = str(value or "").strip().lstrip("#")
+    if len(text) != 6:
+        return f"rgba(148, 163, 184, {alpha})"
+    try:
+        red, green, blue = (int(text[index:index + 2], 16) for index in (0, 2, 4))
+    except ValueError:
+        return f"rgba(148, 163, 184, {alpha})"
+    return f"rgba({red}, {green}, {blue}, {alpha})"
+
+
+def _number_de(value) -> str:
+    try:
+        return f"{int(value or 0):,}".replace(",", ".")
+    except (TypeError, ValueError):
+        return "0"
+
+
+app.jinja_env.filters["hex_alpha"] = _hex_alpha
+app.jinja_env.filters["number_de"] = _number_de
 app.jinja_env.globals["PERMISSION_LABELS"] = PERMISSION_LABELS
 
 init_db()
@@ -3002,6 +3025,7 @@ def _mc_ctx() -> dict:
     return {
         "mc_server_name": Config.MC_SERVER_NAME or "Minecraft",
         "mc_server_address": Config.MC_SERVER_ADDRESS or None,
+        "mc_skills": mc_db.SKILLS,
         "mc_can_players": any(
             has_permission(permission) for permission in MINECRAFT_PLAYER_PERMISSIONS
         ),
@@ -3199,9 +3223,21 @@ def minecraft_player_page(player_uuid: str):
     show_moderation = any(
         has_permission(permission) for permission in MINECRAFT_MODERATION_PERMISSIONS
     )
+
+    skills = []
+    skills_total = 0
+    try:
+        if mc_db.skills_supported():
+            skills = mc_db.get_player_skills(player_uuid)
+            skills_total = sum(entry["score"] for entry in skills)
+    except mc_db.MinecraftDatabaseUnavailable:
+        skills = []
+
     return render_template(
         "minecraft_player.html",
         player=player,
+        skills=skills,
+        skills_total=skills_total,
         playtime_total=mc_db.format_duration(playtime.get("total_seconds"), "—"),
         playtime_active=mc_db.format_duration(playtime.get("active_seconds"), "—"),
         playtime_afk=mc_db.format_duration(playtime.get("afk_seconds"), "—"),
@@ -3224,6 +3260,124 @@ def minecraft_player_page(player_uuid: str):
         **_mc_ctx(),
         **_ctx(),
     )
+
+
+# -- Minecraft: Skills --
+
+
+@app.get("/minecraft/skills")
+@permission_any_required(*MINECRAFT_PLAYER_PERMISSIONS)
+def minecraft_skills_page():
+    try:
+        if not mc_db.skills_supported():
+            return render_template(
+                "minecraft_skills.html",
+                skills_pending=True,
+                overview=None,
+                active_page="minecraft_skills",
+                **_mc_ctx(),
+                **_ctx(),
+            )
+        overview = mc_db.get_skills_overview()
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return _mc_unavailable_page(
+            "minecraft_skills.html",
+            str(exc),
+            "minecraft_skills",
+            skills_pending=False,
+            overview=None,
+        )
+
+    return render_template(
+        "minecraft_skills.html",
+        skills_pending=False,
+        overview=overview,
+        active_page="minecraft_skills",
+        **_mc_ctx(),
+        **_ctx(),
+    )
+
+
+@app.get("/minecraft/skills/<skill_id>")
+@permission_any_required(*MINECRAFT_PLAYER_PERMISSIONS)
+def minecraft_skill_page(skill_id: str):
+    skill = mc_db.SKILLS_BY_ID.get(skill_id)
+    if not skill:
+        abort(404)
+
+    try:
+        if not mc_db.skills_supported():
+            return render_template(
+                "minecraft_skill.html",
+                skill=skill,
+                skills_pending=True,
+                player_count=0,
+                top_stats=[],
+                top_label="",
+                active_page="minecraft_skills",
+                **_mc_ctx(),
+                **_ctx(),
+            )
+        player_count = mc_db.count_skill_leaderboard(skill_id)
+        top_stats = mc_db.get_skill_top_stats(skill_id)
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return _mc_unavailable_page(
+            "minecraft_skill.html",
+            str(exc),
+            "minecraft_skills",
+            skill=skill,
+            skills_pending=False,
+            player_count=0,
+            top_stats=[],
+            top_label="",
+        )
+
+    return render_template(
+        "minecraft_skill.html",
+        skill=skill,
+        skills_pending=False,
+        player_count=player_count,
+        top_stats=top_stats,
+        top_label=mc_db.SKILL_DETAILS.get(skill_id, {}).get("top_label", ""),
+        active_page="minecraft_skills",
+        **_mc_ctx(),
+        **_ctx(),
+    )
+
+
+@app.get("/panel-api/minecraft/skills/<skill_id>")
+@permission_any_required(*MINECRAFT_PLAYER_PERMISSIONS)
+def panel_api_minecraft_skill_leaderboard(skill_id: str):
+    page, page_size, offset = _pagination_args(25)
+    if skill_id not in mc_db.SKILLS_BY_ID:
+        abort(404)
+    try:
+        if not mc_db.skills_supported():
+            return _paginated_response([], 0, page, page_size)
+        entries = mc_db.list_skill_leaderboard(skill_id, limit=page_size, offset=offset)
+        total = mc_db.count_skill_leaderboard(skill_id)
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return _mc_unavailable_api(exc, page, page_size)
+
+    skill = mc_db.SKILLS_BY_ID[skill_id]
+    best = entries[0]["score"] if entries else 0
+    items = []
+    for entry in entries:
+        items.append(
+            {
+                **entry,
+                "rank_label": f"#{entry['rank']}",
+                "level_label": f"Lv {entry['level']}",
+                "score_label": f"{entry['score']:,}".replace(",", "."),
+                "detail_url": url_for(
+                    "minecraft_player_page", player_uuid=entry["player_uuid"]
+                ),
+                "bar_percent": round(entry["score"] / best * 100, 1) if best else 0,
+                "bar_color": skill["color"],
+                "player_uuid_short": str(entry["player_uuid"])[:8],
+            }
+        )
+    return _paginated_response(items, total, page, page_size)
 
 
 # -- Minecraft: Strafen --

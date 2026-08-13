@@ -217,7 +217,7 @@
         <span class="rounded border border-cyan-500/20 bg-cyan-500/10 px-1.5 py-0.5 text-[10.5px] text-cyan-300">{{ perm|permission_label }}</span>
         {% endfor %}
         {% if role.permissions|length > 4 %}
-        <button type="button" data-open-role-modal="{{ role.id }}" data-open-role-tab="permissions"
+        <button type="button" data-open-role-permissions="{{ role.id }}"
           title="Alle Rechte anzeigen" aria-label="Alle {{ role.permissions|length }} Rechte von {{ role.role_name }} anzeigen"
           class="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10.5px] text-slate-400 transition hover:border-cyan-500/30 hover:bg-cyan-500/10 hover:text-cyan-300 focus:outline-none focus:ring-1 focus:ring-cyan-500/50">+{{ role.permissions|length - 4 }}</button>
         {% endif %}
@@ -365,6 +365,38 @@
 </div>
 
 {# ════════════════════════════════════════════════════════════════
+   READ-ONLY PERMISSION LISTS (one per role)
+   ════════════════════════════════════════════════════════════════ #}
+{% for role in roles %}
+<div data-role-permissions-modal="{{ role.id }}" role="dialog" aria-modal="true" aria-labelledby="role-permissions-title-{{ role.id }}"
+  class="fixed inset-0 z-50 hidden items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
+  <div class="my-8 flex w-full max-w-xl flex-col overflow-hidden rounded-xl border border-white/[0.08] bg-[#0d1320] shadow-2xl">
+    <div class="flex items-center justify-between gap-4 border-b border-white/[0.06] px-5 py-4">
+      <div class="min-w-0">
+        <h2 id="role-permissions-title-{{ role.id }}" class="truncate text-base font-semibold text-white">Rechte von {{ role.role_name }}</h2>
+        <p class="mt-0.5 text-xs text-slate-500">{{ role.permissions|length }} zugewiesene Rechte</p>
+      </div>
+      <button type="button" data-close-role-permissions aria-label="Rechteübersicht schließen"
+        class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-white/10 text-lg text-slate-400 transition hover:bg-white/10 hover:text-white">&times;</button>
+    </div>
+    <div class="max-h-[min(60vh,32rem)] overflow-y-auto px-5 py-2">
+      {% for perm in role.permissions %}
+      <div class="grid gap-1 border-b border-white/[0.05] py-3 last:border-b-0 sm:grid-cols-2 sm:items-center sm:gap-4">
+        <span class="min-w-0 text-sm text-slate-200">{{ perm|permission_label }}</span>
+        <code class="min-w-0 break-all text-[11px] text-cyan-300/80 sm:text-right">{{ perm }}</code>
+      </div>
+      {% else %}
+      <div class="py-10 text-center text-sm text-slate-500">Dieser Rolle sind keine Rechte zugewiesen.</div>
+      {% endfor %}
+    </div>
+    <div class="flex justify-end border-t border-white/[0.06] px-5 py-4">
+      <button type="button" data-close-role-permissions class="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300 transition hover:bg-white/10">Schließen</button>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+{# ════════════════════════════════════════════════════════════════
    EDIT MODALS (one per role)
    ════════════════════════════════════════════════════════════════ #}
 {% for role in roles %}
@@ -482,8 +514,6 @@
       b.addEventListener("click", () => {
         const modal = document.querySelector(`[data-role-modal="${b.dataset.openRoleModal}"]`);
         showModal(modal);
-        const tab = b.dataset.openRoleTab;
-        if (tab) modal?.querySelector(`[data-modal-tab="${tab}"]`)?.click();
       });
     });
     document.querySelectorAll("[data-close-role-modal]").forEach((b) =>
@@ -491,9 +521,21 @@
     document.querySelectorAll("[data-role-modal]").forEach((m) =>
       m.addEventListener("click", (e) => { if (e.target === m) hideModal(m); }));
 
+    /* ─── Read-only permission lists ─── */
+    document.querySelectorAll("[data-open-role-permissions]").forEach((b) => {
+      b.addEventListener("click", () => {
+        const modal = document.querySelector(`[data-role-permissions-modal="${b.dataset.openRolePermissions}"]`);
+        showModal(modal);
+      });
+    });
+    document.querySelectorAll("[data-close-role-permissions]").forEach((b) =>
+      b.addEventListener("click", () => hideModal(b.closest("[data-role-permissions-modal]"))));
+    document.querySelectorAll("[data-role-permissions-modal]").forEach((m) =>
+      m.addEventListener("click", (e) => { if (e.target === m) hideModal(m); }));
+
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
-      document.querySelectorAll("[data-role-modal], [data-create-modal]").forEach((m) => {
+      document.querySelectorAll("[data-role-modal], [data-create-modal], [data-role-permissions-modal]").forEach((m) => {
         if (!m.classList.contains("hidden")) hideModal(m);
       });
     });

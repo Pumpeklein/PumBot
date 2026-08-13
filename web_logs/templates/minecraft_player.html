@@ -88,42 +88,22 @@
       <h2 class="text-sm font-semibold text-white">Notizen & Auffälligkeiten</h2>
       <p class="mt-0.5 text-xs text-slate-500">Interne Moderationshistorie für {{ player.player_name }}</p>
     </div>
-    <div class="flex items-center gap-2 text-[10.5px] text-slate-500">
-      <span>{{ player_notes|length }} Notizen</span>
-      <span class="text-slate-700">•</span>
-      <span>{{ anticheat_events|length }} AntiCheat-Ereignisse</span>
+    <div class="flex flex-wrap items-center justify-end gap-3">
+      <div class="flex items-center gap-2 text-[10.5px] text-slate-500">
+        <span>{{ player_notes|length }} Notizen</span>
+        <span class="text-slate-700">•</span>
+        <span>{{ anticheat_events|length }} AntiCheat-Ereignisse</span>
+      </div>
+      <button type="button" data-open-note-modal
+        class="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-xs font-medium text-cyan-300 transition hover:bg-cyan-500/20">
+        <span class="text-base leading-none" aria-hidden="true">+</span>
+        Neue Notiz
+      </button>
     </div>
   </div>
 
   <div class="grid gap-6 lg:grid-cols-2">
     <div>
-      {% if not notes_supported %}
-      <div class="mb-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-        Die Notiz-Datenbank wird noch eingerichtet. Eingaben sind bereits möglich; zum Speichern muss PumpeDatabase die Migration V5 ausgeführt haben.
-      </div>
-      {% endif %}
-      <form id="mc-player-note-form" data-endpoint="{{ url_for('panel_api_minecraft_player_note_create', player_uuid=player.player_uuid) }}"
-        class="mb-4 border-b border-white/[0.06] pb-4">
-        <div class="grid gap-3 sm:grid-cols-[9rem_minmax(0,1fr)]">
-          <label class="block">
-            <span class="mb-1.5 block text-xs font-medium text-slate-400">Kategorie</span>
-            <select name="category" class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-500">
-              <option value="GENERAL">Allgemein</option>
-              <option value="BEHAVIOR">Verhalten</option>
-              <option value="ANTICHEAT">AntiCheat</option>
-            </select>
-          </label>
-          <label class="block">
-            <span class="mb-1.5 block text-xs font-medium text-slate-400">Neue Notiz</span>
-            <textarea name="note" maxlength="2000" rows="3" required placeholder="Interne Notiz"
-              class="w-full resize-y rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40"></textarea>
-          </label>
-        </div>
-        <div class="mt-3 flex justify-end">
-          <button type="submit" class="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-cyan-500 disabled:opacity-50">Notiz speichern</button>
-        </div>
-      </form>
-
       <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Teamnotizen</h3>
       {% if player_notes %}
       <div class="space-y-2">
@@ -166,6 +146,45 @@
     </div>
   </div>
 </section>
+
+<div data-note-modal role="dialog" aria-modal="true" aria-labelledby="mc-note-modal-title"
+  class="fixed inset-0 z-50 hidden items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
+  <form id="mc-player-note-form" data-endpoint="{{ url_for('panel_api_minecraft_player_note_create', player_uuid=player.player_uuid) }}"
+    class="my-8 w-full max-w-xl overflow-hidden rounded-xl border border-white/[0.08] bg-[#0d1320] shadow-2xl">
+    <div class="flex items-center justify-between gap-4 border-b border-white/[0.06] px-5 py-4">
+      <div>
+        <h2 id="mc-note-modal-title" class="text-base font-semibold text-white">Neue Teamnotiz</h2>
+        <p class="mt-0.5 text-xs text-slate-500">Interne Notiz zu {{ player.player_name }}</p>
+      </div>
+      <button type="button" data-close-note-modal aria-label="Notizfenster schließen"
+        class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/10 text-lg text-slate-400 transition hover:bg-white/10 hover:text-white">&times;</button>
+    </div>
+    <div class="space-y-4 p-5">
+      {% if not notes_supported %}
+      <div class="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+        Zum Speichern muss PumpeDatabase die Migration V5 ausgeführt haben.
+      </div>
+      {% endif %}
+      <label class="block">
+        <span class="mb-1.5 block text-xs font-medium text-slate-400">Thema</span>
+        <select name="category" class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-500">
+          <option value="GENERAL">Allgemein</option>
+          <option value="BEHAVIOR">Verhalten</option>
+          <option value="ANTICHEAT">AntiCheat</option>
+        </select>
+      </label>
+      <label class="block">
+        <span class="mb-1.5 block text-xs font-medium text-slate-400">Notiz</span>
+        <textarea name="note" maxlength="2000" rows="6" required placeholder="Interne Notiz"
+          class="w-full resize-y rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40"></textarea>
+      </label>
+    </div>
+    <div class="flex justify-end gap-2 border-t border-white/[0.06] px-5 py-4">
+      <button type="button" data-close-note-modal class="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-300 transition hover:bg-white/10">Abbrechen</button>
+      <button type="submit" class="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-cyan-500 disabled:opacity-50">Notiz speichern</button>
+    </div>
+  </form>
+</div>
 
 {% if player.mute %}
 <div class="mb-6 rounded-xl border border-amber-500/25 bg-amber-500/[0.07] p-5">
@@ -295,7 +314,26 @@
 <script>
   document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("mc-player-note-form");
-    if (!form) return;
+    const modal = document.querySelector("[data-note-modal]");
+    if (!form || !modal) return;
+    const openModal = () => {
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+      document.body.style.overflow = "hidden";
+      window.setTimeout(() => form.querySelector('textarea[name="note"]')?.focus(), 0);
+    };
+    const closeModal = () => {
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+      document.body.style.overflow = "";
+    };
+    document.querySelector("[data-open-note-modal]")?.addEventListener("click", openModal);
+    document.querySelectorAll("[data-close-note-modal]").forEach((button) =>
+      button.addEventListener("click", closeModal));
+    modal.addEventListener("click", (event) => { if (event.target === modal) closeModal(); });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !modal.classList.contains("hidden")) closeModal();
+    });
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const submit = form.querySelector('button[type="submit"]');
@@ -310,6 +348,8 @@
         });
         const payload = await response.json();
         if (!response.ok || !payload.ok) throw new Error(payload.error || "Notiz konnte nicht gespeichert werden.");
+        form.reset();
+        closeModal();
         window.pumbotToast?.(payload.message || "Notiz gespeichert.", "success");
         window.setTimeout(() => window.location.reload(), 350);
       } catch (error) {

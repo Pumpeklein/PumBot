@@ -193,11 +193,11 @@ Der gesamte Zugriff liegt in [web_logs/mc_db.py](./web_logs/mc_db.py).
 | --- | --- | --- |
 | Übersicht | `/minecraft` | Kennzahlen (Spieler, Spielzeit, Tode, offene Reports, aktive Bans/Mutes), Top-Spielzeit, Top-Tode, letzte Strafen und Reports |
 | Spieler | `/minecraft/spieler` | Durchsuch- und sortierbare Spielerliste mit Spielzeit (gesamt/aktiv/AFK), Toden, Verwarnungen, Strafen, Reports und Status |
-| Spieler-Detail | `/minecraft/spieler/<uuid>` | Vollständiges Profil inkl. Spielzeit-Rang, aktivem Mute, Ban-Historie, Verwarnungen und Reports |
+| Spieler-Detail | `/minecraft/spieler/<uuid>` | Vollständiges Profil inkl. Spielzeit-Rang, aktivem Mute, Ban-Historie, Verwarnungen, Reports, Teamnotizen und AntiCheat-Auffälligkeiten |
 | Skills | `/minecraft/skills` | Sieben Skill-Karten mit Spitzenreiter, Level und Punkteverteilung |
 | Skill-Detail | `/minecraft/skills/<skill>` | Bestenliste des Skills plus die serverweit häufigsten Einträge |
 | Strafen | `/minecraft/strafen` | Bans, Mutes und Verwarnungen als drei filterbare Tabellen mit gemeinsamer Suche |
-| Reports | `/minecraft/reports` | Spielermeldungen, filterbar nach offen/geschlossen |
+| Reports | `/minecraft/reports` | Spielermeldungen, filterbar nach offen/geschlossen, mit Detaildialog und Abschlussaktion |
 
 Die Skill-Farben spiegeln die In-Game-Farben des Plugins und sind auf der dunklen
 Kartenfläche geprüft: benachbarte Karten halten einen CVD-Abstand von ΔE 13,0

@@ -3272,6 +3272,22 @@ def minecraft_player_page(player_uuid: str):
             _mc_moderation_row(row) for row in player.get("reports_against", [])
         ],
         reports_by=[_mc_moderation_row(row) for row in player.get("reports_by", [])],
+        player_notes=[
+            {
+                **row,
+                "created_at_display": mc_db.format_epoch_millis(row.get("created_at")),
+            }
+            for row in player.get("notes", [])
+        ],
+        anticheat_events=[
+            {
+                **row,
+                "created_at_display": mc_db.format_epoch_millis(row.get("created_at")),
+                "violation_level_display": f"{float(row.get('violation_level') or 0):.1f}",
+            }
+            for row in player.get("anticheat_events", [])
+        ],
+        notes_supported=mc_db.moderation_notes_supported(),
         mute=(
             _mc_moderation_row(player["mute"], time_field="muted_at")
             if player.get("mute")
@@ -3563,8 +3579,81 @@ def panel_api_minecraft_reports():
             else None
         )
         item["report_label"] = f"#{row.get('id')}"
+        item["closed_at_display"] = mc_db.format_epoch_millis(
+            row.get("closed_at"), fallback=""
+        )
+        item["close_url"] = url_for(
+            "panel_api_minecraft_report_close", report_id=row["id"]
+        )
         items.append(item)
     return _paginated_response(items, total, page, page_size)
+
+
+@app.post("/panel-api/minecraft/reports/<int:report_id>/close")
+@permission_any_required(*MINECRAFT_MODERATION_PERMISSIONS)
+def panel_api_minecraft_report_close(report_id: int):
+    if not request.is_json:
+        return jsonify({"ok": False, "error": "JSON-Anfrage erforderlich."}), 415
+    data = request.get_json(silent=True) or {}
+    close_note = str(data.get("note") or "").strip()
+    if len(close_note) > 500:
+        return jsonify({"ok": False, "error": "Die Abschlussnotiz ist zu lang."}), 400
+
+    actor = current_user() or {}
+    try:
+        report = mc_db.close_report(
+            report_id,
+            str(actor.get("discord_id") or ""),
+            str(actor.get("username") or "Unbekannt"),
+            close_note,
+        )
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    if not report:
+        return jsonify({"ok": False, "error": "Report nicht gefunden."}), 404
+    return jsonify({"ok": True, "message": f"Report #{report_id} wurde geschlossen."})
+
+
+@app.post("/panel-api/minecraft/players/<player_uuid>/notes")
+@permission_any_required(*MINECRAFT_MODERATION_PERMISSIONS)
+def panel_api_minecraft_player_note_create(player_uuid: str):
+    if not request.is_json:
+        return jsonify({"ok": False, "error": "JSON-Anfrage erforderlich."}), 415
+    data = request.get_json(silent=True) or {}
+    note = str(data.get("note") or "").strip()
+    category = str(data.get("category") or "GENERAL").strip().upper()
+    categories = {"GENERAL", "BEHAVIOR", "ANTICHEAT"}
+    if not note:
+        return jsonify({"ok": False, "error": "Die Notiz darf nicht leer sein."}), 400
+    if len(note) > 2000:
+        return jsonify({"ok": False, "error": "Die Notiz ist zu lang."}), 400
+    if category not in categories:
+        return jsonify({"ok": False, "error": "Ungültige Kategorie."}), 400
+
+    actor = current_user() or {}
+    try:
+        player = mc_db.get_player(player_uuid)
+        if not player:
+            return jsonify({"ok": False, "error": "Spieler nicht gefunden."}), 404
+        created = mc_db.add_player_note(
+            player_uuid,
+            note,
+            category,
+            str(actor.get("discord_id") or ""),
+            str(actor.get("username") or "Unbekannt"),
+        )
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    return jsonify(
+        {
+            "ok": True,
+            "message": "Notiz gespeichert.",
+            "note": {
+                **created,
+                "created_at_display": mc_db.format_epoch_millis(created.get("created_at")),
+            },
+        }
+    )
 
 
 # --------------------------------------------------------

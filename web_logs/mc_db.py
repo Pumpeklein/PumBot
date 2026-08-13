@@ -1,9 +1,9 @@
-"""Read-only access layer for the PumpeCraft Minecraft plugin database.
+"""Access layer for the PumpeCraft Minecraft plugin database.
 
 This is a *separate* MariaDB instance from the PumBot panel database, so it gets
 its own connection settings (``MC_DB_*`` in the .env) and its own module.
-Everything in here is read-only: the panel only visualises what the Minecraft
-plugins write.
+Most operations are read-only. Moderation users can additionally complete
+reports and create player notes through narrowly scoped write functions.
 """
 
 from __future__ import annotations
@@ -96,6 +96,17 @@ class MinecraftConnection:
             return default
         value = next(iter(row.values()), default)
         return default if value is None else value
+
+    def execute(self, sql: str, params: Any = None) -> int:
+        try:
+            with self.conn.cursor() as cursor:
+                cursor.execute(sql, params)
+                return int(cursor.rowcount)
+        except pymysql.MySQLError as exc:
+            logger.exception("Minecraft write failed")
+            raise MinecraftDatabaseUnavailable(
+                f"Änderung in der Minecraft-Datenbank fehlgeschlagen: {exc}"
+            ) from exc
 
 
 def _connect() -> MinecraftConnection:
@@ -243,6 +254,58 @@ def players_table_supported() -> bool:
                     )
                 _players_table_supported = bool(rows)
     return _players_table_supported
+
+
+_moderation_schema_lock = threading.Lock()
+_moderation_schema_cache: dict[str, bool] = {}
+
+
+def _table_supported(table_name: str) -> bool:
+    with _moderation_schema_lock:
+        cached = _moderation_schema_cache.get(table_name)
+        if cached is not None:
+            return cached
+        with _connect() as conn:
+            present = bool(
+                conn.scalar(
+                    """SELECT COUNT(*) AS total
+                         FROM INFORMATION_SCHEMA.TABLES
+                        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s""",
+                    (table_name,),
+                )
+            )
+        _moderation_schema_cache[table_name] = present
+        return present
+
+
+def _column_supported(table_name: str, column_name: str) -> bool:
+    cache_key = f"{table_name}.{column_name}"
+    with _moderation_schema_lock:
+        cached = _moderation_schema_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        with _connect() as conn:
+            present = bool(
+                conn.scalar(
+                    """SELECT COUNT(*) AS total
+                         FROM INFORMATION_SCHEMA.COLUMNS
+                        WHERE TABLE_SCHEMA = DATABASE()
+                          AND TABLE_NAME = %s AND COLUMN_NAME = %s""",
+                    (table_name, column_name),
+                )
+            )
+        _moderation_schema_cache[cache_key] = present
+        return present
+
+
+def moderation_notes_supported() -> bool:
+    return _table_supported("pc_player_notes") and _table_supported(
+        "pc_anticheat_events"
+    )
+
+
+def report_closure_supported() -> bool:
+    return _column_supported("pc_reports", "closed_at")
 
 
 # ══════════ Name resolution ══════════
@@ -601,6 +664,7 @@ def list_players(
 def get_player(player_uuid: str) -> dict | None:
     """Full profile for a single player, including their moderation history."""
     right_now = now_ms()
+    has_moderation_notes = moderation_notes_supported()
     with _connect() as conn:
         exists = conn.scalar(
             f"""SELECT COUNT(*) AS total
@@ -644,6 +708,27 @@ def get_player(player_uuid: str) -> dict | None:
                 ORDER BY created_at DESC""",
             (player_uuid,),
         )
+        notes = (
+            conn.query(
+                """SELECT * FROM pc_player_notes
+                    WHERE player_uuid = %s
+                    ORDER BY created_at DESC, id DESC""",
+                (player_uuid,),
+            )
+            if has_moderation_notes
+            else []
+        )
+        anticheat_events = (
+            conn.query(
+                """SELECT * FROM pc_anticheat_events
+                    WHERE player_uuid = %s
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT 100""",
+                (player_uuid,),
+            )
+            if has_moderation_notes
+            else []
+        )
         rank = conn.scalar(
             """SELECT COUNT(*) + 1 AS rank_position
                  FROM pc_playtime
@@ -670,6 +755,8 @@ def get_player(player_uuid: str) -> dict | None:
         "warnings": warnings,
         "reports_against": reports_against,
         "reports_by": reports_by,
+        "notes": notes,
+        "anticheat_events": anticheat_events,
         "playtime_rank": int(rank) if rank and playtime else None,
         "generated_at": right_now,
     }
@@ -716,6 +803,59 @@ def count_reports(q: str = "", status: str = "all") -> int:
             conn.scalar(f"SELECT COUNT(*) AS total FROM pc_reports{where}", tuple(params))
             or 0
         )
+
+
+def close_report(
+    report_id: int,
+    actor_id: str,
+    actor_name: str,
+    close_note: str = "",
+) -> dict | None:
+    supports_audit = report_closure_supported()
+    with _connect() as conn:
+        report = conn.query_one("SELECT * FROM pc_reports WHERE id = %s", (report_id,))
+        if not report:
+            return None
+        if report.get("is_open"):
+            if supports_audit:
+                conn.execute(
+                    """UPDATE pc_reports
+                          SET is_open = 0, closed_at = %s, closed_by_id = %s,
+                              closed_by_name = %s, close_note = %s
+                        WHERE id = %s AND is_open = 1""",
+                    (now_ms(), actor_id, actor_name, close_note or None, report_id),
+                )
+            else:
+                conn.execute(
+                    "UPDATE pc_reports SET is_open = 0 WHERE id = %s AND is_open = 1",
+                    (report_id,),
+                )
+        return conn.query_one("SELECT * FROM pc_reports WHERE id = %s", (report_id,))
+
+
+def add_player_note(
+    player_uuid: str,
+    note: str,
+    category: str,
+    author_id: str,
+    author_name: str,
+) -> dict:
+    if not moderation_notes_supported():
+        raise MinecraftDatabaseUnavailable(
+            "Spielernotizen sind noch nicht verfügbar. Starte PumpeDatabase mit Migration V5."
+        )
+    created_at = now_ms()
+    with _connect() as conn:
+        conn.execute(
+            """INSERT INTO pc_player_notes
+                   (player_uuid, note, category, author_id, author_name, created_at)
+               VALUES (%s, %s, %s, %s, %s, %s)""",
+            (player_uuid, note, category, author_id, author_name, created_at),
+        )
+        note_id = conn.scalar("SELECT LAST_INSERT_ID() AS id")
+        return conn.query_one(
+            "SELECT * FROM pc_player_notes WHERE id = %s", (note_id,)
+        ) or {}
 
 
 # ══════════ Punishments (bans) ══════════

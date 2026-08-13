@@ -171,6 +171,28 @@
       if (!url) return "";
       return `<form method="post" action="${escapeHtml(url)}" class="text-right" onsubmit="return confirm('${escapeHtml(column.confirm || "Wirklich löschen?")}')"><button type="submit" class="rounded border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-400 transition hover:bg-red-500/20">${escapeHtml(column.label || "Löschen")}</button></form>`;
     }
+    if (column.type === "report") {
+      const payload = {
+        id: row.id,
+        label: row.report_label,
+        status: row.status,
+        reporterName: row.reporter_name,
+        reporterUuid: row.reporter_uuid,
+        targetName: row.target_name,
+        targetUuid: row.target_uuid,
+        reason: row.reason,
+        createdAt: row.created_at_display,
+        closedAt: row.closed_at_display,
+        closedBy: row.closed_by_name,
+        closeNote: row.close_note,
+        closeUrl: row.close_url,
+      };
+      return `<button type="button" data-pumbot-report='${escapeHtml(JSON.stringify(payload))}'
+        title="Report öffnen" aria-label="Report ${escapeHtml(row.report_label || "")} öffnen"
+        class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-slate-400 transition hover:border-cyan-500/30 hover:bg-cyan-500/10 hover:text-cyan-300">
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.25 12s3.5-6 9.75-6 9.75 6 9.75 6-3.5 6-9.75 6S2.25 12 2.25 12Z"/><circle cx="12" cy="12" r="2.75" stroke-width="1.8"/></svg>
+      </button>`;
+    }
     if (column.type === "rank") {
       if (value === 1)
         return '<span class="font-bold text-yellow-400">#1</span>';
@@ -457,6 +479,7 @@
         if (!document.hidden) load(true);
       }, refreshMs);
     }
+    root.addEventListener("pumbot:table-refresh", () => load(true));
   };
 
   const ensureModal = () => {
@@ -534,6 +557,127 @@
       modal.classList.add("hidden");
       modal.classList.remove("flex");
     }
+  });
+
+  const ensureReportModal = () => {
+    let modal = document.getElementById("pumbot-report-modal");
+    if (modal) return modal;
+    modal = document.createElement("div");
+    modal.id = "pumbot-report-modal";
+    modal.className =
+      "fixed inset-0 z-[210] hidden items-center justify-center bg-black/70 p-4 backdrop-blur-sm";
+    modal.innerHTML = `
+      <div class="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-xl border border-white/10 bg-[#0d1320] shadow-2xl">
+        <div class="flex items-center justify-between border-b border-white/10 px-5 py-3">
+          <div class="flex items-center gap-2.5">
+            <h3 data-report-title class="text-sm font-semibold text-white">Report</h3>
+            <span data-report-status></span>
+          </div>
+          <button type="button" data-report-close-modal title="Schließen" aria-label="Dialog schließen" class="rounded p-1 text-slate-400 hover:bg-white/10 hover:text-white">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="max-h-[calc(90vh-3.5rem)] overflow-y-auto p-5">
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <div class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Melder</div>
+              <div data-report-reporter class="mt-1 text-sm font-medium text-slate-200"></div>
+              <div data-report-reporter-uuid class="mt-0.5 break-all font-mono text-[10.5px] text-slate-500"></div>
+            </div>
+            <div>
+              <div class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Gemeldeter Spieler</div>
+              <div data-report-target class="mt-1 text-sm font-medium text-slate-200"></div>
+              <div data-report-target-uuid class="mt-0.5 break-all font-mono text-[10.5px] text-slate-500"></div>
+            </div>
+          </div>
+          <div class="mt-5 border-t border-white/[0.06] pt-4">
+            <div class="flex items-center justify-between gap-3">
+              <div class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Grund</div>
+              <div data-report-created class="text-[10.5px] text-slate-500"></div>
+            </div>
+            <p data-report-reason class="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-200"></p>
+          </div>
+          <div data-report-completed class="mt-5 hidden border-t border-white/[0.06] pt-4">
+            <div class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Abschluss</div>
+            <p data-report-completed-by class="mt-1 text-sm text-slate-300"></p>
+            <p data-report-close-note class="mt-2 hidden whitespace-pre-wrap break-words rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 text-sm text-slate-300"></p>
+          </div>
+          <form data-report-close-form class="mt-5 border-t border-white/[0.06] pt-4">
+            <label for="pumbot-report-close-note" class="block text-xs font-medium text-slate-400">Abschlussnotiz <span class="text-slate-600">optional</span></label>
+            <textarea id="pumbot-report-close-note" data-report-close-note-input maxlength="500" rows="3" placeholder="Kurze Zusammenfassung der Bearbeitung"
+              class="mt-2 w-full resize-y rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder-slate-600 outline-none transition focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40"></textarea>
+            <div class="mt-3 flex justify-end gap-2">
+              <button type="button" data-report-close-modal class="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-white/10">Abbrechen</button>
+              <button type="submit" data-report-submit class="rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/20">Report schließen</button>
+            </div>
+          </form>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    const hide = () => {
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+    };
+    modal.addEventListener("click", (event) => {
+      if (event.target === modal || event.target.closest("[data-report-close-modal]")) hide();
+    });
+    modal.querySelector("[data-report-close-form]").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const submit = modal.querySelector("[data-report-submit]");
+      submit.disabled = true;
+      try {
+        const response = await fetch(modal.dataset.closeUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ note: modal.querySelector("[data-report-close-note-input]").value }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Report konnte nicht geschlossen werden.");
+        hide();
+        window.pumbotToast?.(data.message || "Report geschlossen.", "success");
+        document.querySelectorAll("[data-paginated-table]").forEach((table) =>
+          table.dispatchEvent(new CustomEvent("pumbot:table-refresh")),
+        );
+      } catch (error) {
+        window.pumbotToast?.(error.message || "Report konnte nicht geschlossen werden.", "error");
+      } finally {
+        submit.disabled = false;
+      }
+    });
+    return modal;
+  };
+
+  document.addEventListener("click", (event) => {
+    const trigger = event.target.closest("[data-pumbot-report]");
+    if (!trigger) return;
+    const payload = JSON.parse(trigger.dataset.pumbotReport);
+    const modal = ensureReportModal();
+    const open = payload.status === "Offen";
+    modal.dataset.closeUrl = payload.closeUrl || "";
+    modal.querySelector("[data-report-title]").textContent = `Report ${payload.label || ""}`;
+    modal.querySelector("[data-report-status]").innerHTML = renderBadge(
+      payload.status,
+      { Offen: "danger", Geschlossen: "success" },
+    );
+    modal.querySelector("[data-report-reporter]").textContent = payload.reporterName || "—";
+    modal.querySelector("[data-report-reporter-uuid]").textContent = payload.reporterUuid || "";
+    modal.querySelector("[data-report-target]").textContent = payload.targetName || "—";
+    modal.querySelector("[data-report-target-uuid]").textContent = payload.targetUuid || "";
+    modal.querySelector("[data-report-created]").textContent = payload.createdAt || "";
+    modal.querySelector("[data-report-reason]").textContent = payload.reason || "Kein Grund angegeben";
+    const completed = modal.querySelector("[data-report-completed]");
+    completed.classList.toggle("hidden", open);
+    modal.querySelector("[data-report-completed-by]").textContent = payload.closedBy
+      ? `${payload.closedAt || ""} von ${payload.closedBy}`
+      : payload.closedAt || "Bereits geschlossen";
+    const closeNote = modal.querySelector("[data-report-close-note]");
+    closeNote.textContent = payload.closeNote || "";
+    closeNote.classList.toggle("hidden", !payload.closeNote);
+    modal.querySelector("[data-report-close-form]").classList.toggle("hidden", !open);
+    modal.querySelector("[data-report-close-note-input]").value = "";
+    modal.classList.remove("hidden");
+    modal.classList.add("flex");
   });
 
   document.addEventListener("DOMContentLoaded", () => {

@@ -82,6 +82,88 @@
 
 {% if show_moderation %}
 
+<section class="mb-6 border-y border-white/[0.06] py-5">
+  <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h2 class="text-sm font-semibold text-white">Notizen & Auffälligkeiten</h2>
+      <p class="mt-0.5 text-xs text-slate-500">Interne Moderationshistorie für {{ player.player_name }}</p>
+    </div>
+    <div class="flex items-center gap-2 text-[10.5px] text-slate-500">
+      <span>{{ player_notes|length }} Notizen</span>
+      <span class="text-slate-700">•</span>
+      <span>{{ anticheat_events|length }} AntiCheat-Ereignisse</span>
+    </div>
+  </div>
+
+  <div class="grid gap-6 lg:grid-cols-2">
+    <div>
+      {% if notes_supported %}
+      <form id="mc-player-note-form" data-endpoint="{{ url_for('panel_api_minecraft_player_note_create', player_uuid=player.player_uuid) }}"
+        class="mb-4 border-b border-white/[0.06] pb-4">
+        <div class="grid gap-3 sm:grid-cols-[9rem_minmax(0,1fr)]">
+          <label class="block">
+            <span class="mb-1.5 block text-xs font-medium text-slate-400">Kategorie</span>
+            <select name="category" class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3 py-2.5 text-sm text-white outline-none focus:border-cyan-500">
+              <option value="GENERAL">Allgemein</option>
+              <option value="BEHAVIOR">Verhalten</option>
+              <option value="ANTICHEAT">AntiCheat</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="mb-1.5 block text-xs font-medium text-slate-400">Neue Notiz</span>
+            <textarea name="note" maxlength="2000" rows="3" required placeholder="Interne Notiz"
+              class="w-full resize-y rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/40"></textarea>
+          </label>
+        </div>
+        <div class="mt-3 flex justify-end">
+          <button type="submit" class="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-cyan-500 disabled:opacity-50">Notiz speichern</button>
+        </div>
+      </form>
+      {% endif %}
+
+      <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Teamnotizen</h3>
+      {% if player_notes %}
+      <div class="space-y-2">
+        {% for note in player_notes %}
+        {% set note_label = {"GENERAL":"Allgemein", "BEHAVIOR":"Verhalten", "ANTICHEAT":"AntiCheat"}.get(note.category, note.category) %}
+        <article class="border-l-2 {{ 'border-red-400/60' if note.category == 'ANTICHEAT' else 'border-amber-400/50' if note.category == 'BEHAVIOR' else 'border-cyan-400/40' }} py-1 pl-3">
+          <div class="flex flex-wrap items-center gap-2 text-[10.5px] text-slate-500">
+            <span class="font-medium text-slate-300">{{ note_label }}</span>
+            <span>von {{ note.author_name }}</span>
+            <span class="ml-auto">{{ note.created_at_display }}</span>
+          </div>
+          <p class="mt-1.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-200">{{ note.note }}</p>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="py-6 text-center text-sm text-slate-500">Keine Teamnotizen vorhanden.</div>
+      {% endif %}
+    </div>
+
+    <div class="lg:border-l lg:border-white/[0.06] lg:pl-6">
+      <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">AntiCheat-Historie</h3>
+      {% if anticheat_events %}
+      <div class="max-h-[32rem] space-y-2 overflow-y-auto pr-1">
+        {% for event in anticheat_events %}
+        <article class="border-l-2 border-red-400/50 py-1 pl-3">
+          <div class="flex flex-wrap items-center gap-2">
+            {{ mc_pill(event.check_type, "danger") }}
+            <span class="text-[10.5px] font-medium text-red-300">VL {{ event.violation_level_display }}</span>
+            <span class="text-[10.5px] text-slate-500">{{ event.platform }}</span>
+            <span class="ml-auto text-[10.5px] text-slate-500">{{ event.created_at_display }}</span>
+          </div>
+          <p class="mt-1.5 break-words text-sm text-slate-300">{{ event.detail }}</p>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="py-6 text-center text-sm text-slate-500">Keine AntiCheat-Auffälligkeiten gespeichert.</div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
 {% if player.mute %}
 <div class="mb-6 rounded-xl border border-amber-500/25 bg-amber-500/[0.07] p-5">
   {{ section_heading("Aktiver Mute", "Der Spieler kann aktuell nicht schreiben") }}
@@ -202,5 +284,38 @@
 </div>
 {% endif %}
 
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if show_moderation and notes_supported %}
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const form = document.getElementById("mc-player-note-form");
+    if (!form) return;
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const submit = form.querySelector('button[type="submit"]');
+      const data = new FormData(form);
+      submit.disabled = true;
+      try {
+        const response = await fetch(form.dataset.endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ category: data.get("category"), note: data.get("note") }),
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) throw new Error(payload.error || "Notiz konnte nicht gespeichert werden.");
+        window.pumbotToast?.(payload.message || "Notiz gespeichert.", "success");
+        window.setTimeout(() => window.location.reload(), 350);
+      } catch (error) {
+        window.pumbotToast?.(error.message || "Notiz konnte nicht gespeichert werden.", "error");
+      } finally {
+        submit.disabled = false;
+      }
+    });
+  });
+</script>
 {% endif %}
 {% endblock %}

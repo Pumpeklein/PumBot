@@ -3214,6 +3214,101 @@ def minecraft_page():
     )
 
 
+# -- Minecraft: Statistiken --
+
+
+@app.get("/minecraft/statistiken")
+@permission_any_required(*MINECRAFT_PERMISSIONS)
+def minecraft_statistics_page():
+    try:
+        overview = mc_db.get_overview()
+        top_playtime = mc_db.get_top_playtime(8)
+        top_deaths = mc_db.get_top_deaths(8)
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return _mc_unavailable_page(
+            "minecraft_statistics.html", str(exc), "minecraft_statistics"
+        )
+
+    total_seconds = max(0, int(overview.get("total_seconds") or 0))
+    afk_seconds = min(total_seconds, max(0, int(overview.get("afk_seconds") or 0)))
+    active_seconds = max(0, total_seconds - afk_seconds)
+    tracked_players = max(0, int(overview.get("playtime_players") or 0))
+    known_players = max(0, int(overview.get("players") or 0))
+
+    playtime_rows = []
+    for player in top_playtime:
+        player_total = max(0, int(player.get("total_seconds") or 0))
+        player_afk = min(player_total, max(0, int(player.get("afk_seconds") or 0)))
+        player_active = max(0, player_total - player_afk)
+        playtime_rows.append(
+            {
+                **player,
+                "total_time": mc_db.format_duration(player_total),
+                "active_time": mc_db.format_duration(player_active),
+                "afk_time": mc_db.format_duration(player_afk),
+                "active_percent": (
+                    round(player_active / player_total * 100, 1)
+                    if player_total
+                    else 0
+                ),
+                "afk_percent": (
+                    round(player_afk / player_total * 100, 1)
+                    if player_total
+                    else 0
+                ),
+                "detail_url": url_for(
+                    "minecraft_player_page", player_uuid=player["player_uuid"]
+                ),
+            }
+        )
+
+    highest_death_count = max(
+        (int(player.get("death_count") or 0) for player in top_deaths), default=0
+    )
+    death_rows = [
+        {
+            **player,
+            "bar_percent": (
+                round(int(player.get("death_count") or 0) / highest_death_count * 100, 1)
+                if highest_death_count
+                else 0
+            ),
+            "detail_url": url_for(
+                "minecraft_player_page", player_uuid=player["player_uuid"]
+            ),
+        }
+        for player in top_deaths
+    ]
+
+    return render_template(
+        "minecraft_statistics.html",
+        overview=overview,
+        total_playtime=mc_db.format_duration(total_seconds),
+        average_playtime=mc_db.format_duration(
+            total_seconds // tracked_players if tracked_players else 0
+        ),
+        active_playtime=mc_db.format_duration(active_seconds),
+        afk_playtime=mc_db.format_duration(afk_seconds),
+        active_percent=round(active_seconds / total_seconds * 100, 1) if total_seconds else 0,
+        afk_percent=round(afk_seconds / total_seconds * 100, 1) if total_seconds else 0,
+        tracked_percent=(
+            round(tracked_players / known_players * 100, 1) if known_players else 0
+        ),
+        playtime_chart={
+            "total": total_seconds,
+            "segments": [
+                {"label": "Aktiv", "value": active_seconds, "color": "#22d3ee"},
+                {"label": "AFK", "value": afk_seconds, "color": "#f59e0b"},
+            ],
+        },
+        top_playtime=playtime_rows,
+        top_deaths=death_rows,
+        active_page="minecraft_statistics",
+        **_mc_ctx(),
+        **_ctx(),
+    )
+
+
 # -- Minecraft: Spieler --
 
 

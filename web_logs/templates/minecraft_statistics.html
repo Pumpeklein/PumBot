@@ -146,10 +146,72 @@
   </div>
 </section>
 
+<section id="chat-messages" class="mt-6 scroll-mt-24 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+  <div class="mb-5 flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <h2 class="text-sm font-semibold text-white">All-Chat-Nachrichten</h2>
+      <p class="mt-1 text-xs text-slate-500">Global- und MSG-Nachrichten. System-, Todes- und Achievement-Meldungen werden nicht gespeichert.</p>
+    </div>
+    <div class="flex flex-wrap gap-2 text-[10.5px]">
+      <span class="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-400">{{ chat_stats.total }} gesamt</span>
+      <span class="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1 text-cyan-300">{{ chat_stats.global }} Global</span>
+      <span class="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-amber-300">{{ chat_stats.msg }} MSG</span>
+    </div>
+  </div>
+
+  <form id="mc-chat-filter" class="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem]">
+    <label class="block">
+      <span class="mb-1 block text-xs font-medium text-slate-400">Nachrichten durchsuchen</span>
+      <input type="search" name="q" data-live-search placeholder="Spieler oder Inhalt"
+        class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30">
+    </label>
+    <label class="block">
+      <span class="mb-1 block text-xs font-medium text-slate-400">Art</span>
+      <select name="message_type" data-live-search class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3 py-2 text-sm text-white outline-none focus:border-cyan-500/50">
+        <option value="all">Global und MSG</option>
+        <option value="GLOBAL">Nur Global</option>
+        <option value="MSG">Nur MSG</option>
+      </select>
+    </label>
+    <input type="hidden" name="sort" value="newest" data-live-search data-chat-sort-input>
+  </form>
+
+  <div data-paginated-table data-endpoint="{{ url_for('panel_api_minecraft_chat') }}" data-form="#mc-chat-filter"
+    data-page-size="25" data-auto-refresh-ms="15000" data-preserve-empty-rows="false">
+    <script type="application/json">
+      [
+        {"type":"user","nameKey":"player_name","subKey":"player_uuid_short","avatarKey":"player_head_url","urlKey":"player_detail_url","class":"px-3 py-2.5"},
+        {"key":"message","type":"message","deletedAtKey":"deleted_at","alwaysInteractive":true,"modalTitle":"Minecraft Chatnachricht","previewLength":180,"class":"px-3 py-2.5 min-w-[18rem]"},
+        {"key":"created_at","type":"date","class":"px-3 py-2.5 whitespace-nowrap"},
+        {"key":"message_type_label","type":"badge","variants":{"Global":"info","MSG":"warning"},"class":"px-3 py-2.5"}
+      ]
+    </script>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+          <th class="px-3 py-2.5"><button type="button" data-chat-sort-asc="player_asc" data-chat-sort-desc="player_desc" class="inline-flex items-center gap-1 hover:text-white">Player <span data-sort-indicator></span></button></th>
+          <th class="px-3 py-2.5"><button type="button" data-chat-sort-asc="message_asc" data-chat-sort-desc="message_desc" class="inline-flex items-center gap-1 hover:text-white">Nachricht <span data-sort-indicator></span></button></th>
+          <th class="px-3 py-2.5"><button type="button" data-chat-sort-asc="oldest" data-chat-sort-desc="newest" class="inline-flex items-center gap-1 hover:text-white">Datum <span data-sort-indicator>↓</span></button></th>
+          <th class="px-3 py-2.5"><button type="button" data-chat-sort-asc="type_asc" data-chat-sort-desc="type_desc" class="inline-flex items-center gap-1 hover:text-white">Art <span data-sort-indicator></span></button></th>
+        </tr></thead>
+        <tbody data-table-body></tbody>
+      </table>
+    </div>
+    <div data-table-empty class="hidden">{{ empty_state("Keine Chatnachrichten", "Die gewählte Suche oder Nachrichtenart liefert keine Treffer.") }}</div>
+    <div class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
+      <label class="flex items-center gap-2 text-xs text-slate-500">Pro Seite
+        <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option>10</option><option selected>25</option><option>50</option><option>100</option></select>
+      </label>
+      <div data-table-pagination class="flex-1"></div>
+    </div>
+  </div>
+</section>
+
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
 <script>
   document.addEventListener("DOMContentLoaded", () => {
     const canvas = document.querySelector("[data-mc-playtime-chart]");
@@ -199,6 +261,18 @@
     draw();
     const observer = new ResizeObserver(draw);
     observer.observe(canvas.parentElement);
+
+    const sortInput = document.querySelector("[data-chat-sort-input]");
+    const sortButtons = document.querySelectorAll("[data-chat-sort-asc]");
+    sortButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const currentlyAscending = sortInput.value === button.dataset.chatSortAsc;
+        sortInput.value = currentlyAscending ? button.dataset.chatSortDesc : button.dataset.chatSortAsc;
+        sortButtons.forEach((other) => { other.querySelector("[data-sort-indicator]").textContent = ""; });
+        button.querySelector("[data-sort-indicator]").textContent = currentlyAscending ? "↓" : "↑";
+        sortInput.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    });
   });
 </script>
 {% endblock %}

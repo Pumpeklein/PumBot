@@ -1082,6 +1082,95 @@ def get_recent_reports(limit: int = 6) -> list[dict]:
         )
 
 
+# ══════════ Chat Control ══════════
+
+CHAT_SORTS = {
+    "newest": "created_at DESC, id DESC",
+    "oldest": "created_at ASC, id ASC",
+    "player_asc": "player_name ASC, created_at DESC",
+    "player_desc": "player_name DESC, created_at DESC",
+    "message_asc": "message ASC, created_at DESC",
+    "message_desc": "message DESC, created_at DESC",
+    "type_asc": "message_type ASC, created_at DESC",
+    "type_desc": "message_type DESC, created_at DESC",
+}
+
+
+def chat_messages_supported() -> bool:
+    return _table_supported("pc_chat_messages")
+
+
+def get_chat_stats() -> dict:
+    if not chat_messages_supported():
+        return {"total": 0, "global": 0, "msg": 0, "deleted": 0}
+    with _connect() as conn:
+        row = conn.query_one(
+            """SELECT COUNT(*) AS total,
+                      SUM(message_type = 'GLOBAL') AS global_count,
+                      SUM(message_type = 'MSG') AS msg_count,
+                      SUM(deleted_at IS NOT NULL) AS deleted_count
+                 FROM pc_chat_messages
+                WHERE blocked = 0"""
+        ) or {}
+    return {
+        "total": int(row.get("total") or 0),
+        "global": int(row.get("global_count") or 0),
+        "msg": int(row.get("msg_count") or 0),
+        "deleted": int(row.get("deleted_count") or 0),
+    }
+
+
+def _chat_where(q: str, message_type: str) -> tuple[str, list[Any]]:
+    clauses = ["blocked = 0"]
+    params: list[Any] = []
+    normalized_type = message_type.upper()
+    if normalized_type in {"GLOBAL", "MSG"}:
+        clauses.append("message_type = %s")
+        params.append(normalized_type)
+    if q:
+        like = f"%{q}%"
+        clauses.append(
+            "(player_name LIKE %s OR player_uuid LIKE %s OR message LIKE %s"
+            " OR recipient_name LIKE %s)"
+        )
+        params.extend([like] * 4)
+    return " WHERE " + " AND ".join(clauses), params
+
+
+def list_chat_messages(
+    q: str = "",
+    message_type: str = "all",
+    sort: str = "newest",
+    limit: int = 25,
+    offset: int = 0,
+) -> list[dict]:
+    if not chat_messages_supported():
+        return []
+    where, params = _chat_where(q, message_type)
+    order = CHAT_SORTS.get(sort, CHAT_SORTS["newest"])
+    with _connect() as conn:
+        return conn.query(
+            f"SELECT * FROM pc_chat_messages{where} ORDER BY {order} LIMIT %s OFFSET %s",
+            tuple([*params, limit, offset]),
+        )
+
+
+def count_chat_messages(q: str = "", message_type: str = "all") -> int:
+    if not chat_messages_supported():
+        return 0
+    where, params = _chat_where(q, message_type)
+    with _connect() as conn:
+        return int(
+            conn.scalar(
+                f"SELECT COUNT(*) AS total FROM pc_chat_messages{where}", tuple(params)
+            ) or 0
+        )
+
+
+def get_recent_chat_messages(limit: int = 6) -> list[dict]:
+    return list_chat_messages(limit=limit, offset=0)
+
+
 # ══════════ Skills ══════════
 
 # Reihenfolge und Farben spiegeln das PumpeSkills-Plugin. Die Hex-Werte sind auf

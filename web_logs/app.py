@@ -3149,6 +3149,26 @@ def _mc_report_row(row: dict) -> dict:
     return item
 
 
+def _mc_chat_row(row: dict) -> dict:
+    item = dict(row)
+    message_type = str(item.get("message_type") or "GLOBAL").upper()
+    item["message_type_label"] = "Global" if message_type == "GLOBAL" else "MSG"
+    item["created_at_display"] = mc_db.format_epoch_millis(item.get("created_at"))
+    item["player_head_url"] = mc_db.head_url(item.get("player_uuid"))
+    item["player_detail_url"] = (
+        url_for("minecraft_player_page", player_uuid=item["player_uuid"])
+        if item.get("player_uuid")
+        else None
+    )
+    item["player_uuid_short"] = str(item.get("player_uuid") or "")[:8]
+    item["type_detail"] = (
+        f"an {item.get('recipient_name')}"
+        if message_type == "MSG" and item.get("recipient_name")
+        else "Öffentlicher Chat" if message_type == "GLOBAL" else "Private Nachricht"
+    )
+    return item
+
+
 # -- Minecraft: Übersicht --
 
 
@@ -3161,6 +3181,7 @@ def minecraft_page():
         top_deaths = mc_db.get_top_deaths(5)
         recent_moderation = mc_db.get_recent_moderation(6)
         recent_reports = mc_db.get_recent_reports(5)
+        recent_chat = mc_db.get_recent_chat_messages(6)
     except mc_db.MinecraftDatabaseUnavailable as exc:
         return _mc_unavailable_page(
             "minecraft_overview.html", str(exc), "minecraft"
@@ -3208,6 +3229,7 @@ def minecraft_page():
             _mc_moderation_row(entry) for entry in recent_moderation
         ],
         recent_reports=[_mc_report_row(entry) for entry in recent_reports],
+        recent_chat=[_mc_chat_row(entry) for entry in recent_chat],
         active_page="minecraft",
         **_mc_ctx(),
         **_ctx(),
@@ -3224,6 +3246,7 @@ def minecraft_statistics_page():
         overview = mc_db.get_overview()
         top_playtime = mc_db.get_top_playtime(8)
         top_deaths = mc_db.get_top_deaths(8)
+        chat_stats = mc_db.get_chat_stats()
     except mc_db.MinecraftDatabaseUnavailable as exc:
         return _mc_unavailable_page(
             "minecraft_statistics.html", str(exc), "minecraft_statistics"
@@ -3303,6 +3326,7 @@ def minecraft_statistics_page():
         },
         top_playtime=playtime_rows,
         top_deaths=death_rows,
+        chat_stats=chat_stats,
         active_page="minecraft_statistics",
         **_mc_ctx(),
         **_ctx(),
@@ -3681,6 +3705,29 @@ def panel_api_minecraft_reports():
 
     items = [_mc_report_row(row) for row in rows]
     return _paginated_response(items, total, page, page_size)
+
+
+@app.get("/panel-api/minecraft/chat")
+@permission_any_required(*MINECRAFT_PERMISSIONS)
+def panel_api_minecraft_chat():
+    page, page_size, offset = _pagination_args()
+    q = request.args.get("q", "").strip()
+    message_type = request.args.get("message_type", "all").strip()
+    sort = request.args.get("sort", "newest").strip()
+    try:
+        rows = mc_db.list_chat_messages(
+            q=q,
+            message_type=message_type,
+            sort=sort,
+            limit=page_size,
+            offset=offset,
+        )
+        total = mc_db.count_chat_messages(q=q, message_type=message_type)
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return _mc_unavailable_api(exc, page, page_size)
+    return _paginated_response(
+        [_mc_chat_row(row) for row in rows], total, page, page_size
+    )
 
 
 @app.post("/panel-api/minecraft/reports/<int:report_id>/close")

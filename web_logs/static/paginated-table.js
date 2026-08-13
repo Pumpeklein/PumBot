@@ -52,6 +52,7 @@
     const variant = (map && map[value]) || "default";
     const styles = {
       success: "border-emerald-500/25 bg-emerald-500/10 text-emerald-400",
+      info: "border-cyan-500/25 bg-cyan-500/10 text-cyan-300",
       warning: "border-amber-500/25 bg-amber-500/10 text-amber-400",
       danger: "border-red-500/25 bg-red-500/10 text-red-400",
       default: "border-slate-500/25 bg-slate-500/10 text-slate-300",
@@ -80,7 +81,7 @@
       const limit = column.previewLength || 140;
       const truncated = fullText.length > limit;
       const preview = truncated ? fullText.slice(0, limit) + "…" : fullText;
-      const interactive = truncated || changed;
+      const interactive = Boolean(column.alwaysInteractive) || truncated || changed;
       const payload = {
         title: column.modalTitle || "Nachricht",
         content: fullText,

@@ -119,6 +119,21 @@
     {% if recent_reports %}
     <ul class="space-y-1">
       {% for report in recent_reports %}
+      {% set report_payload = {
+        "id": report.id,
+        "label": report.report_label,
+        "status": report.status,
+        "reporterName": report.reporter_name,
+        "reporterUuid": report.reporter_uuid,
+        "targetName": report.target_name,
+        "targetUuid": report.target_uuid,
+        "reason": report.reason,
+        "createdAt": report.created_at_display,
+        "closedAt": report.closed_at_display,
+        "closedBy": report.closed_by_name,
+        "closeNote": report.close_note,
+        "closeUrl": report.close_url
+      } %}
       <li class="flex items-start gap-3 rounded-lg px-2 py-2 transition hover:bg-white/[0.03]">
         <div class="mt-0.5 shrink-0">
           {{ mc_pill("Offen" if report.is_open else "Erledigt", "danger" if report.is_open else "default") }}
@@ -131,7 +146,14 @@
           </div>
           <div class="truncate text-xs text-slate-500">{{ report.reason }}</div>
         </div>
-        <div class="shrink-0 text-[10.5px] text-slate-500">{{ report.created_at_display }}</div>
+        <div class="shrink-0 text-right">
+          <div class="text-[10.5px] text-slate-500">{{ report.created_at_display }}</div>
+          <button type="button" data-pumbot-report='{{ report_payload|tojson|forceescape }}'
+            title="Report öffnen" aria-label="Report {{ report.report_label }} öffnen"
+            class="mt-1 inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-slate-400 transition hover:border-cyan-500/30 hover:bg-cyan-500/10 hover:text-cyan-300">
+            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.25 12s3.5-6 9.75-6 9.75 6 9.75 6-3.5 6-9.75 6S2.25 12 2.25 12Z"/><circle cx="12" cy="12" r="2.75" stroke-width="1.8"/></svg>
+          </button>
+        </div>
       </li>
       {% endfor %}
     </ul>
@@ -152,4 +174,8 @@
 </div>
 
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
 {% endblock %}

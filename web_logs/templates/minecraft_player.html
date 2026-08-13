@@ -97,7 +97,11 @@
 
   <div class="grid gap-6 lg:grid-cols-2">
     <div>
-      {% if notes_supported %}
+      {% if not notes_supported %}
+      <div class="mb-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+        Die Notiz-Datenbank wird noch eingerichtet. Eingaben sind bereits möglich; zum Speichern muss PumpeDatabase die Migration V5 ausgeführt haben.
+      </div>
+      {% endif %}
       <form id="mc-player-note-form" data-endpoint="{{ url_for('panel_api_minecraft_player_note_create', player_uuid=player.player_uuid) }}"
         class="mb-4 border-b border-white/[0.06] pb-4">
         <div class="grid gap-3 sm:grid-cols-[9rem_minmax(0,1fr)]">
@@ -119,7 +123,6 @@
           <button type="submit" class="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-cyan-500 disabled:opacity-50">Notiz speichern</button>
         </div>
       </form>
-      {% endif %}
 
       <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Teamnotizen</h3>
       {% if player_notes %}
@@ -288,7 +291,7 @@
 {% endblock %}
 
 {% block scripts %}
-{% if show_moderation and notes_supported %}
+{% if show_moderation %}
 <script>
   document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("mc-player-note-form");

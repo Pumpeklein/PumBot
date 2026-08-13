@@ -263,8 +263,8 @@ _moderation_schema_cache: dict[str, bool] = {}
 def _table_supported(table_name: str) -> bool:
     with _moderation_schema_lock:
         cached = _moderation_schema_cache.get(table_name)
-        if cached is not None:
-            return cached
+        if cached is True:
+            return True
         with _connect() as conn:
             present = bool(
                 conn.scalar(
@@ -274,7 +274,10 @@ def _table_supported(table_name: str) -> bool:
                     (table_name,),
                 )
             )
-        _moderation_schema_cache[table_name] = present
+        if present:
+            _moderation_schema_cache[table_name] = True
+        else:
+            _moderation_schema_cache.pop(table_name, None)
         return present
 
 
@@ -282,8 +285,8 @@ def _column_supported(table_name: str, column_name: str) -> bool:
     cache_key = f"{table_name}.{column_name}"
     with _moderation_schema_lock:
         cached = _moderation_schema_cache.get(cache_key)
-        if cached is not None:
-            return cached
+        if cached is True:
+            return True
         with _connect() as conn:
             present = bool(
                 conn.scalar(
@@ -294,7 +297,10 @@ def _column_supported(table_name: str, column_name: str) -> bool:
                     (table_name, column_name),
                 )
             )
-        _moderation_schema_cache[cache_key] = present
+        if present:
+            _moderation_schema_cache[cache_key] = True
+        else:
+            _moderation_schema_cache.pop(cache_key, None)
         return present
 
 

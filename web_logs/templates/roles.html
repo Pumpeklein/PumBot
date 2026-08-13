@@ -217,7 +217,9 @@
         <span class="rounded border border-cyan-500/20 bg-cyan-500/10 px-1.5 py-0.5 text-[10.5px] text-cyan-300">{{ perm|permission_label }}</span>
         {% endfor %}
         {% if role.permissions|length > 4 %}
-        <span class="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10.5px] text-slate-400">+{{ role.permissions|length - 4 }}</span>
+        <button type="button" data-open-role-modal="{{ role.id }}" data-open-role-tab="permissions"
+          title="Alle Rechte anzeigen" aria-label="Alle {{ role.permissions|length }} Rechte von {{ role.role_name }} anzeigen"
+          class="rounded border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10.5px] text-slate-400 transition hover:border-cyan-500/30 hover:bg-cyan-500/10 hover:text-cyan-300 focus:outline-none focus:ring-1 focus:ring-cyan-500/50">+{{ role.permissions|length - 4 }}</button>
         {% endif %}
       </div>
 
@@ -480,6 +482,8 @@
       b.addEventListener("click", () => {
         const modal = document.querySelector(`[data-role-modal="${b.dataset.openRoleModal}"]`);
         showModal(modal);
+        const tab = b.dataset.openRoleTab;
+        if (tab) modal?.querySelector(`[data-modal-tab="${tab}"]`)?.click();
       });
     });
     document.querySelectorAll("[data-close-role-modal]").forEach((b) =>

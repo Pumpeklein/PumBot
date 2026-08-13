@@ -636,9 +636,14 @@
         if (!response.ok || !data.ok) throw new Error(data.error || "Report konnte nicht geschlossen werden.");
         hide();
         window.pumbotToast?.(data.message || "Report geschlossen.", "success");
-        document.querySelectorAll("[data-paginated-table]").forEach((table) =>
-          table.dispatchEvent(new CustomEvent("pumbot:table-refresh")),
-        );
+        const tables = document.querySelectorAll("[data-paginated-table]");
+        if (tables.length) {
+          tables.forEach((table) =>
+            table.dispatchEvent(new CustomEvent("pumbot:table-refresh")),
+          );
+        } else {
+          window.setTimeout(() => window.location.reload(), 350);
+        }
       } catch (error) {
         window.pumbotToast?.(error.message || "Report konnte nicht geschlossen werden.", "error");
       } finally {

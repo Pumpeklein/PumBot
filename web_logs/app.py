@@ -3124,6 +3124,31 @@ def _mc_moderation_row(row: dict, *, time_field: str = "created_at") -> dict:
     return item
 
 
+def _mc_report_row(row: dict) -> dict:
+    item = _mc_moderation_row(row)
+    reporter_uuid = row.get("reporter_uuid")
+    item.setdefault("closed_by_name", None)
+    item.setdefault("close_note", None)
+    item.update(
+        status="Offen" if row.get("is_open") else "Geschlossen",
+        reporter_head_url=mc_db.head_url(reporter_uuid),
+        reporter_uuid_short=str(reporter_uuid or "")[:8],
+        reporter_detail_url=(
+            url_for("minecraft_player_page", player_uuid=reporter_uuid)
+            if reporter_uuid
+            else None
+        ),
+        report_label=f"#{row.get('id')}",
+        closed_at_display=mc_db.format_epoch_millis(
+            row.get("closed_at"), fallback=""
+        ),
+        close_url=url_for(
+            "panel_api_minecraft_report_close", report_id=row["id"]
+        ),
+    )
+    return item
+
+
 # -- Minecraft: Übersicht --
 
 
@@ -3182,15 +3207,7 @@ def minecraft_page():
         recent_moderation=[
             _mc_moderation_row(entry) for entry in recent_moderation
         ],
-        recent_reports=[
-            {
-                **_mc_moderation_row(entry),
-                "reporter_detail_url": url_for(
-                    "minecraft_player_page", player_uuid=entry["reporter_uuid"]
-                ),
-            }
-            for entry in recent_reports
-        ],
+        recent_reports=[_mc_report_row(entry) for entry in recent_reports],
         active_page="minecraft",
         **_mc_ctx(),
         **_ctx(),
@@ -3567,25 +3584,7 @@ def panel_api_minecraft_reports():
     except mc_db.MinecraftDatabaseUnavailable as exc:
         return _mc_unavailable_api(exc, page, page_size)
 
-    items = []
-    for row in rows:
-        item = _mc_moderation_row(row)
-        item["status"] = "Offen" if row.get("is_open") else "Geschlossen"
-        item["reporter_head_url"] = mc_db.head_url(row.get("reporter_uuid"))
-        item["reporter_uuid_short"] = str(row.get("reporter_uuid") or "")[:8]
-        item["reporter_detail_url"] = (
-            url_for("minecraft_player_page", player_uuid=row["reporter_uuid"])
-            if row.get("reporter_uuid")
-            else None
-        )
-        item["report_label"] = f"#{row.get('id')}"
-        item["closed_at_display"] = mc_db.format_epoch_millis(
-            row.get("closed_at"), fallback=""
-        )
-        item["close_url"] = url_for(
-            "panel_api_minecraft_report_close", report_id=row["id"]
-        )
-        items.append(item)
+    items = [_mc_report_row(row) for row in rows]
     return _paginated_response(items, total, page, page_size)
 
 

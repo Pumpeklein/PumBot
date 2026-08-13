@@ -242,6 +242,15 @@ def _seed_default_bot_messages() -> None:
             message_id = row["config_value"]
             if not guild_id or not message_id:
                 continue
+            existing = conn.execute(
+                """SELECT 1
+                   FROM bot_messages
+                   WHERE guild_id = ? AND message_type = 'birthday_list'
+                   LIMIT 1""",
+                (guild_id,),
+            ).fetchone()
+            if existing:
+                continue
             channel_row = conn.execute(
                 """SELECT config_value
                    FROM guild_config

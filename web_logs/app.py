@@ -3235,14 +3235,25 @@ def minecraft_page():
 @app.get("/minecraft/statistiken")
 @permission_any_required(*MINECRAFT_PERMISSIONS)
 def minecraft_statistics_page():
+    selected_dimension = mc_db.normalize_dimension(
+        request.args.get("dimension", "OVERWORLD")
+    )
     try:
-        overview = mc_db.get_overview()
+        overview = {
+            **mc_db.get_overview(),
+            **mc_db.get_dimension_overview(selected_dimension),
+        }
         player_growth = mc_db.get_player_growth_summary(30)
-        top_playtime = mc_db.get_top_playtime(8)
-        top_deaths = mc_db.get_top_deaths(8)
+        top_playtime = mc_db.get_dimension_top_playtime(selected_dimension, 8)
+        top_deaths = mc_db.get_dimension_top_deaths(selected_dimension, 8)
     except mc_db.MinecraftDatabaseUnavailable as exc:
         return _mc_unavailable_page(
-            "minecraft_statistics.html", str(exc), "minecraft_statistics"
+            "minecraft_statistics.html",
+            str(exc),
+            "minecraft_statistics",
+            selected_dimension=selected_dimension,
+            selected_dimension_label=mc_db.DIMENSIONS[selected_dimension],
+            dimension_options=mc_db.DIMENSIONS,
         )
 
     total_seconds = max(0, int(overview.get("total_seconds") or 0))
@@ -3320,6 +3331,9 @@ def minecraft_statistics_page():
         },
         top_playtime=playtime_rows,
         top_deaths=death_rows,
+        selected_dimension=selected_dimension,
+        selected_dimension_label=mc_db.DIMENSIONS[selected_dimension],
+        dimension_options=mc_db.DIMENSIONS,
         active_page="minecraft_statistics",
         **_mc_ctx(),
         **_ctx(),
@@ -3375,6 +3389,9 @@ def _minecraft_server_chart_hours() -> int:
 @app.get("/minecraft/statistiken/server")
 @permission_any_required(*MINECRAFT_PERMISSIONS)
 def minecraft_server_performance_page():
+    selected_dimension = mc_db.normalize_dimension(
+        request.args.get("dimension", "OVERWORLD")
+    )
     try:
         performance = mc_db.get_server_performance()
     except mc_db.MinecraftDatabaseUnavailable as exc:
@@ -3383,6 +3400,7 @@ def minecraft_server_performance_page():
             str(exc),
             "minecraft_statistics",
             performance={"supported": False, "latest": None, "specs": None, "summary": {}},
+            selected_dimension=selected_dimension,
         )
 
     latest = dict(performance.get("latest") or {})
@@ -3411,6 +3429,7 @@ def minecraft_server_performance_page():
     return render_template(
         "minecraft_server_performance.html",
         performance=performance,
+        selected_dimension=selected_dimension,
         active_page="minecraft_statistics",
         **_mc_ctx(),
         **_ctx(),
@@ -3714,12 +3733,17 @@ def minecraft_reports_page():
 @permission_any_required(*MINECRAFT_PERMISSIONS)
 def panel_api_minecraft_statistics_chart():
     metric = request.args.get("metric", "players").strip().lower()
+    dimension = mc_db.normalize_dimension(request.args.get("dimension", "OVERWORLD"))
     if metric in mc_db.MODERATION_CHART_METRICS and not any(
         has_permission(permission) for permission in MINECRAFT_MODERATION_PERMISSIONS
     ):
         return jsonify({"ok": False, "error": "Keine Berechtigung."}), 403
     try:
-        return jsonify(mc_db.get_statistics_chart(metric, _minecraft_chart_days()))
+        return jsonify(
+            mc_db.get_statistics_chart(
+                metric, _minecraft_chart_days(), dimension
+            )
+        )
     except mc_db.MinecraftDatabaseUnavailable as exc:
         return jsonify({"ok": False, "error": str(exc)}), 503
 
@@ -3780,8 +3804,9 @@ def _playtime_live_row(row: dict | None) -> dict | None:
 @permission_any_required(*MINECRAFT_PERMISSIONS)
 def panel_api_minecraft_playtime_live():
     player_uuid = request.args.get("player_uuid", "").strip() or None
+    dimension = request.args.get("dimension", "").strip() or None
     try:
-        playtime = mc_db.get_playtime_live(player_uuid)
+        playtime = mc_db.get_playtime_live(player_uuid, dimension)
     except mc_db.MinecraftDatabaseUnavailable as exc:
         return jsonify({"ok": False, "error": str(exc)}), 503
     return jsonify(

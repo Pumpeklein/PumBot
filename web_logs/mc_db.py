@@ -829,7 +829,9 @@ def _playtime_chart(dates: list[date], player_uuid: str | None = None) -> list[d
     ]
 
 
-def get_statistics_chart(metric: str = "players", days: int = 30) -> dict:
+def get_statistics_chart(
+    metric: str = "players", days: int = 30, dimension: str = "OVERWORLD"
+) -> dict:
     safe_days = (
         days
         if days in CHART_DAYS or days == ALL_TIME_CHART_DAYS
@@ -837,7 +839,16 @@ def get_statistics_chart(metric: str = "players", days: int = 30) -> dict:
     )
     valid_metrics = {"players", "playtime", "chat"} | MODERATION_CHART_METRICS
     safe_metric = metric if metric in valid_metrics else "players"
-    first_date = _first_chart_date(safe_metric)
+    safe_dimension = normalize_dimension(dimension)
+    if safe_metric == "playtime" and _table_supported("pc_dimension_playtime_history"):
+        with _connect() as conn:
+            first_date = conn.scalar(
+                "SELECT MIN(snapshot_date) FROM pc_dimension_playtime_history WHERE dimension = %s",
+                (safe_dimension,),
+                default=None,
+            )
+    else:
+        first_date = _first_chart_date(safe_metric)
     dates = _chart_dates(
         safe_days,
         earliest=first_date if safe_days == ALL_TIME_CHART_DAYS else None,
@@ -857,11 +868,13 @@ def get_statistics_chart(metric: str = "players", days: int = 30) -> dict:
     if safe_metric == "players":
         series = _player_growth_chart(dates)
     elif safe_metric == "playtime":
-        series = _playtime_chart(dates)
+        series = _dimension_playtime_chart(dates, safe_dimension)
+        title += f" · {DIMENSIONS[safe_dimension]}"
     else:
         series = [_event_chart(safe_metric, dates)]
     return {
         "metric": safe_metric,
+        "dimension": safe_dimension,
         "days": safe_days,
         "all_time": safe_days == ALL_TIME_CHART_DAYS,
         "history_start": first_date.isoformat() if first_date else None,
@@ -900,15 +913,28 @@ def get_player_playtime_chart(player_uuid: str, days: int = 30) -> dict:
     }
 
 
-def get_playtime_live(player_uuid: str | None = None) -> dict:
+def get_playtime_live(
+    player_uuid: str | None = None, dimension: str | None = None
+) -> dict:
     with _connect() as conn:
-        server = conn.query_one(
-            """SELECT COALESCE(SUM(total_seconds), 0) AS total_seconds,
-                      COALESCE(SUM(active_seconds), 0) AS active_seconds,
-                      COALESCE(SUM(afk_seconds), 0) AS afk_seconds,
-                      MAX(updated_at) AS updated_at
-                 FROM pc_playtime"""
-        ) or {}
+        if dimension:
+            server = conn.query_one(
+                """SELECT COALESCE(SUM(total_seconds), 0) AS total_seconds,
+                          COALESCE(SUM(active_seconds), 0) AS active_seconds,
+                          COALESCE(SUM(afk_seconds), 0) AS afk_seconds,
+                          MAX(updated_at) AS updated_at
+                     FROM pc_dimension_playtime
+                    WHERE dimension = %s""",
+                (normalize_dimension(dimension),),
+            ) or {}
+        else:
+            server = conn.query_one(
+                """SELECT COALESCE(SUM(total_seconds), 0) AS total_seconds,
+                          COALESCE(SUM(active_seconds), 0) AS active_seconds,
+                          COALESCE(SUM(afk_seconds), 0) AS afk_seconds,
+                          MAX(updated_at) AS updated_at
+                     FROM pc_playtime"""
+            ) or {}
         player = None
         if player_uuid:
             player = conn.query_one(
@@ -1775,8 +1801,97 @@ def get_player_chat_messages(
 DIMENSIONS = {"OVERWORLD": "Overworld", "NETHER": "Nether", "END": "End"}
 
 
+def normalize_dimension(dimension: str | None) -> str:
+    normalized = str(dimension or "OVERWORLD").strip().upper()
+    return normalized if normalized in DIMENSIONS else "OVERWORLD"
+
+
 def dimension_statistics_supported() -> bool:
     return _table_supported("pc_dimension_playtime")
+
+
+def get_dimension_overview(dimension: str = "OVERWORLD") -> dict:
+    safe_dimension = normalize_dimension(dimension)
+    empty = {
+        "total_seconds": 0,
+        "active_seconds": 0,
+        "afk_seconds": 0,
+        "playtime_players": 0,
+        "playtime_last_update": None,
+        "total_deaths": 0,
+        "death_players": 0,
+    }
+    if not dimension_statistics_supported():
+        return empty
+    with _connect() as conn:
+        playtime = conn.query_one(
+            """SELECT COALESCE(SUM(total_seconds), 0) AS total_seconds,
+                      COALESCE(SUM(active_seconds), 0) AS active_seconds,
+                      COALESCE(SUM(afk_seconds), 0) AS afk_seconds,
+                      COUNT(*) AS playtime_players,
+                      MAX(updated_at) AS playtime_last_update
+                 FROM pc_dimension_playtime
+                WHERE dimension = %s""",
+            (safe_dimension,),
+        ) or {}
+        deaths = (
+            conn.query_one(
+                """SELECT COALESCE(SUM(death_count), 0) AS total_deaths,
+                          COUNT(*) AS death_players
+                     FROM pc_dimension_death_counts
+                    WHERE dimension = %s""",
+                (safe_dimension,),
+            ) or {}
+            if _table_supported("pc_dimension_death_counts")
+            else {}
+        )
+    return {
+        "total_seconds": int(playtime.get("total_seconds") or 0),
+        "active_seconds": int(playtime.get("active_seconds") or 0),
+        "afk_seconds": int(playtime.get("afk_seconds") or 0),
+        "playtime_players": int(playtime.get("playtime_players") or 0),
+        "playtime_last_update": playtime.get("playtime_last_update"),
+        "total_deaths": int(deaths.get("total_deaths") or 0),
+        "death_players": int(deaths.get("death_players") or 0),
+    }
+
+
+def get_dimension_top_playtime(
+    dimension: str = "OVERWORLD", limit: int = 5
+) -> list[dict]:
+    if not dimension_statistics_supported():
+        return []
+    safe_dimension = normalize_dimension(dimension)
+    with _connect() as conn:
+        rows = conn.query(
+            """SELECT player_uuid, total_seconds, active_seconds, afk_seconds, updated_at
+                 FROM pc_dimension_playtime
+                WHERE dimension = %s
+                ORDER BY total_seconds DESC
+                LIMIT %s""",
+            (safe_dimension, limit),
+        )
+        names = resolve_names(conn, [row["player_uuid"] for row in rows])
+    return [decorate_player(row, "player_uuid", names) for row in rows]
+
+
+def get_dimension_top_deaths(
+    dimension: str = "OVERWORLD", limit: int = 5
+) -> list[dict]:
+    if not _table_supported("pc_dimension_death_counts"):
+        return []
+    safe_dimension = normalize_dimension(dimension)
+    with _connect() as conn:
+        rows = conn.query(
+            """SELECT player_uuid, death_count, updated_at
+                 FROM pc_dimension_death_counts
+                WHERE dimension = %s
+                ORDER BY death_count DESC
+                LIMIT %s""",
+            (safe_dimension, limit),
+        )
+        names = resolve_names(conn, [row["player_uuid"] for row in rows])
+    return [decorate_player(row, "player_uuid", names) for row in rows]
 
 
 def _dimension_playtime_chart(dates: list[date], dimension: str) -> list[dict]:

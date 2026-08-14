@@ -25,6 +25,7 @@
       try {
         const url = new URL(root.dataset.endpoint, window.location.origin);
         if (root.dataset.playerUuid) url.searchParams.set("player_uuid", root.dataset.playerUuid);
+        if (root.dataset.dimension) url.searchParams.set("dimension", root.dataset.dimension);
         const response = await fetch(url, { headers: { Accept: "application/json" } });
         const payload = await response.json();
         if (response.ok && payload.ok !== false) updatePage(payload);

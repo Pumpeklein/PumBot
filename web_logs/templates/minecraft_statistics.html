@@ -159,20 +159,45 @@
     </div>
   </div>
 
-  <form id="mc-chat-filter" class="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem]">
-    <label class="block">
-      <span class="mb-1 block text-xs font-medium text-slate-400">Nachrichten durchsuchen</span>
-      <input type="search" name="q" data-live-search placeholder="Spieler oder Inhalt"
-        class="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-slate-500 outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30">
-    </label>
-    <label class="block">
-      <span class="mb-1 block text-xs font-medium text-slate-400">Art</span>
+  <form id="mc-chat-filter" class="mb-4 flex flex-wrap items-end justify-end gap-3">
+    <label class="block w-full sm:w-44">
+      <span class="mb-1 block text-[11px] font-medium text-slate-500">Art</span>
       <select name="message_type" data-live-search class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3 py-2 text-sm text-white outline-none focus:border-cyan-500/50">
         <option value="all">Global und MSG</option>
         <option value="GLOBAL">Nur Global</option>
         <option value="MSG">Nur MSG</option>
       </select>
     </label>
+    <div class="relative w-full sm:w-80" data-chat-search>
+      <label class="block">
+        <span class="mb-1 block text-[11px] font-medium text-slate-500">Suche</span>
+        <span class="relative block">
+          <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke-width="1.7"/><path stroke-linecap="round" stroke-width="1.7" d="m16.5 16.5 4 4"/></svg>
+          <input type="search" name="q" data-live-search data-chat-search-input placeholder="Username eingeben"
+            autocomplete="off" aria-haspopup="listbox" aria-expanded="false"
+            class="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-9 pr-3 text-sm text-white placeholder-slate-500 outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30">
+        </span>
+      </label>
+      <input type="hidden" name="search_field" value="username" data-live-search data-chat-search-field>
+      <div data-chat-search-menu role="listbox" aria-label="Suchbereich wählen"
+        class="absolute right-0 top-full z-30 mt-1 hidden w-full overflow-hidden rounded-lg border border-white/10 bg-[#111827] p-1.5 shadow-2xl">
+        <button type="button" role="option" data-chat-search-option="uuid" data-placeholder="UUID eingeben"
+          class="flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left transition hover:bg-white/[0.06]">
+          <span class="mt-0.5 font-mono text-xs font-semibold text-cyan-300">ID</span>
+          <span><span class="block text-sm font-medium text-slate-200">Nach UUID suchen</span><span class="mt-0.5 block text-[11px] text-slate-500">Absender oder MSG-Empfänger eindeutig finden</span></span>
+        </button>
+        <button type="button" role="option" aria-selected="true" data-chat-search-option="username" data-placeholder="Username eingeben"
+          class="flex w-full items-start gap-3 rounded-md bg-cyan-500/[0.08] px-3 py-2.5 text-left transition hover:bg-white/[0.06]">
+          <svg class="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5" stroke-width="1.7"/><path stroke-linecap="round" stroke-width="1.7" d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>
+          <span><span class="block text-sm font-medium text-slate-200">Nach Username suchen</span><span class="mt-0.5 block text-[11px] text-slate-500">Spielernamen im Global- und MSG-Chat</span></span>
+        </button>
+        <button type="button" role="option" data-chat-search-option="message" data-placeholder="Nachrichteninhalt eingeben"
+          class="flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left transition hover:bg-white/[0.06]">
+          <svg class="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linejoin="round" stroke-width="1.7" d="M4 5h16v11H9l-5 4V5Z"/><path stroke-linecap="round" stroke-width="1.7" d="M8 9h8m-8 3h5"/></svg>
+          <span><span class="block text-sm font-medium text-slate-200">Im Nachrichteninhalt suchen</span><span class="mt-0.5 block text-[11px] text-slate-500">Begriffe und Gesprächsausschnitte auffinden</span></span>
+        </button>
+      </div>
+    </div>
     <input type="hidden" name="sort" value="newest" data-live-search data-chat-sort-input>
   </form>
 
@@ -189,10 +214,10 @@
     <div class="overflow-x-auto">
       <table class="w-full text-left text-sm">
         <thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
-          <th class="px-3 py-2.5"><button type="button" data-chat-sort-asc="player_asc" data-chat-sort-desc="player_desc" class="inline-flex items-center gap-1 hover:text-white">Player <span data-sort-indicator></span></button></th>
-          <th class="px-3 py-2.5"><button type="button" data-chat-sort-asc="message_asc" data-chat-sort-desc="message_desc" class="inline-flex items-center gap-1 hover:text-white">Nachricht <span data-sort-indicator></span></button></th>
-          <th class="px-3 py-2.5"><button type="button" data-chat-sort-asc="oldest" data-chat-sort-desc="newest" class="inline-flex items-center gap-1 hover:text-white">Datum <span data-sort-indicator>↓</span></button></th>
-          <th class="px-3 py-2.5"><button type="button" data-chat-sort-asc="type_asc" data-chat-sort-desc="type_desc" class="inline-flex items-center gap-1 hover:text-white">Art <span data-sort-indicator></span></button></th>
+          <th class="px-3 py-2.5"><button type="button" data-chat-sort-asc="player_asc" data-chat-sort-desc="player_desc" data-sort-state="0" class="inline-flex items-center gap-1 hover:text-white">Player <span data-sort-indicator></span></button></th>
+          <th class="px-3 py-2.5"><button type="button" data-chat-sort-asc="message_asc" data-chat-sort-desc="message_desc" data-sort-state="0" class="inline-flex items-center gap-1 hover:text-white">Nachricht <span data-sort-indicator></span></button></th>
+          <th class="px-3 py-2.5"><button type="button" data-chat-sort-asc="oldest" data-chat-sort-desc="newest" data-sort-state="0" class="inline-flex items-center gap-1 hover:text-white">Datum <span data-sort-indicator></span></button></th>
+          <th class="px-3 py-2.5"><button type="button" data-chat-sort-asc="type_asc" data-chat-sort-desc="type_desc" data-sort-state="0" class="inline-flex items-center gap-1 hover:text-white">Art <span data-sort-indicator></span></button></th>
         </tr></thead>
         <tbody data-table-body></tbody>
       </table>
@@ -266,12 +291,54 @@
     const sortButtons = document.querySelectorAll("[data-chat-sort-asc]");
     sortButtons.forEach((button) => {
       button.addEventListener("click", () => {
-        const currentlyAscending = sortInput.value === button.dataset.chatSortAsc;
-        sortInput.value = currentlyAscending ? button.dataset.chatSortDesc : button.dataset.chatSortAsc;
-        sortButtons.forEach((other) => { other.querySelector("[data-sort-indicator]").textContent = ""; });
-        button.querySelector("[data-sort-indicator]").textContent = currentlyAscending ? "↓" : "↑";
+        const nextState = (Number(button.dataset.sortState || 0) + 1) % 3;
+        sortButtons.forEach((other) => {
+          other.dataset.sortState = "0";
+          other.querySelector("[data-sort-indicator]").textContent = "";
+        });
+        button.dataset.sortState = String(nextState);
+        sortInput.value = nextState === 1
+          ? button.dataset.chatSortAsc
+          : nextState === 2 ? button.dataset.chatSortDesc : "newest";
+        button.querySelector("[data-sort-indicator]").textContent = nextState === 1 ? "↑" : nextState === 2 ? "↓" : "";
         sortInput.dispatchEvent(new Event("change", { bubbles: true }));
       });
+    });
+
+    const search = document.querySelector("[data-chat-search]");
+    const searchInput = search?.querySelector("[data-chat-search-input]");
+    const searchField = search?.querySelector("[data-chat-search-field]");
+    const searchMenu = search?.querySelector("[data-chat-search-menu]");
+    const searchOptions = search?.querySelectorAll("[data-chat-search-option]") || [];
+    const showSearchMenu = () => {
+      searchMenu?.classList.remove("hidden");
+      searchInput?.setAttribute("aria-expanded", "true");
+    };
+    const hideSearchMenu = () => {
+      searchMenu?.classList.add("hidden");
+      searchInput?.setAttribute("aria-expanded", "false");
+    };
+    searchInput?.addEventListener("focus", showSearchMenu);
+    searchInput?.addEventListener("click", showSearchMenu);
+    searchOptions.forEach((option) => {
+      option.addEventListener("click", () => {
+        searchField.value = option.dataset.chatSearchOption;
+        searchInput.placeholder = option.dataset.placeholder;
+        searchOptions.forEach((other) => {
+          const active = other === option;
+          other.setAttribute("aria-selected", String(active));
+          other.classList.toggle("bg-cyan-500/[0.08]", active);
+        });
+        searchField.dispatchEvent(new Event("change", { bubbles: true }));
+        searchInput.focus();
+        hideSearchMenu();
+      });
+    });
+    document.addEventListener("click", (event) => {
+      if (search && !search.contains(event.target)) hideSearchMenu();
+    });
+    searchInput?.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") hideSearchMenu();
     });
   });
 </script>

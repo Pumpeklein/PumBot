@@ -1120,7 +1120,9 @@ def get_chat_stats() -> dict:
     }
 
 
-def _chat_where(q: str, message_type: str) -> tuple[str, list[Any]]:
+def _chat_where(
+    q: str, message_type: str, search_field: str = "all"
+) -> tuple[str, list[Any]]:
     clauses = ["blocked = 0"]
     params: list[Any] = []
     normalized_type = message_type.upper()
@@ -1129,24 +1131,35 @@ def _chat_where(q: str, message_type: str) -> tuple[str, list[Any]]:
         params.append(normalized_type)
     if q:
         like = f"%{q}%"
-        clauses.append(
-            "(player_name LIKE %s OR player_uuid LIKE %s OR message LIKE %s"
-            " OR recipient_name LIKE %s)"
-        )
-        params.extend([like] * 4)
+        if search_field == "uuid":
+            clauses.append("(player_uuid LIKE %s OR recipient_uuid LIKE %s)")
+            params.extend([like, like])
+        elif search_field == "username":
+            clauses.append("(player_name LIKE %s OR recipient_name LIKE %s)")
+            params.extend([like, like])
+        elif search_field == "message":
+            clauses.append("message LIKE %s")
+            params.append(like)
+        else:
+            clauses.append(
+                "(player_name LIKE %s OR player_uuid LIKE %s OR message LIKE %s"
+                " OR recipient_name LIKE %s OR recipient_uuid LIKE %s)"
+            )
+            params.extend([like] * 5)
     return " WHERE " + " AND ".join(clauses), params
 
 
 def list_chat_messages(
     q: str = "",
     message_type: str = "all",
+    search_field: str = "all",
     sort: str = "newest",
     limit: int = 25,
     offset: int = 0,
 ) -> list[dict]:
     if not chat_messages_supported():
         return []
-    where, params = _chat_where(q, message_type)
+    where, params = _chat_where(q, message_type, search_field)
     order = CHAT_SORTS.get(sort, CHAT_SORTS["newest"])
     with _connect() as conn:
         return conn.query(
@@ -1155,10 +1168,12 @@ def list_chat_messages(
         )
 
 
-def count_chat_messages(q: str = "", message_type: str = "all") -> int:
+def count_chat_messages(
+    q: str = "", message_type: str = "all", search_field: str = "all"
+) -> int:
     if not chat_messages_supported():
         return 0
-    where, params = _chat_where(q, message_type)
+    where, params = _chat_where(q, message_type, search_field)
     with _connect() as conn:
         return int(
             conn.scalar(

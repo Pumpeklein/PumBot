@@ -3713,16 +3713,20 @@ def panel_api_minecraft_chat():
     page, page_size, offset = _pagination_args()
     q = request.args.get("q", "").strip()
     message_type = request.args.get("message_type", "all").strip()
+    search_field = request.args.get("search_field", "all").strip()
     sort = request.args.get("sort", "newest").strip()
     try:
         rows = mc_db.list_chat_messages(
             q=q,
             message_type=message_type,
+            search_field=search_field,
             sort=sort,
             limit=page_size,
             offset=offset,
         )
-        total = mc_db.count_chat_messages(q=q, message_type=message_type)
+        total = mc_db.count_chat_messages(
+            q=q, message_type=message_type, search_field=search_field
+        )
     except mc_db.MinecraftDatabaseUnavailable as exc:
         return _mc_unavailable_api(exc, page, page_size)
     return _paginated_response(

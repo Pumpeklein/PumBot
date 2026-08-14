@@ -307,6 +307,8 @@ def _number_de(value) -> str:
 
 app.jinja_env.filters["hex_alpha"] = _hex_alpha
 app.jinja_env.filters["number_de"] = _number_de
+app.jinja_env.filters["points"] = mc_db.format_points
+app.jinja_env.filters["epoch_de"] = mc_db.format_epoch_millis
 app.jinja_env.globals["PERMISSION_LABELS"] = PERMISSION_LABELS
 
 init_db()
@@ -3234,6 +3236,28 @@ def _mc_chat_row(row: dict) -> dict:
     return item
 
 
+def _mc_transaction_row(row: dict) -> dict:
+    item = dict(row)
+    amount = int(item.get("amount") or 0)
+    player_uuid = item.get("player_uuid")
+    item["created_at_display"] = mc_db.format_epoch_millis(item.get("created_at"))
+    item["type_label"] = mc_db.transaction_type_label(item.get("transaction_type"))
+    item["amount_display"] = ("+" if amount > 0 else "") + mc_db.format_points(amount)
+    item["balance_after_display"] = mc_db.format_points(item.get("balance_after"))
+    item["incoming"] = amount > 0
+    item["counterparty_display"] = item.get("counterparty_name") or "—"
+    item["actor_display"] = item.get("actor_name") or "Server"
+    item["reason_display"] = item.get("reason") or "—"
+    item["player_uuid_short"] = str(player_uuid or "")[:8]
+    item["player_head_url"] = item.get("player_head_url") or mc_db.head_url(player_uuid)
+    item["player_detail_url"] = (
+        url_for("minecraft_player_page", player_uuid=player_uuid)
+        if player_uuid
+        else None
+    )
+    return item
+
+
 # -- Minecraft: Übersicht --
 
 
@@ -3410,6 +3434,28 @@ def minecraft_chat_page():
     )
 
 
+# -- Minecraft: PumpePoints --
+
+
+@app.get("/minecraft/pumpepoints")
+@permission_any_required(*MINECRAFT_PERMISSIONS)
+def minecraft_points_page():
+    try:
+        currency = mc_db.get_currency_overview()
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return _mc_unavailable_page(
+            "minecraft_points.html", str(exc), "minecraft_points", currency={}
+        )
+    return render_template(
+        "minecraft_points.html",
+        currency=currency,
+        transaction_types=mc_db.TRANSACTION_TYPES,
+        active_page="minecraft_points",
+        **_mc_ctx(),
+        **_ctx(),
+    )
+
+
 def _minecraft_chart_days() -> int:
     try:
         days = int(request.args.get("days", "30"))
@@ -3563,6 +3609,32 @@ def minecraft_player_page(player_uuid: str):
     ]
     anticheat_groups = _mc_anticheat_groups(anticheat_events)
 
+    try:
+        player_currency = mc_db.get_player_currency(player_uuid)
+    except mc_db.MinecraftDatabaseUnavailable:
+        player_currency = {"supported": False, "transactions": []}
+    if player_currency.get("supported"):
+        player_currency = {
+            **player_currency,
+            "balance_display": mc_db.format_points(player_currency["balance"]),
+            "earned_display": mc_db.format_points(player_currency["earned"]),
+            "spent_display": mc_db.format_points(player_currency["spent"]),
+            "payout_total_display": mc_db.format_points(
+                player_currency["payout_total"]
+            ),
+            "share_display": f"{player_currency['share'] * 100:.1f}".replace(".", ",")
+            + " %",
+            "accrued_display": mc_db.format_duration(
+                player_currency["accrued_seconds"], "0m"
+            ),
+            "last_payout_display": mc_db.format_epoch_millis(
+                player_currency.get("last_payout_at")
+            ),
+            "transactions": [
+                _mc_transaction_row(row) for row in player_currency["transactions"]
+            ],
+        }
+
     player_chat = []
     chat_detections = []
     try:
@@ -3610,6 +3682,7 @@ def minecraft_player_page(player_uuid: str):
         ],
         anticheat_events=anticheat_events,
         anticheat_groups=anticheat_groups,
+        player_currency=player_currency,
         player_chat=player_chat,
         chat_detections=chat_detections,
         notes_supported=mc_db.moderation_notes_supported(),
@@ -4030,6 +4103,42 @@ def panel_api_minecraft_chat():
     return _paginated_response(
         [_mc_chat_row(row) for row in rows], total, page, page_size
     )
+
+
+@app.get("/panel-api/minecraft/transactions")
+@permission_any_required(*MINECRAFT_PERMISSIONS)
+def panel_api_minecraft_transactions():
+    page, page_size, offset = _pagination_args(25)
+    q = request.args.get("q", "").strip()
+    transaction_type = request.args.get("transaction_type", "all").strip()
+    direction = request.args.get("direction", "all").strip()
+    sort = request.args.get("sort", "newest").strip()
+    try:
+        rows = mc_db.list_transactions(
+            q=q,
+            transaction_type=transaction_type,
+            direction=direction,
+            sort=sort,
+            limit=page_size,
+            offset=offset,
+        )
+        total = mc_db.count_transactions(
+            q=q, transaction_type=transaction_type, direction=direction
+        )
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return _mc_unavailable_api(exc, page, page_size)
+    return _paginated_response(
+        [_mc_transaction_row(row) for row in rows], total, page, page_size
+    )
+
+
+@app.get("/panel-api/minecraft/currency-chart")
+@permission_any_required(*MINECRAFT_PERMISSIONS)
+def panel_api_minecraft_currency_chart():
+    try:
+        return jsonify(mc_db.get_currency_chart(_minecraft_chart_days()))
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
 
 
 @app.post("/panel-api/minecraft/reports/<int:report_id>/close")

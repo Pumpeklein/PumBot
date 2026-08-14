@@ -2542,3 +2542,395 @@ def _stat_label(prefix: str, stat_key: str) -> str:
     """Macht aus 'ore.deepslate_diamond_ore' ein lesbares 'Deepslate Diamond Ore'."""
     suffix = stat_key[len(prefix):] if stat_key.startswith(prefix) else stat_key
     return suffix.replace("_", " ").title()
+
+
+# ══════════ PumpePoints (Währung) ══════════
+
+CURRENCY_SYMBOL = "PP"
+CURRENCY_NAME = "PumpePoints"
+
+TRANSACTION_TYPES = {
+    "PAYOUT": "Zeitgutschrift",
+    "TRANSFER_IN": "Erhalten",
+    "TRANSFER_OUT": "Gesendet",
+    "ADMIN_GRANT": "Team-Gutschrift",
+    "ADMIN_TAKE": "Team-Abbuchung",
+    "ADMIN_SET": "Team-Korrektur",
+}
+
+TEAM_TRANSACTION_TYPES = ("ADMIN_GRANT", "ADMIN_TAKE", "ADMIN_SET")
+
+# Überweisungen verschieben Guthaben nur zwischen Spielern; der Umlauf ändert sich
+# dadurch nicht. Nur diese Buchungsarten schaffen oder vernichten PP.
+SUPPLY_TRANSACTION_TYPES = ("PAYOUT", "ADMIN_GRANT", "ADMIN_TAKE", "ADMIN_SET")
+
+TRANSACTION_SORTS = {
+    "newest": "t.created_at DESC, t.id DESC",
+    "oldest": "t.created_at ASC, t.id ASC",
+    "amount_desc": "ABS(t.amount) DESC, t.created_at DESC",
+    "amount_asc": "ABS(t.amount) ASC, t.created_at DESC",
+    "balance_desc": "t.balance_after DESC, t.created_at DESC",
+    "balance_asc": "t.balance_after ASC, t.created_at DESC",
+}
+
+_TRANSACTION_SOURCE = """
+      FROM pc_transactions t
+ LEFT JOIN pc_currency_accounts a ON a.player_uuid = t.player_uuid
+"""
+
+
+def currency_supported() -> bool:
+    return _table_supported("pc_currency_accounts") and _table_supported(
+        "pc_transactions"
+    )
+
+
+def format_points(value: Any) -> str:
+    try:
+        amount = int(value or 0)
+    except (TypeError, ValueError):
+        amount = 0
+    return f"{amount:,}".replace(",", ".") + " " + CURRENCY_SYMBOL
+
+
+def transaction_type_label(value: Any) -> str:
+    key = str(value or "").upper()
+    return TRANSACTION_TYPES.get(key, key or "Buchung")
+
+
+def _transactions_where(
+    q: str = "",
+    transaction_type: str = "all",
+    direction: str = "all",
+) -> tuple[str, list[Any]]:
+    clauses: list[str] = []
+    params: list[Any] = []
+    normalized = str(transaction_type or "all").upper()
+    if normalized == "TEAM":
+        placeholders = ", ".join(["%s"] * len(TEAM_TRANSACTION_TYPES))
+        clauses.append(f"t.transaction_type IN ({placeholders})")
+        params.extend(TEAM_TRANSACTION_TYPES)
+    elif normalized in TRANSACTION_TYPES:
+        clauses.append("t.transaction_type = %s")
+        params.append(normalized)
+    if direction == "in":
+        clauses.append("t.amount > 0")
+    elif direction == "out":
+        clauses.append("t.amount < 0")
+    if q:
+        like = f"%{q}%"
+        clauses.append(
+            "(a.player_name LIKE %s OR t.player_uuid LIKE %s"
+            " OR t.counterparty_name LIKE %s OR t.actor_name LIKE %s OR t.reason LIKE %s)"
+        )
+        params.extend([like] * 5)
+    where = " WHERE " + " AND ".join(clauses) if clauses else ""
+    return where, params
+
+
+def list_transactions(
+    q: str = "",
+    transaction_type: str = "all",
+    direction: str = "all",
+    sort: str = "newest",
+    limit: int = 25,
+    offset: int = 0,
+) -> list[dict]:
+    if not currency_supported():
+        return []
+    where, params = _transactions_where(q, transaction_type, direction)
+    order = TRANSACTION_SORTS.get(sort, TRANSACTION_SORTS["newest"])
+    with _connect() as conn:
+        rows = conn.query(
+            f"""SELECT t.*, a.player_name
+                  {_TRANSACTION_SOURCE}
+                {where}
+                ORDER BY {order}
+                LIMIT %s OFFSET %s""",
+            tuple([*params, limit, offset]),
+        )
+        names = resolve_names(
+            conn,
+            [str(row.get("player_uuid")) for row in rows if not row.get("player_name")],
+            allow_lookup=False,
+        )
+    return [decorate_player(row, "player_uuid", names) for row in rows]
+
+
+def count_transactions(
+    q: str = "",
+    transaction_type: str = "all",
+    direction: str = "all",
+) -> int:
+    if not currency_supported():
+        return 0
+    where, params = _transactions_where(q, transaction_type, direction)
+    with _connect() as conn:
+        return int(
+            conn.scalar(
+                f"SELECT COUNT(*) AS total {_TRANSACTION_SOURCE} {where}",
+                tuple(params),
+            )
+            or 0
+        )
+
+
+def get_currency_overview() -> dict:
+    """Umlauf, Konten, Zeitgutschriften, Überweisungen und Team-Eingriffe."""
+    if not currency_supported():
+        return {
+            "supported": False,
+            "circulating": 0,
+            "accounts": 0,
+            "holders": 0,
+            "average": 0,
+            "transactions": 0,
+            "payout_total": 0,
+            "payout_count": 0,
+            "payout_24h": 0,
+            "transfer_total": 0,
+            "transfer_count": 0,
+            "team_granted": 0,
+            "team_taken": 0,
+            "team_count": 0,
+            "last_transaction_at": None,
+            "top_holders": [],
+            "top_earners": [],
+        }
+
+    day_ago = now_ms() - 86_400_000
+    with _connect() as conn:
+        accounts = conn.query_one(
+            """SELECT COUNT(*) AS accounts,
+                      COALESCE(SUM(balance), 0) AS circulating,
+                      COALESCE(SUM(balance > 0), 0) AS holders
+                 FROM pc_currency_accounts"""
+        ) or {}
+        ledger = conn.query_one(
+            """SELECT COUNT(*) AS transactions,
+                      MAX(created_at) AS last_transaction_at,
+                      COALESCE(SUM(CASE WHEN transaction_type = 'PAYOUT'
+                                        THEN amount ELSE 0 END), 0) AS payout_total,
+                      COALESCE(SUM(transaction_type = 'PAYOUT'), 0) AS payout_count,
+                      COALESCE(SUM(CASE WHEN transaction_type = 'PAYOUT'
+                                         AND created_at >= %s
+                                        THEN amount ELSE 0 END), 0) AS payout_24h,
+                      COALESCE(SUM(CASE WHEN transaction_type = 'TRANSFER_OUT'
+                                        THEN -amount ELSE 0 END), 0) AS transfer_total,
+                      COALESCE(SUM(transaction_type = 'TRANSFER_OUT'), 0) AS transfer_count,
+                      COALESCE(SUM(CASE WHEN transaction_type IN ('ADMIN_GRANT', 'ADMIN_SET')
+                                         AND amount > 0 THEN amount ELSE 0 END), 0) AS team_granted,
+                      COALESCE(SUM(CASE WHEN transaction_type IN ('ADMIN_TAKE', 'ADMIN_SET')
+                                         AND amount < 0 THEN -amount ELSE 0 END), 0) AS team_taken,
+                      COALESCE(SUM(transaction_type IN
+                          ('ADMIN_GRANT', 'ADMIN_TAKE', 'ADMIN_SET')), 0) AS team_count
+                 FROM pc_transactions""",
+            (day_ago,),
+        ) or {}
+        top_holders = conn.query(
+            """SELECT player_uuid, player_name, balance
+                 FROM pc_currency_accounts
+                WHERE balance > 0
+                ORDER BY balance DESC, player_name ASC
+                LIMIT 10"""
+        )
+        top_earners = conn.query(
+            """SELECT t.player_uuid, a.player_name,
+                      COALESCE(SUM(t.amount), 0) AS earned,
+                      COUNT(*) AS payouts
+                 FROM pc_transactions t
+            LEFT JOIN pc_currency_accounts a ON a.player_uuid = t.player_uuid
+                WHERE t.transaction_type = 'PAYOUT'
+             GROUP BY t.player_uuid, a.player_name
+             ORDER BY earned DESC
+                LIMIT 10"""
+        )
+        names = resolve_names(
+            conn,
+            [
+                str(row.get("player_uuid"))
+                for row in [*top_holders, *top_earners]
+                if not row.get("player_name")
+            ],
+            allow_lookup=False,
+        )
+
+    circulating = int(accounts.get("circulating") or 0)
+    account_count = int(accounts.get("accounts") or 0)
+    return {
+        "supported": True,
+        "circulating": circulating,
+        "accounts": account_count,
+        "holders": int(accounts.get("holders") or 0),
+        "average": circulating // account_count if account_count else 0,
+        "transactions": int(ledger.get("transactions") or 0),
+        "payout_total": int(ledger.get("payout_total") or 0),
+        "payout_count": int(ledger.get("payout_count") or 0),
+        "payout_24h": int(ledger.get("payout_24h") or 0),
+        "transfer_total": int(ledger.get("transfer_total") or 0),
+        "transfer_count": int(ledger.get("transfer_count") or 0),
+        "team_granted": int(ledger.get("team_granted") or 0),
+        "team_taken": int(ledger.get("team_taken") or 0),
+        "team_count": int(ledger.get("team_count") or 0),
+        "last_transaction_at": ledger.get("last_transaction_at"),
+        "top_holders": [
+            decorate_player(row, "player_uuid", names) for row in top_holders
+        ],
+        "top_earners": [
+            decorate_player(row, "player_uuid", names) for row in top_earners
+        ],
+    }
+
+
+def get_currency_chart(days: int = 30) -> dict:
+    """Täglich neu geschaffene PP und der daraus fortgeschriebene Umlauf."""
+    safe_days = days if days in CHART_DAYS or days == ALL_TIME_CHART_DAYS else 30
+    if not currency_supported():
+        dates = _chart_dates(safe_days)
+        return {
+            "metric": "currency",
+            "days": safe_days,
+            "all_time": safe_days == ALL_TIME_CHART_DAYS,
+            "title": f"{CURRENCY_NAME}-Umlauf",
+            "subtitle": "Keine Währungsdaten vorhanden",
+            "unit": "count",
+            "labels": [day.isoformat() for day in dates],
+            "series": [],
+        }
+
+    placeholders = ", ".join(["%s"] * len(SUPPLY_TRANSACTION_TYPES))
+    with _connect() as conn:
+        first_created = conn.scalar(
+            "SELECT MIN(created_at) AS first_value FROM pc_transactions", default=None
+        )
+        rows = conn.query(
+            f"""SELECT created_at, amount
+                  FROM pc_transactions
+                 WHERE transaction_type IN ({placeholders})
+                 ORDER BY created_at ASC""",
+            tuple(SUPPLY_TRANSACTION_TYPES),
+        )
+
+    dates = _chart_dates(
+        safe_days,
+        earliest=_epoch_millis_date(first_created)
+        if safe_days == ALL_TIME_CHART_DAYS
+        else None,
+    )
+    start = dates[0]
+    issued: dict[str, int] = {}
+    carried = 0
+    for row in rows:
+        day = _epoch_millis_date(row.get("created_at"))
+        if day is None:
+            continue
+        amount = int(row.get("amount") or 0)
+        if day < start:
+            carried += amount
+        else:
+            key = day.isoformat()
+            issued[key] = issued.get(key, 0) + amount
+
+    daily_values: list[int] = []
+    supply_values: list[int] = []
+    running = carried
+    for day in dates:
+        change = issued.get(day.isoformat(), 0)
+        running += change
+        daily_values.append(change)
+        supply_values.append(max(0, running))
+
+    return {
+        "metric": "currency",
+        "days": safe_days,
+        "all_time": safe_days == ALL_TIME_CHART_DAYS,
+        "title": f"{CURRENCY_NAME}-Umlauf",
+        "subtitle": "Umlauf und täglich neu ausgeschüttete PP",
+        "unit": "count",
+        "labels": [day.isoformat() for day in dates],
+        "series": [
+            {"label": "Im Umlauf", "color": "#22d3ee", "values": supply_values},
+            {"label": "Neu am Tag", "color": "#34d399", "values": daily_values},
+        ],
+    }
+
+
+def get_player_currency(player_uuid: str, history_limit: int = 25) -> dict:
+    """Kontostand, Rang, Zeitgutschriften und letzte Buchungen eines Spielers."""
+    if not currency_supported():
+        return {
+            "supported": False,
+            "balance": 0,
+            "updated_at": None,
+            "rank": None,
+            "accounts": 0,
+            "share": 0.0,
+            "earned": 0,
+            "spent": 0,
+            "payout_total": 0,
+            "payout_count": 0,
+            "accrued_seconds": 0,
+            "last_payout_at": None,
+            "transactions": [],
+        }
+
+    with _connect() as conn:
+        account = conn.query_one(
+            "SELECT balance, updated_at FROM pc_currency_accounts WHERE player_uuid = %s",
+            (player_uuid,),
+        ) or {}
+        balance = int(account.get("balance") or 0)
+        totals = conn.query_one(
+            """SELECT COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS earned,
+                      COALESCE(SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END), 0) AS spent,
+                      COALESCE(SUM(CASE WHEN transaction_type = 'PAYOUT'
+                                        THEN amount ELSE 0 END), 0) AS payout_total,
+                      COALESCE(SUM(transaction_type = 'PAYOUT'), 0) AS payout_count
+                 FROM pc_transactions
+                WHERE player_uuid = %s""",
+            (player_uuid,),
+        ) or {}
+        rank = conn.scalar(
+            "SELECT COUNT(*) + 1 AS rank_position FROM pc_currency_accounts WHERE balance > %s",
+            (balance,),
+            default=None,
+        )
+        accounts = conn.scalar(
+            "SELECT COUNT(*) AS total FROM pc_currency_accounts", default=0
+        )
+        circulating = conn.scalar(
+            "SELECT COALESCE(SUM(balance), 0) AS total FROM pc_currency_accounts",
+            default=0,
+        )
+        payout_state = (
+            conn.query_one(
+                """SELECT accrued_seconds, payout_count, total_paid, last_payout_at
+                     FROM pc_currency_payouts WHERE player_uuid = %s""",
+                (player_uuid,),
+            )
+            or {}
+        ) if _table_supported("pc_currency_payouts") else {}
+        transactions = conn.query(
+            """SELECT * FROM pc_transactions
+                WHERE player_uuid = %s
+                ORDER BY created_at DESC, id DESC
+                LIMIT %s""",
+            (player_uuid, history_limit),
+        )
+
+    total_supply = int(circulating or 0)
+    return {
+        "supported": True,
+        "balance": balance,
+        "updated_at": account.get("updated_at"),
+        "rank": int(rank) if rank and balance > 0 else None,
+        "accounts": int(accounts or 0),
+        "share": (balance / total_supply) if total_supply else 0.0,
+        "earned": int(totals.get("earned") or 0),
+        "spent": int(totals.get("spent") or 0),
+        "payout_total": int(totals.get("payout_total") or 0),
+        "payout_count": int(totals.get("payout_count") or 0),
+        "accrued_seconds": int(payout_state.get("accrued_seconds") or 0),
+        "last_payout_at": payout_state.get("last_payout_at"),
+        "transactions": transactions,
+    }

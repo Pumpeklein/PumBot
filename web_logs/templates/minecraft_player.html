@@ -9,6 +9,7 @@
 {% else %}
 
 {# ── Welche Bereiche hat dieser Spieler? ── #}
+{% set has_points = player_currency and player_currency.supported %}
 {% set has_punishments = show_moderation and (mute or punishments or warnings) %}
 {% set has_reports = show_moderation and (reports_against or reports_by) %}
 {% set has_anticheat = show_moderation and anticheat_groups %}
@@ -16,6 +17,7 @@
 
 {% set tabs = [
   {"id": "overview", "label": "Übersicht", "icon": "◷", "count": 0, "show": true},
+  {"id": "points", "label": "PumpePoints", "icon": "◆", "count": 0, "show": has_points},
   {"id": "punishments", "label": "Strafen", "icon": "◇", "count": punishments|length + warnings|length, "show": has_punishments},
   {"id": "reports", "label": "Reports", "icon": "↶", "count": reports_against|length + reports_by|length, "show": has_reports},
   {"id": "anticheat", "label": "AntiCheat", "icon": "⬡", "count": anticheat_events|length, "show": has_anticheat},
@@ -133,6 +135,67 @@
   </div>
   {% endif %}
   {% endcall %}
+
+  {# ═══ PumpePoints ═══ #}
+  {% if has_points %}
+  {% call mc_tab_panel("points") %}
+  <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    {{ stat_tile("Kontostand", player_currency.balance_display, accent="cyan",
+      sub=("Rang #{} von {} Konten".format(player_currency.rank, player_currency.accounts|number_de)
+           if player_currency.rank else "Noch kein Guthaben")) }}
+    {{ stat_tile("Anteil am Umlauf", player_currency.share_display, accent="violet",
+      sub="Gemessen an allen PP auf dem Server") }}
+    {{ stat_tile("Eingenommen", player_currency.earned_display, accent="emerald",
+      sub="Ausgegeben: {}".format(player_currency.spent_display)) }}
+    {{ stat_tile("Zeitgutschriften", player_currency.payout_total_display, accent="amber",
+      sub="{} Auszahlungen · zuletzt {}".format(
+        player_currency.payout_count|number_de, player_currency.last_payout_display)) }}
+  </div>
+
+  <section class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    {{ section_heading("Buchungen",
+      "Letzte {} Bewegungen · offene Spielzeit bis zur nächsten Gutschrift: {}".format(
+        player_currency.transactions|length, player_currency.accrued_display)) }}
+    {% if player_currency.transactions %}
+    <div class="divide-y divide-white/[0.05]">
+      {% for entry in player_currency.transactions %}
+      <article class="grid gap-1 py-2.5 sm:grid-cols-[9rem_minmax(0,1fr)_auto] sm:items-center sm:gap-3">
+        <div class="flex items-center gap-2">
+          {{ mc_pill(entry.type_label,
+            "info" if entry.transaction_type == "PAYOUT"
+            else "success" if entry.incoming else "warning") }}
+        </div>
+        <div class="min-w-0">
+          <span class="text-sm font-semibold tabular-nums {{ 'text-emerald-300' if entry.incoming else 'text-red-300' }}">{{ entry.amount_display }}</span>
+          <span class="ml-2 text-[10.5px] text-slate-500">danach {{ entry.balance_after_display }}</span>
+          {% if entry.counterparty_name or entry.reason %}
+          <p class="mt-0.5 truncate text-[11px] text-slate-500">
+            {% if entry.counterparty_name %}{{ entry.counterparty_name }}{% endif %}
+            {% if entry.counterparty_name and entry.reason %} · {% endif %}
+            {% if entry.reason %}{{ entry.reason }}{% endif %}
+          </p>
+          {% endif %}
+        </div>
+        <div class="text-[10.5px] text-slate-500 sm:text-right">
+          <div>{{ entry.created_at_display }}</div>
+          {% if entry.actor_name and entry.actor_name != "Server" %}
+          <div class="text-slate-600">von {{ entry.actor_name }}</div>
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    {{ empty_state("Keine Buchungen", "Für diesen Spieler wurde noch keine Bewegung verbucht.") }}
+    {% endif %}
+    <div class="mt-4 border-t border-white/[0.06] pt-3">
+      <a href="{{ url_for('minecraft_points_page') }}" class="text-xs font-medium text-cyan-300 transition hover:text-cyan-200">
+        Alle Transaktionen und den Umlauf ansehen →
+      </a>
+    </div>
+  </section>
+  {% endcall %}
+  {% endif %}
 
   {# ═══ Strafen ═══ #}
   {% if has_punishments %}

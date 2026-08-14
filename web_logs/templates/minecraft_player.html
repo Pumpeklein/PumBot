@@ -90,17 +90,29 @@
   <div class="grid gap-x-6 gap-y-4 sm:grid-cols-2">
     {% for entry in skills %}
     <a href="{{ url_for('minecraft_skill_page', skill_id=entry.id) }}"
-      class="group flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-white/[0.03]">
+      class="group flex items-start gap-3 rounded-lg px-2 py-3 transition hover:bg-white/[0.03]">
       {{ skill_icon(entry, size="h-9 w-9", text="text-base") }}
       <div class="min-w-0 flex-1">
         <div class="flex items-baseline justify-between gap-2">
           <span class="truncate text-[13px] font-medium text-slate-200">{{ entry.name }}</span>
           <span class="shrink-0 text-[11px] tabular-nums text-slate-500">
-            {{ entry.score|number_de }}
+            {{ entry.score|number_de }} gesamt
             {% if entry.rank %}<span class="text-slate-600"> · #{{ entry.rank }}</span>{% endif %}
           </span>
         </div>
-        <div class="mt-1.5">{{ skill_meter(entry.progress, entry.color, "h-1.5") }}</div>
+        <div class="mt-1 flex items-center justify-between gap-3 text-[10px] tabular-nums text-slate-500">
+          {% if entry.next_level %}
+          <span>Level {{ entry.level }} → {{ entry.next_level }}</span>
+          <span>{{ entry.level_score|number_de }} / {{ entry.level_target|number_de }}</span>
+          {% else %}
+          <span class="text-amber-300">Maximales Level erreicht</span>
+          {% endif %}
+        </div>
+        <div class="mt-1.5">{{ skill_meter(entry.progress, entry.color, "h-2") }}</div>
+        <div class="mt-1 flex flex-wrap justify-between gap-x-3 text-[10px] text-slate-600">
+          {% if entry.next_level %}<span>noch {{ entry.to_next|number_de }} Punkte</span>{% endif %}
+          {% if entry.next_reward %}<span class="text-amber-300/75">Reward bei Lv {{ entry.next_reward.level }}</span>{% endif %}
+        </div>
       </div>
       {{ skill_level_badge(entry.level, entry.color) }}
     </a>

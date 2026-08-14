@@ -3512,6 +3512,7 @@ def minecraft_skills_page():
         "minecraft_skills.html",
         skills_pending=False,
         overview=overview,
+        skill_rewards=mc_db.get_skill_rewards(),
         active_page="minecraft_skills",
         **_mc_ctx(),
         **_ctx(),
@@ -3559,6 +3560,7 @@ def minecraft_skill_page(skill_id: str):
         player_count=player_count,
         top_stats=top_stats,
         top_label=mc_db.SKILL_DETAILS.get(skill_id, {}).get("top_label", ""),
+        skill_rewards=mc_db.get_skill_rewards(),
         active_page="minecraft_skills",
         **_mc_ctx(),
         **_ctx(),
@@ -3580,7 +3582,6 @@ def panel_api_minecraft_skill_leaderboard(skill_id: str):
         return _mc_unavailable_api(exc, page, page_size)
 
     skill = mc_db.SKILLS_BY_ID[skill_id]
-    best = entries[0]["score"] if entries else 0
     items = []
     for entry in entries:
         items.append(
@@ -3588,11 +3589,16 @@ def panel_api_minecraft_skill_leaderboard(skill_id: str):
                 **entry,
                 "rank_label": f"#{entry['rank']}",
                 "level_label": f"Lv {entry['level']}",
-                "score_label": f"{entry['score']:,}".replace(",", "."),
+                "score_label": (
+                    "MAX"
+                    if not entry["next_level"]
+                    else f"{entry['level_score']:,} / {entry['level_target']:,}"
+                    .replace(",", ".")
+                ),
                 "detail_url": url_for(
                     "minecraft_player_page", player_uuid=entry["player_uuid"]
                 ),
-                "bar_percent": round(entry["score"] / best * 100, 1) if best else 0,
+                "bar_percent": entry["progress_percent"],
                 "bar_color": skill["color"],
                 "player_uuid_short": str(entry["player_uuid"])[:8],
             }

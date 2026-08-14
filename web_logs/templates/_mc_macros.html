@@ -121,7 +121,18 @@
       {{ skill_level_badge(card.leader_level, card.color) }}
     </div>
     {{ skill_meter(card.leader_progress, card.color) }}
-    <div class="mt-1.5 text-[11px] tabular-nums text-slate-500">{{ card.leader_score|number_de }} Punkte</div>
+    <div class="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[11px] tabular-nums">
+      {% if card.leader_next_level %}
+      <span class="text-slate-400">{{ card.leader_level_score|number_de }} / {{ card.leader_level_target|number_de }} im Level</span>
+      <span class="text-slate-500">noch {{ card.leader_to_next|number_de }} bis Lv {{ card.leader_next_level }}</span>
+      {% else %}
+      <span class="font-medium text-amber-300">Maximales Level</span>
+      <span class="text-slate-500">{{ card.leader_score|number_de }} Punkte gesamt</span>
+      {% endif %}
+    </div>
+    {% if card.leader_next_reward %}
+    <div class="mt-2 text-[10px] text-amber-300/80">Reward Lv {{ card.leader_next_reward.level }} · {{ card.leader_next_reward.label }}</div>
+    {% endif %}
   </div>
   {% else %}
   <div class="rounded-xl border border-dashed border-white/[0.08] px-3 py-4 text-center">

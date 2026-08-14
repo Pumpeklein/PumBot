@@ -63,6 +63,9 @@ class MinecraftConnection:
                 autocommit=True,
                 connect_timeout=Config.MC_DB_CONNECT_TIMEOUT,
                 read_timeout=Config.MC_DB_READ_TIMEOUT,
+                # MariaDB TIMESTAMP values are converted to the session timezone.
+                # Fetch them as UTC so the display formatter applies Berlin time once.
+                init_command="SET time_zone = '+00:00'",
             )
         except pymysql.MySQLError as exc:
             raise MinecraftDatabaseUnavailable(
@@ -1682,6 +1685,49 @@ SKILLS_BY_ID = {skill["id"]: skill for skill in SKILLS}
 SKILL_SCORE_KEY = "score"
 SKILL_MAX_LEVEL = 100
 _SKILL_LEVEL_BASE = 50
+DEFAULT_SKILL_REWARDS = (
+    {"level": 10, "label": "4 Smaragde"},
+    {"level": 20, "label": "8 Smaragde"},
+    {"level": 30, "label": "2 Diamanten"},
+    {"level": 40, "label": "8 Erfahrungsfläschchen"},
+    {"level": 50, "label": "4 Diamanten"},
+    {"level": 60, "label": "16 Erfahrungsfläschchen"},
+    {"level": 70, "label": "1 Netherit-Schrott"},
+    {"level": 80, "label": "1 verzauberter goldener Apfel"},
+    {"level": 90, "label": "2 Netherit-Schrott"},
+    {"level": 100, "label": "1 Netheritbarren"},
+)
+_skill_rewards_lock = threading.Lock()
+_skill_rewards_cache: tuple[float, tuple[dict, ...]] = (0.0, DEFAULT_SKILL_REWARDS)
+
+
+def get_skill_rewards() -> tuple[dict, ...]:
+    global _skill_rewards_cache
+    expires_at, cached = _skill_rewards_cache
+    now = time.monotonic()
+    if now < expires_at:
+        return cached
+    with _skill_rewards_lock:
+        expires_at, cached = _skill_rewards_cache
+        if now < expires_at:
+            return cached
+        rewards = DEFAULT_SKILL_REWARDS
+        try:
+            if _table_supported("pc_skill_reward_definitions"):
+                with _connect() as conn:
+                    rows = conn.query(
+                        """SELECT milestone_level, label
+                             FROM pc_skill_reward_definitions
+                            ORDER BY milestone_level"""
+                    )
+                rewards = tuple(
+                    {"level": int(row["milestone_level"]), "label": row["label"]}
+                    for row in rows
+                )
+        except MinecraftDatabaseUnavailable:
+            logger.warning("Could not refresh skill reward definitions.", exc_info=True)
+        _skill_rewards_cache = (now + 60.0, rewards)
+        return rewards
 
 # Detailzähler je Skill – Beschriftung, Schlüssel und das Präfix, aus dem die
 # Top-Einträge kommen. Deckungsgleich mit SkillsCommand im Plugin.
@@ -1805,6 +1851,37 @@ def skill_progress(score: Any) -> float:
     return max(0.0, min(1.0, (value - start) / (end - start)))
 
 
+def skill_level_details(score: Any) -> dict:
+    value = max(0, int(score or 0))
+    level = skill_level(value)
+    if level >= SKILL_MAX_LEVEL:
+        return {
+            "level": level,
+            "progress": 1.0,
+            "progress_percent": 100.0,
+            "level_score": 0,
+            "level_target": 0,
+            "to_next": 0,
+            "next_level": None,
+            "next_reward": None,
+        }
+    start = skill_score_for_level(level)
+    target = skill_score_for_level(level + 1)
+    progress = skill_progress(value)
+    return {
+        "level": level,
+        "progress": progress,
+        "progress_percent": round(progress * 100, 1),
+        "level_score": max(0, value - start),
+        "level_target": max(0, target - start),
+        "to_next": max(0, target - value),
+        "next_level": level + 1,
+        "next_reward": next(
+            (reward for reward in get_skill_rewards() if reward["level"] > level), None
+        ),
+    }
+
+
 # ── Abfragen ──
 
 
@@ -1865,8 +1942,7 @@ def get_skills_overview() -> dict:
                 or (str(leader.get("player_uuid") or "")[:8] or None),
                 "leader_uuid": leader.get("player_uuid"),
                 "leader_score": best,
-                "leader_level": skill_level(best),
-                "leader_progress": skill_progress(best),
+                **{f"leader_{key}": value for key, value in skill_level_details(best).items()},
             }
         )
 
@@ -1918,8 +1994,7 @@ def list_skill_leaderboard(skill_id: str, limit: int = 25, offset: int = 0) -> l
                 or str(row["player_uuid"])[:8],
                 "player_head_url": head_url(row["player_uuid"]),
                 "score": score,
-                "level": skill_level(score),
-                "progress": skill_progress(score),
+                **skill_level_details(score),
             }
         )
     return result
@@ -1980,9 +2055,7 @@ def get_player_skills(player_uuid: str) -> list[dict]:
             {
                 **skill,
                 "score": score,
-                "level": skill_level(score),
-                "progress": skill_progress(score),
-                "to_next": skill_score_to_next(score),
+                **skill_level_details(score),
                 "rank": ranks_by_skill.get(skill["id"]) or None,
             }
         )

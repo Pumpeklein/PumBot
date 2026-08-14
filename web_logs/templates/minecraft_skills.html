@@ -36,6 +36,18 @@
   {% endfor %}
 </div>
 
+<section class="mt-6 border-y border-white/[0.07] py-5">
+  {{ section_heading("Rewards alle 10 Level", "Jeder Skill besitzt seine eigene Reward-Reihe") }}
+  <div class="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-5">
+    {% for reward in skill_rewards %}
+    <div class="flex min-w-0 items-center gap-3 py-1">
+      <span class="flex h-8 w-10 shrink-0 items-center justify-center rounded-md border border-amber-500/20 bg-amber-500/[0.07] text-xs font-bold text-amber-300">{{ reward.level }}</span>
+      <div class="min-w-0"><div class="text-[10px] uppercase tracking-wider text-slate-600">Level-Reward</div><div class="truncate text-xs text-slate-300" title="{{ reward.label }}">{{ reward.label }}</div></div>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
 {# ── Punkteverteilung als eine Leiste ── #}
 {% if overview.total_score %}
 <div class="mt-6 rounded-2xl border border-white/[0.06] bg-[#0d1320] p-5">

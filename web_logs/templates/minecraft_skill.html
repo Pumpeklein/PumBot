@@ -42,11 +42,20 @@
 {{ skills_pending_card() }}
 {% else %}
 
-<div class="mb-6 grid gap-3 sm:grid-cols-2">
+<div class="mb-6 grid gap-3 sm:grid-cols-3">
   {{ stat_tile("Spieler mit Punkten", player_count, accent="cyan",
      sub=("in diesem Skill" if player_count else "noch niemand dabei")) }}
   {{ stat_tile("Levelkurve", "50 · (Lv−1)²", accent="slate", sub="Level 2 ab 50, Level 10 ab 4.050") }}
+  {{ stat_tile("Rewards", "Alle 10 Level", accent="amber", sub="separat für jeden Skill") }}
 </div>
+
+<section class="mb-6 border-y border-white/[0.07] py-4">
+  <div class="flex gap-5 overflow-x-auto pb-1">
+    {% for reward in skill_rewards %}
+    <div class="min-w-32 shrink-0"><div class="text-[10px] font-medium uppercase tracking-wider text-amber-300/70">Level {{ reward.level }}</div><div class="mt-1 text-xs text-slate-300">{{ reward.label }}</div></div>
+    {% endfor %}
+  </div>
+</section>
 
 <div class="grid gap-4 lg:grid-cols-3">
 
@@ -61,7 +70,7 @@
         {"key":"rank","type":"rank","class":"px-3 py-2.5 w-14"},
         {"type":"user","nameKey":"player_name","subKey":"player_uuid_short","copyKey":"player_uuid","copyLabel":"UUID","avatarKey":"player_head_url","urlKey":"detail_url","class":"px-3 py-2.5"},
         {"key":"level_label","class":"px-3 py-2.5 whitespace-nowrap text-slate-300 w-16"},
-        {"type":"meter","percentKey":"bar_percent","colorKey":"bar_color","labelKey":"score_label","class":"px-3 py-2.5 w-64"}
+        {"type":"meter","percentKey":"bar_percent","colorKey":"bar_color","labelKey":"score_label","class":"px-3 py-2.5 w-72"}
       ]
     </script>
     <div class="rounded-2xl border border-white/[0.06] bg-[#0d1320] p-5">
@@ -76,7 +85,7 @@
               <th class="px-3 py-2.5">Platz</th>
               <th class="px-3 py-2.5">Spieler</th>
               <th class="px-3 py-2.5">Level</th>
-              <th class="px-3 py-2.5">Punkte</th>
+              <th class="px-3 py-2.5">Level-Fortschritt</th>
             </tr>
           </thead>
           <tbody data-table-body></tbody>

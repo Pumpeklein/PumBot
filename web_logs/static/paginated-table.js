@@ -154,7 +154,7 @@
         <span class="relative block h-2 flex-1 overflow-hidden rounded-full" style="background:${escapeHtml(hexAlpha(color, 0.16))}">
           <span class="absolute inset-y-0 left-0 rounded-r-full" style="width:${percent}%;background:${escapeHtml(color)}"></span>
         </span>
-        ${label ? `<span class="w-16 shrink-0 text-right text-xs font-medium tabular-nums text-slate-200">${escapeHtml(label)}</span>` : ""}
+        ${label ? `<span class="w-32 shrink-0 text-right text-xs font-medium tabular-nums text-slate-200">${escapeHtml(label)}</span>` : ""}
       </div>`;
     }
     if (column.type === "badge")

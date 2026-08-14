@@ -15,6 +15,7 @@
 {{ empty_state("Noch keine Messdaten", "Nach dem Neustart des Minecraft-Servers wird innerhalb einer Minute der erste Leistungspunkt gespeichert.") }}
 {% else %}
 {% set latest = performance.latest %}
+{% set dimension_latest = performance.dimension_latest %}
 {% set summary = performance.summary %}
 {% set specs = performance.specs %}
 
@@ -35,9 +36,9 @@
     <div class="mt-1 text-[10px] text-slate-500">Unter 50 ms ist stabil</div>
   </div>
   <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.04] p-4">
-    <div class="text-[10px] font-medium uppercase tracking-wider text-emerald-300/70">Spieler online</div>
-    <div class="mt-2 text-xl font-bold text-white">{{ latest.online_players }} / {{ latest.max_players }}</div>
-    <div class="mt-1 text-[10px] text-slate-500">{{ latest.world_count }} Welten</div>
+    <div class="text-[10px] font-medium uppercase tracking-wider text-emerald-300/70">Spieler · {{ selected_dimension_label }}</div>
+    <div class="mt-2 text-xl font-bold text-white">{{ dimension_latest.online_players if dimension_latest else "—" }}</div>
+    <div class="mt-1 text-[10px] text-slate-500">Serverweit {{ latest.online_players }} / {{ latest.max_players }}</div>
   </div>
   <div class="rounded-lg border border-purple-500/20 bg-purple-500/[0.04] p-4">
     <div class="text-[10px] font-medium uppercase tracking-wider text-purple-300/70">RAM</div>
@@ -51,7 +52,7 @@
   </div>
 </div>
 
-<section data-minecraft-chart data-default-metric="tps" data-default-period="6" data-period-param="hours"
+<section data-minecraft-chart data-default-metric="tps" data-default-period="6" data-period-param="hours" data-default-dimension="{{ selected_dimension }}"
   data-default-type="line" data-auto-refresh-ms="60000"
   data-endpoint="{{ url_for('panel_api_minecraft_server_performance_chart') }}"
   class="mb-6 overflow-hidden rounded-lg border border-white/[0.07] bg-[#0d1320]">
@@ -97,8 +98,8 @@
       <div class="bg-[#0b111d] p-3"><div class="text-[10px] uppercase tracking-wider text-slate-500">Höchste MSPT</div><div class="mt-1 text-lg font-semibold text-white">{{ "%.2f"|format(summary.maximum_mspt or 0)|replace(".", ",") }} ms</div></div>
     </div>
     <div class="mt-4 grid gap-3 sm:grid-cols-2">
-      <div><div class="text-[10px] uppercase tracking-wider text-slate-500">Chunks</div><div class="mt-1 text-sm font-medium text-white">{{ latest.loaded_chunks }}</div></div>
-      <div><div class="text-[10px] uppercase tracking-wider text-slate-500">Entities</div><div class="mt-1 text-sm font-medium text-white">{{ latest.entity_count }}</div></div>
+      <div><div class="text-[10px] uppercase tracking-wider text-slate-500">Chunks · {{ selected_dimension_label }}</div><div class="mt-1 text-sm font-medium text-white">{{ dimension_latest.loaded_chunks if dimension_latest else "—" }}</div></div>
+      <div><div class="text-[10px] uppercase tracking-wider text-slate-500">Entities · {{ selected_dimension_label }}</div><div class="mt-1 text-sm font-medium text-white">{{ dimension_latest.entity_count if dimension_latest else "—" }}</div></div>
       <div><div class="text-[10px] uppercase tracking-wider text-slate-500">Uptime</div><div class="mt-1 text-sm font-medium text-white">{{ latest.uptime_display }}</div></div>
       <div><div class="text-[10px] uppercase tracking-wider text-slate-500">Datenträger</div><div class="mt-1 text-sm font-medium text-white">{{ latest.disk_percent }} %</div><div class="text-[10px] text-slate-500">{{ latest.disk_used_display }} / {{ latest.disk_total_display }}</div></div>
     </div>

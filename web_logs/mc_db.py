@@ -577,9 +577,6 @@ def get_overview() -> dict:
         "total_seconds": total_seconds,
         "active_seconds": int(playtime.get("active_seconds") or 0),
         "afk_seconds": afk_seconds,
-        # Online-Zeit ohne AFK. "active_seconds" zählt nur Sekunden mit echter
-        # Aktion (Bewegung/Interaktion) und ist deshalb immer kleiner.
-        "nonafk_seconds": max(0, total_seconds - afk_seconds),
         "playtime_players": int(playtime.get("tracked_players") or 0),
         "playtime_last_update": playtime.get("last_update"),
         "total_deaths": int(deaths.get("total_deaths") or 0),
@@ -952,6 +949,10 @@ def server_metrics_supported() -> bool:
     )
 
 
+def dimension_server_metrics_supported() -> bool:
+    return _table_supported("pc_dimension_server_metrics")
+
+
 def _float_or_none(value: Any) -> float | None:
     if value is None:
         return None
@@ -961,10 +962,11 @@ def _float_or_none(value: Any) -> float | None:
         return None
 
 
-def get_server_performance() -> dict:
+def get_server_performance(dimension: str = "OVERWORLD") -> dict:
     if not server_metrics_supported():
         return {"supported": False, "latest": None, "specs": None, "summary": {}}
     since = now_ms() - 24 * 60 * 60 * 1000
+    safe_dimension = normalize_dimension(dimension)
     with _connect() as conn:
         latest = conn.query_one(
             "SELECT * FROM pc_server_metrics ORDER BY captured_at DESC LIMIT 1"
@@ -981,6 +983,17 @@ def get_server_performance() -> dict:
                 WHERE captured_at >= %s""",
             (since,),
         ) or {}
+        dimension_latest = (
+            conn.query_one(
+                """SELECT * FROM pc_dimension_server_metrics
+                    WHERE dimension = %s
+                    ORDER BY captured_at DESC
+                    LIMIT 1""",
+                (safe_dimension,),
+            )
+            if dimension_server_metrics_supported()
+            else None
+        )
 
     if latest:
         for key in (
@@ -1012,10 +1025,20 @@ def get_server_performance() -> dict:
         summary[key] = _float_or_none(summary.get(key))
     summary["samples"] = int(summary.get("samples") or 0)
     summary["lag_samples"] = int(summary.get("lag_samples") or 0)
-    return {"supported": True, "latest": latest, "specs": specs, "summary": summary}
+    return {
+        "supported": True,
+        "latest": latest,
+        "dimension_latest": dimension_latest,
+        "dimension": safe_dimension,
+        "dimension_supported": dimension_server_metrics_supported(),
+        "specs": specs,
+        "summary": summary,
+    }
 
 
-def get_server_performance_chart(metric: str = "tps", hours: int = 6) -> dict:
+def get_server_performance_chart(
+    metric: str = "tps", hours: int = 6, dimension: str = "OVERWORLD"
+) -> dict:
     safe_hours = (
         hours
         if hours in SERVER_CHART_HOURS or hours == ALL_TIME_CHART_HOURS
@@ -1023,14 +1046,16 @@ def get_server_performance_chart(metric: str = "tps", hours: int = 6) -> dict:
     )
     valid_metrics = {"tps", "mspt", "cpu", "memory", "players", "chunks", "entities"}
     safe_metric = metric if metric in valid_metrics else "tps"
+    safe_dimension = normalize_dimension(dimension)
+    dimension_metric = safe_metric in {"players", "chunks", "entities"}
     metadata = {
         "tps": ("TPS-Verlauf", "Ticks pro Sekunde", "decimal"),
         "mspt": ("MSPT-Verlauf", "Millisekunden pro Tick", "ms"),
         "cpu": ("CPU-Auslastung", "Java-Prozess und Gesamtsystem", "percent"),
         "memory": ("RAM-Auslastung", "Belegter Java-Heap", "percent"),
-        "players": ("Online-Spieler", "Spieler pro Messpunkt", "count"),
-        "chunks": ("Geladene Chunks", "Chunks über alle Welten", "count"),
-        "entities": ("Geladene Entities", "Entities über alle Welten", "count"),
+        "players": ("Online-Spieler", f"Spieler in {DIMENSIONS[safe_dimension]}", "count"),
+        "chunks": ("Geladene Chunks", f"Chunks in {DIMENSIONS[safe_dimension]}", "count"),
+        "entities": ("Geladene Entities", f"Entities in {DIMENSIONS[safe_dimension]}", "count"),
     }
     title, subtitle, unit = metadata[safe_metric]
     if not server_metrics_supported():
@@ -1038,15 +1063,33 @@ def get_server_performance_chart(metric: str = "tps", hours: int = 6) -> dict:
             "metric": safe_metric, "hours": safe_hours, "title": title,
             "subtitle": subtitle, "unit": unit, "label_format": "datetime",
             "all_time": safe_hours == ALL_TIME_CHART_HOURS,
+            "dimension": safe_dimension,
             "labels": [], "series": [],
         }
+    if dimension_metric and not dimension_server_metrics_supported():
+        return {
+            "metric": safe_metric, "hours": safe_hours, "title": title,
+            "subtitle": "Dimensionsmesswerte werden ab Datenbank-Migration V13 erfasst.",
+            "unit": unit, "label_format": "datetime",
+            "all_time": safe_hours == ALL_TIME_CHART_HOURS,
+            "dimension": safe_dimension, "labels": [], "series": [],
+        }
+
+    source_table = (
+        "pc_dimension_server_metrics"
+        if dimension_metric and dimension_server_metrics_supported()
+        else "pc_server_metrics"
+    )
+    dimension_where = " AND dimension = %s" if source_table == "pc_dimension_server_metrics" else ""
 
     current_ms = now_ms()
     if safe_hours == ALL_TIME_CHART_HOURS:
         with _connect() as conn:
             first_captured = int(
                 conn.scalar(
-                    "SELECT MIN(captured_at) AS first_captured FROM pc_server_metrics",
+                    f"SELECT MIN(captured_at) AS first_captured FROM {source_table}"
+                    + (" WHERE dimension = %s" if dimension_where else ""),
+                    (safe_dimension,) if dimension_where else (),
                     default=current_ms,
                 )
                 or current_ms
@@ -1089,14 +1132,17 @@ def get_server_performance_chart(metric: str = "tps", hours: int = 6) -> dict:
         f"{expression} AS value_{index}" for index, (_, expression, _) in enumerate(expressions)
     )
     with _connect() as conn:
+        query_params: list[Any] = [bucket_ms, bucket_ms, since]
+        if dimension_where:
+            query_params.append(safe_dimension)
         rows = conn.query(
             f"""SELECT FLOOR(captured_at / %s) * %s AS bucket_at,
                        {select_values}
-                  FROM pc_server_metrics
-                 WHERE captured_at >= %s
+                  FROM {source_table}
+                 WHERE captured_at >= %s{dimension_where}
                  GROUP BY bucket_at
                  ORDER BY bucket_at""",
-            (bucket_ms, bucket_ms, since),
+            tuple(query_params),
         )
 
     labels = [
@@ -1116,6 +1162,7 @@ def get_server_performance_chart(metric: str = "tps", hours: int = 6) -> dict:
         "metric": safe_metric,
         "hours": safe_hours,
         "all_time": safe_hours == ALL_TIME_CHART_HOURS,
+        "dimension": safe_dimension,
         "title": title,
         "subtitle": subtitle,
         "unit": unit,
@@ -1137,10 +1184,6 @@ _PLAYER_UNIVERSE = """
 
 PLAYER_SORTS = {
     "playtime": "total_seconds DESC, death_count DESC",
-    "nonafk": (
-        "(COALESCE(pt.total_seconds, 0) - COALESCE(pt.afk_seconds, 0)) DESC,"
-        " total_seconds DESC"
-    ),
     "active": "active_seconds DESC, total_seconds DESC",
     "afk": "afk_seconds DESC, total_seconds DESC",
     "deaths": "death_count DESC, total_seconds DESC",
@@ -1302,6 +1345,22 @@ def get_player(player_uuid: str) -> dict | None:
             if has_moderation_notes
             else []
         )
+        clan = (
+            conn.query_one(
+                """SELECT c.id, c.clan_name, c.clan_tag, c.tag_color,
+                          c.owner_uuid, c.owner_name, c.created_at,
+                          cm.member_role, cm.joined_at,
+                          (SELECT COUNT(*) FROM pc_clan_members members
+                            WHERE members.clan_id = c.id) AS member_count
+                     FROM pc_clan_members cm
+                     JOIN pc_clans c ON c.id = cm.clan_id
+                    WHERE cm.player_uuid = %s
+                    LIMIT 1""",
+                (player_uuid,),
+            )
+            if _table_supported("pc_clans") and _table_supported("pc_clan_members")
+            else None
+        )
         rank = conn.scalar(
             """SELECT COUNT(*) + 1 AS rank_position
                  FROM pc_playtime
@@ -1330,6 +1389,7 @@ def get_player(player_uuid: str) -> dict | None:
         "reports_by": reports_by,
         "notes": notes,
         "anticheat_events": anticheat_events,
+        "clan": clan,
         "playtime_rank": int(rank) if rank and playtime else None,
         "generated_at": right_now,
     }

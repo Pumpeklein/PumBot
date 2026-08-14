@@ -3074,8 +3074,6 @@ def _mc_player_row(player: dict) -> dict:
     total_seconds = int(player.get("total_seconds") or 0)
     active_seconds = int(player.get("active_seconds") or 0)
     afk_seconds = int(player.get("afk_seconds") or 0)
-    # Online-Zeit ohne AFK – "aktiv" zählt nur Sekunden mit Bewegung/Interaktion.
-    nonafk_seconds = max(0, total_seconds - afk_seconds)
     banned = int(player.get("active_ban_count") or 0) > 0
     muted = bool(player.get("muted"))
     return {
@@ -3087,11 +3085,9 @@ def _mc_player_row(player: dict) -> dict:
             "minecraft_player_page", player_uuid=player["player_uuid"]
         ),
         "playtime": mc_db.format_duration(total_seconds, fallback="—"),
-        "nonafk_time": mc_db.format_duration(nonafk_seconds, fallback="—"),
         "active_time": mc_db.format_duration(active_seconds, fallback="—"),
         "afk_time": mc_db.format_duration(afk_seconds, fallback="—"),
         "total_seconds": total_seconds,
-        "nonafk_seconds": nonafk_seconds,
         "active_seconds": active_seconds,
         "afk_seconds": afk_seconds,
         "death_count": int(player.get("death_count") or 0),
@@ -3235,25 +3231,16 @@ def minecraft_page():
 @app.get("/minecraft/statistiken")
 @permission_any_required(*MINECRAFT_PERMISSIONS)
 def minecraft_statistics_page():
-    selected_dimension = mc_db.normalize_dimension(
-        request.args.get("dimension", "OVERWORLD")
-    )
     try:
-        overview = {
-            **mc_db.get_overview(),
-            **mc_db.get_dimension_overview(selected_dimension),
-        }
+        overview = mc_db.get_overview()
         player_growth = mc_db.get_player_growth_summary(30)
-        top_playtime = mc_db.get_dimension_top_playtime(selected_dimension, 8)
-        top_deaths = mc_db.get_dimension_top_deaths(selected_dimension, 8)
+        top_playtime = mc_db.get_top_playtime(8)
+        top_deaths = mc_db.get_top_deaths(8)
     except mc_db.MinecraftDatabaseUnavailable as exc:
         return _mc_unavailable_page(
             "minecraft_statistics.html",
             str(exc),
             "minecraft_statistics",
-            selected_dimension=selected_dimension,
-            selected_dimension_label=mc_db.DIMENSIONS[selected_dimension],
-            dimension_options=mc_db.DIMENSIONS,
         )
 
     total_seconds = max(0, int(overview.get("total_seconds") or 0))
@@ -3331,9 +3318,6 @@ def minecraft_statistics_page():
         },
         top_playtime=playtime_rows,
         top_deaths=death_rows,
-        selected_dimension=selected_dimension,
-        selected_dimension_label=mc_db.DIMENSIONS[selected_dimension],
-        dimension_options=mc_db.DIMENSIONS,
         active_page="minecraft_statistics",
         **_mc_ctx(),
         **_ctx(),
@@ -3393,7 +3377,7 @@ def minecraft_server_performance_page():
         request.args.get("dimension", "OVERWORLD")
     )
     try:
-        performance = mc_db.get_server_performance()
+        performance = mc_db.get_server_performance(selected_dimension)
     except mc_db.MinecraftDatabaseUnavailable as exc:
         return _mc_unavailable_page(
             "minecraft_server_performance.html",
@@ -3401,6 +3385,8 @@ def minecraft_server_performance_page():
             "minecraft_statistics",
             performance={"supported": False, "latest": None, "specs": None, "summary": {}},
             selected_dimension=selected_dimension,
+            selected_dimension_label=mc_db.DIMENSIONS[selected_dimension],
+            dimension_options=mc_db.DIMENSIONS,
         )
 
     latest = dict(performance.get("latest") or {})
@@ -3430,6 +3416,8 @@ def minecraft_server_performance_page():
         "minecraft_server_performance.html",
         performance=performance,
         selected_dimension=selected_dimension,
+        selected_dimension_label=mc_db.DIMENSIONS[selected_dimension],
+        dimension_options=mc_db.DIMENSIONS,
         active_page="minecraft_statistics",
         **_mc_ctx(),
         **_ctx(),
@@ -3473,6 +3461,25 @@ def minecraft_player_page(player_uuid: str):
         abort(404)
 
     playtime = player.get("playtime") or {}
+    player_clan = dict(player.get("clan") or {})
+    if player_clan:
+        clan_colors = {
+            "BLACK": "#64748b", "DARK_BLUE": "#2563eb", "DARK_GREEN": "#15803d",
+            "DARK_AQUA": "#0891b2", "DARK_RED": "#b91c1c", "DARK_PURPLE": "#7e22ce",
+            "GOLD": "#f59e0b", "GRAY": "#94a3b8", "DARK_GRAY": "#64748b",
+            "BLUE": "#60a5fa", "GREEN": "#4ade80", "AQUA": "#22d3ee",
+            "RED": "#f87171", "LIGHT_PURPLE": "#c084fc", "YELLOW": "#facc15",
+            "WHITE": "#f8fafc",
+        }
+        player_clan["tag_color_hex"] = clan_colors.get(
+            str(player_clan.get("tag_color") or "AQUA").upper(), "#22d3ee"
+        )
+        player_clan["created_at_display"] = mc_db.format_epoch_millis(
+            player_clan.get("created_at")
+        )
+        player_clan["joined_at_display"] = mc_db.format_epoch_millis(
+            player_clan.get("joined_at")
+        )
     show_moderation = any(
         has_permission(permission) for permission in MINECRAFT_MODERATION_PERMISSIONS
     )
@@ -3509,6 +3516,7 @@ def minecraft_player_page(player_uuid: str):
     return render_template(
         "minecraft_player.html",
         player=player,
+        player_clan=player_clan or None,
         skills=skills,
         skills_total=skills_total,
         playtime_total=mc_db.format_duration(playtime.get("total_seconds"), "—"),
@@ -3733,16 +3741,13 @@ def minecraft_reports_page():
 @permission_any_required(*MINECRAFT_PERMISSIONS)
 def panel_api_minecraft_statistics_chart():
     metric = request.args.get("metric", "players").strip().lower()
-    dimension = mc_db.normalize_dimension(request.args.get("dimension", "OVERWORLD"))
     if metric in mc_db.MODERATION_CHART_METRICS and not any(
         has_permission(permission) for permission in MINECRAFT_MODERATION_PERMISSIONS
     ):
         return jsonify({"ok": False, "error": "Keine Berechtigung."}), 403
     try:
         return jsonify(
-            mc_db.get_statistics_chart(
-                metric, _minecraft_chart_days(), dimension
-            )
+            mc_db.get_statistics_chart(metric, _minecraft_chart_days())
         )
     except mc_db.MinecraftDatabaseUnavailable as exc:
         return jsonify({"ok": False, "error": str(exc)}), 503
@@ -3771,6 +3776,7 @@ def panel_api_minecraft_server_performance_chart():
             mc_db.get_server_performance_chart(
                 metric,
                 _minecraft_server_chart_hours(),
+                request.args.get("dimension", "OVERWORLD"),
             )
         )
     except mc_db.MinecraftDatabaseUnavailable as exc:

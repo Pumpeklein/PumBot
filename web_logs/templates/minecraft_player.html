@@ -33,6 +33,7 @@
         {% if player.mute %}{{ mc_pill("Gemutet", "warning") }}{% endif %}
         {% if not player.active_bans and not player.mute %}{{ mc_pill("Keine aktiven Strafen", "success") }}{% endif %}
         {% if player.playtime_rank %}{{ mc_pill("Spielzeit-Rang #" ~ player.playtime_rank, "info") }}{% endif %}
+        {% if player_clan %}<span class="inline-flex items-center rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium" style="color: {{ player_clan.tag_color_hex }}">[{{ player_clan.clan_tag }}] {{ player_clan.clan_name }}</span>{% endif %}
       </div>
     </div>
   </div>
@@ -42,6 +43,7 @@
   <aside class="sticky top-6 hidden rounded-lg border border-white/[0.07] bg-[#0b1019] p-2 lg:block">
     <nav class="space-y-1 text-sm" aria-label="Spielerprofil Bereiche">
       {% if player.playtime or player.deaths %}<a href="#profile-playtime" class="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-slate-300 transition hover:bg-white/[0.05] hover:text-white"><span class="text-cyan-300">◷</span>Spielzeit</a>{% endif %}
+      {% if player_clan %}<a href="#profile-clan" class="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-slate-300 transition hover:bg-white/[0.05] hover:text-white"><span class="text-emerald-300">♜</span>Clan</a>{% endif %}
       {% if show_moderation and (mute or punishments or warnings) %}<a href="#profile-punishments" class="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-slate-300 transition hover:bg-white/[0.05] hover:text-white"><span class="text-rose-300">◇</span>Strafen</a>{% endif %}
       {% if show_moderation and (reports_against or reports_by) %}<a href="#profile-history" class="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-slate-300 transition hover:bg-white/[0.05] hover:text-white"><span class="text-slate-400">↶</span>Verläufe</a>{% endif %}
       {% if show_moderation and anticheat_events %}<a href="#profile-anticheat" class="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-slate-300 transition hover:bg-white/[0.05] hover:text-white"><span class="text-amber-300">⬡</span>AntiCheat</a>{% endif %}
@@ -100,6 +102,24 @@
     <div data-chart-tooltip class="pointer-events-none absolute z-10 hidden min-w-36 rounded-md border border-white/10 bg-[#080d18]/95 px-3 py-2 text-[11px] shadow-xl backdrop-blur"></div>
   </div>
 </section>
+</section>
+{% endif %}
+
+{% if player_clan %}
+<section id="profile-clan" class="order-1 scroll-mt-24 rounded-lg border border-white/[0.06] bg-[#0d1320] p-5">
+  {{ section_heading("Clan", "Mitgliedschaft und Clan-Daten") }}
+  <div class="mt-4 flex flex-wrap items-start justify-between gap-5 border-y border-white/[0.06] py-4">
+    <div>
+      <div class="text-xl font-bold text-white">{{ player_clan.clan_name }}</div>
+      <div class="mt-1 font-mono text-sm font-semibold" style="color: {{ player_clan.tag_color_hex }}">[{{ player_clan.clan_tag }}]</div>
+    </div>
+    <dl class="grid min-w-0 flex-1 gap-x-8 gap-y-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Rolle</dt><dd class="mt-1 text-sm font-medium text-white">{{ "Besitzer" if player_clan.member_role == "OWNER" else "Mitglied" }}</dd></div>
+      <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Mitglieder</dt><dd class="mt-1 text-sm font-medium text-white">{{ player_clan.member_count }}</dd></div>
+      <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Besitzer</dt><dd class="mt-1 truncate text-sm font-medium text-white">{{ player_clan.owner_name }}</dd></div>
+      <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Beigetreten</dt><dd class="mt-1 text-sm font-medium text-white">{{ player_clan.joined_at_display }}</dd></div>
+    </dl>
+  </div>
 </section>
 {% endif %}
 

@@ -49,6 +49,7 @@
       this.periodParam = root.dataset.periodParam || "days";
       this.period = Number(root.dataset.defaultPeriod || root.dataset.defaultDays || 30);
       this.type = root.dataset.defaultType || "line";
+      this.dimension = root.dataset.defaultDimension || "";
       this.labelFormat = "date";
       this.isAllTime = false;
       this.hasValues = false;
@@ -78,6 +79,14 @@
           this.draw();
         });
       });
+      this.root.querySelectorAll("[data-chart-dimension]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const dimension = button.dataset.chartDimension;
+          if (!dimension || dimension === this.dimension) return;
+          this.dimension = dimension;
+          this.load();
+        });
+      });
       this.root.querySelector("[data-chart-period], [data-chart-days]")?.addEventListener("change", (event) => {
         this.period = Number(event.target.value || 30);
         this.load();
@@ -88,9 +97,11 @@
         this.tooltip?.classList.add("hidden");
         this.draw();
       });
-      document.querySelectorAll("[data-stat-metric]").forEach((link) => {
-        link.addEventListener("click", () => this.selectMetric(link.dataset.statMetric));
-      });
+      if (this.root.querySelector("[data-chart-metric]")) {
+        document.querySelectorAll("[data-stat-metric]").forEach((link) => {
+          link.addEventListener("click", () => this.selectMetric(link.dataset.statMetric));
+        });
+      }
     }
 
     selectMetric(metric) {
@@ -112,6 +123,11 @@
         button.dataset.active = String(active);
         button.setAttribute("aria-pressed", String(active));
       });
+      this.root.querySelectorAll("[data-chart-dimension]").forEach((button) => {
+        const active = button.dataset.chartDimension === this.dimension;
+        button.dataset.active = String(active);
+        button.setAttribute("aria-pressed", String(active));
+      });
     }
 
     async load() {
@@ -125,6 +141,7 @@
         if (this.root.querySelector("[data-chart-metric]")) {
           url.searchParams.set("metric", this.metric);
         }
+        if (this.dimension) url.searchParams.set("dimension", this.dimension);
         const response = await fetch(url, { headers: { Accept: "application/json" } });
         const payload = await response.json();
         if (!response.ok || payload.ok === false) {
@@ -133,11 +150,16 @@
         if (token !== this.loadToken) return;
         this.data = payload;
         this.metric = payload.metric || this.metric;
+        this.dimension = payload.dimension || this.dimension;
         this.labelFormat = payload.label_format || "date";
         this.isAllTime = payload.all_time === true;
         this.hasValues = (payload.series || []).some((series) => series.values.some(Number.isFinite));
         this.title.textContent = payload.title || "Statistik";
         this.subtitle.textContent = payload.subtitle || "";
+        this.root.querySelectorAll("[data-chart-summary]").forEach((element) => {
+          const value = payload.summary?.[element.dataset.chartSummary];
+          element.textContent = value ?? "—";
+        });
         this.renderLegend();
         this.updateControls();
         this.draw();

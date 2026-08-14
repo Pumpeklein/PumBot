@@ -1405,6 +1405,17 @@ def add_player_note(
         ) or {}
 
 
+def delete_player_note(note_id: int, player_uuid: str) -> bool:
+    if not moderation_notes_supported():
+        return False
+    with _connect() as conn:
+        affected = conn.execute(
+            "DELETE FROM pc_player_notes WHERE id = %s AND player_uuid = %s",
+            (note_id, player_uuid),
+        )
+    return bool(affected)
+
+
 # ══════════ Punishments (bans) ══════════
 
 
@@ -1643,29 +1654,37 @@ def chat_messages_supported() -> bool:
 
 def get_chat_stats() -> dict:
     if not chat_messages_supported():
-        return {"total": 0, "global": 0, "msg": 0, "deleted": 0}
+        return {"total": 0, "global": 0, "msg": 0, "detected": 0, "deleted": 0}
     with _connect() as conn:
         row = conn.query_one(
             """SELECT COUNT(*) AS total,
                       SUM(message_type = 'GLOBAL') AS global_count,
                       SUM(message_type = 'MSG') AS msg_count,
+                      SUM(blocked = 1) AS detected_count,
                       SUM(deleted_at IS NOT NULL) AS deleted_count
-                 FROM pc_chat_messages
-                WHERE blocked = 0"""
+                 FROM pc_chat_messages"""
         ) or {}
     return {
         "total": int(row.get("total") or 0),
         "global": int(row.get("global_count") or 0),
         "msg": int(row.get("msg_count") or 0),
+        "detected": int(row.get("detected_count") or 0),
         "deleted": int(row.get("deleted_count") or 0),
     }
 
 
 def _chat_where(
-    q: str, message_type: str, search_field: str = "all"
+    q: str,
+    message_type: str,
+    search_field: str = "all",
+    detection_status: str = "all",
 ) -> tuple[str, list[Any]]:
-    clauses = ["blocked = 0"]
+    clauses: list[str] = []
     params: list[Any] = []
+    if detection_status == "detected":
+        clauses.append("blocked = 1")
+    elif detection_status == "accepted":
+        clauses.append("blocked = 0")
     normalized_type = message_type.upper()
     if normalized_type in {"GLOBAL", "MSG"}:
         clauses.append("message_type = %s")
@@ -1687,20 +1706,22 @@ def _chat_where(
                 " OR recipient_name LIKE %s OR recipient_uuid LIKE %s)"
             )
             params.extend([like] * 5)
-    return " WHERE " + " AND ".join(clauses), params
+    where = " WHERE " + " AND ".join(clauses) if clauses else ""
+    return where, params
 
 
 def list_chat_messages(
     q: str = "",
     message_type: str = "all",
     search_field: str = "all",
+    detection_status: str = "all",
     sort: str = "newest",
     limit: int = 25,
     offset: int = 0,
 ) -> list[dict]:
     if not chat_messages_supported():
         return []
-    where, params = _chat_where(q, message_type, search_field)
+    where, params = _chat_where(q, message_type, search_field, detection_status)
     order = CHAT_SORTS.get(sort, CHAT_SORTS["newest"])
     with _connect() as conn:
         return conn.query(
@@ -1710,11 +1731,14 @@ def list_chat_messages(
 
 
 def count_chat_messages(
-    q: str = "", message_type: str = "all", search_field: str = "all"
+    q: str = "",
+    message_type: str = "all",
+    search_field: str = "all",
+    detection_status: str = "all",
 ) -> int:
     if not chat_messages_supported():
         return 0
-    where, params = _chat_where(q, message_type, search_field)
+    where, params = _chat_where(q, message_type, search_field, detection_status)
     with _connect() as conn:
         return int(
             conn.scalar(
@@ -1724,7 +1748,137 @@ def count_chat_messages(
 
 
 def get_recent_chat_messages(limit: int = 6) -> list[dict]:
-    return list_chat_messages(limit=limit, offset=0)
+    return list_chat_messages(detection_status="accepted", limit=limit, offset=0)
+
+
+def get_player_chat_messages(
+    player_uuid: str, *, blocked: bool | None = None, limit: int = 50
+) -> list[dict]:
+    if not chat_messages_supported():
+        return []
+    clauses = ["(player_uuid = %s OR recipient_uuid = %s)"]
+    params: list[Any] = [player_uuid, player_uuid]
+    if blocked is not None:
+        clauses.append("blocked = %s")
+        params.append(1 if blocked else 0)
+    with _connect() as conn:
+        return conn.query(
+            "SELECT * FROM pc_chat_messages WHERE "
+            + " AND ".join(clauses)
+            + " ORDER BY created_at DESC, id DESC LIMIT %s",
+            tuple([*params, limit]),
+        )
+
+
+# ══════════ Dimension statistics ══════════
+
+DIMENSIONS = {"OVERWORLD": "Overworld", "NETHER": "Nether", "END": "End"}
+
+
+def dimension_statistics_supported() -> bool:
+    return _table_supported("pc_dimension_playtime")
+
+
+def _dimension_playtime_chart(dates: list[date], dimension: str) -> list[dict]:
+    if not _table_supported("pc_dimension_playtime_history"):
+        return []
+    with _connect() as conn:
+        rows = conn.query(
+            """SELECT player_uuid, snapshot_date, total_seconds,
+                      active_seconds, afk_seconds
+                 FROM pc_dimension_playtime_history
+                WHERE dimension = %s AND snapshot_date <= %s
+                ORDER BY snapshot_date, player_uuid""",
+            (dimension, dates[-1]),
+        )
+
+    by_day: dict[str, list[dict]] = {}
+    latest: dict[str, dict] = {}
+    start_key = dates[0].isoformat()
+    for row in rows:
+        key = _date_key(row.get("snapshot_date"))
+        if key < start_key:
+            latest[str(row["player_uuid"])] = row
+        else:
+            by_day.setdefault(key, []).append(row)
+
+    values = {"total": [], "active": [], "afk": []}
+    for day in dates:
+        for row in by_day.get(day.isoformat(), []):
+            latest[str(row["player_uuid"])] = row
+        if not latest:
+            for series in values.values():
+                series.append(None)
+            continue
+        values["total"].append(sum(int(row.get("total_seconds") or 0) for row in latest.values()))
+        values["active"].append(sum(int(row.get("active_seconds") or 0) for row in latest.values()))
+        values["afk"].append(sum(int(row.get("afk_seconds") or 0) for row in latest.values()))
+    return [
+        {"label": "Gesamt", "color": "#22d3ee", "values": values["total"]},
+        {"label": "Aktiv", "color": "#34d399", "values": values["active"]},
+        {"label": "AFK", "color": "#fbbf24", "values": values["afk"]},
+    ]
+
+
+def get_dimension_statistics_chart(dimension: str = "OVERWORLD", days: int = 30) -> dict:
+    safe_dimension = dimension if dimension in DIMENSIONS else "OVERWORLD"
+    safe_days = days if days in CHART_DAYS or days == ALL_TIME_CHART_DAYS else 30
+    first_date = None
+    if _table_supported("pc_dimension_playtime_history"):
+        with _connect() as conn:
+            first_date = conn.scalar(
+                "SELECT MIN(snapshot_date) FROM pc_dimension_playtime_history WHERE dimension = %s",
+                (safe_dimension,),
+            )
+    dates = _chart_dates(
+        safe_days,
+        earliest=first_date if safe_days == ALL_TIME_CHART_DAYS else None,
+    )
+    summary = {"players": 0, "total_seconds": 0, "active_seconds": 0, "afk_seconds": 0, "deaths": 0}
+    if dimension_statistics_supported():
+        with _connect() as conn:
+            playtime = conn.query_one(
+                """SELECT COUNT(*) AS players,
+                          COALESCE(SUM(total_seconds), 0) AS total_seconds,
+                          COALESCE(SUM(active_seconds), 0) AS active_seconds,
+                          COALESCE(SUM(afk_seconds), 0) AS afk_seconds
+                     FROM pc_dimension_playtime WHERE dimension = %s""",
+                (safe_dimension,),
+            ) or {}
+            deaths = (
+                conn.scalar(
+                    "SELECT COALESCE(SUM(death_count), 0) FROM pc_dimension_death_counts WHERE dimension = %s",
+                    (safe_dimension,),
+                )
+                if _table_supported("pc_dimension_death_counts")
+                else 0
+            )
+        summary = {
+            "players": int(playtime.get("players") or 0),
+            "total_seconds": int(playtime.get("total_seconds") or 0),
+            "active_seconds": int(playtime.get("active_seconds") or 0),
+            "afk_seconds": int(playtime.get("afk_seconds") or 0),
+            "deaths": int(deaths or 0),
+        }
+    return {
+        "metric": "dimension_playtime",
+        "dimension": safe_dimension,
+        "days": safe_days,
+        "all_time": safe_days == ALL_TIME_CHART_DAYS,
+        "title": DIMENSIONS[safe_dimension],
+        "subtitle": "Spielzeit und Aktivität in dieser Dimension",
+        "unit": "seconds",
+        "labels": [day.isoformat() for day in dates],
+        "series": _dimension_playtime_chart(dates, safe_dimension),
+        "summary": {
+            **summary,
+            "players_display": f"{summary['players']:,}".replace(",", "."),
+            "total_display": format_duration(summary["total_seconds"]),
+            "active_display": format_duration(summary["active_seconds"]),
+            "afk_display": format_duration(summary["afk_seconds"]),
+            "deaths_display": f"{summary['deaths']:,}".replace(",", "."),
+        },
+    }
 
 
 # ══════════ Skills ══════════

@@ -33,7 +33,7 @@
     class="group rounded-lg border border-amber-500/20 bg-amber-500/[0.045] p-4 transition hover:border-amber-400/40 hover:bg-amber-500/[0.08]">
     <div class="text-[10px] font-medium uppercase tracking-wider text-amber-300/70">Tode</div>
     <div class="mt-2 text-2xl font-bold text-white group-hover:text-amber-300">{{ overview.total_deaths }}</div>
-    <div class="mt-2 text-[11px] text-slate-500">Von {{ overview.death_players }} Spielern · {{ chat_stats.total }} Chatnachrichten</div>
+    <div class="mt-2 text-[11px] text-slate-500">Von {{ overview.death_players }} Spielern</div>
   </a>
 
   <div class="rounded-lg border border-rose-500/20 bg-rose-500/[0.04] p-4">
@@ -100,13 +100,58 @@
       <div class="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-1">
         <button type="button" data-chart-metric="players" class="rounded-md border border-transparent px-3 py-2.5 text-left text-xs font-medium text-slate-400 transition hover:bg-white/[0.04] hover:text-white data-[active=true]:border-cyan-500/20 data-[active=true]:bg-cyan-500/10 data-[active=true]:text-cyan-300">Spielerzuwachs</button>
         <button type="button" data-chart-metric="playtime" class="rounded-md border border-transparent px-3 py-2.5 text-left text-xs font-medium text-slate-400 transition hover:bg-white/[0.04] hover:text-white data-[active=true]:border-cyan-500/20 data-[active=true]:bg-cyan-500/10 data-[active=true]:text-cyan-300">Playtime</button>
-        <button type="button" data-chart-metric="chat" class="rounded-md border border-transparent px-3 py-2.5 text-left text-xs font-medium text-slate-400 transition hover:bg-white/[0.04] hover:text-white data-[active=true]:border-cyan-500/20 data-[active=true]:bg-cyan-500/10 data-[active=true]:text-cyan-300">Chataktivität</button>
         {% if mc_can_moderation %}
         <button type="button" data-chart-metric="reports" class="rounded-md border border-transparent px-3 py-2.5 text-left text-xs font-medium text-slate-400 transition hover:bg-white/[0.04] hover:text-white data-[active=true]:border-cyan-500/20 data-[active=true]:bg-cyan-500/10 data-[active=true]:text-cyan-300">Reports</button>
         <button type="button" data-chart-metric="bans" class="rounded-md border border-transparent px-3 py-2.5 text-left text-xs font-medium text-slate-400 transition hover:bg-white/[0.04] hover:text-white data-[active=true]:border-cyan-500/20 data-[active=true]:bg-cyan-500/10 data-[active=true]:text-cyan-300">Bans</button>
         <button type="button" data-chart-metric="warnings" class="rounded-md border border-transparent px-3 py-2.5 text-left text-xs font-medium text-slate-400 transition hover:bg-white/[0.04] hover:text-white data-[active=true]:border-cyan-500/20 data-[active=true]:bg-cyan-500/10 data-[active=true]:text-cyan-300">Verwarnungen</button>
         <button type="button" data-chart-metric="mutes" class="rounded-md border border-transparent px-3 py-2.5 text-left text-xs font-medium text-slate-400 transition hover:bg-white/[0.04] hover:text-white data-[active=true]:border-cyan-500/20 data-[active=true]:bg-cyan-500/10 data-[active=true]:text-cyan-300">Mutes</button>
         {% endif %}
+      </div>
+    </aside>
+  </div>
+</section>
+
+<section data-minecraft-chart data-default-metric="dimension_playtime" data-default-days="30" data-default-type="line" data-default-dimension="OVERWORLD" data-auto-refresh-ms="60000"
+  data-endpoint="{{ url_for('panel_api_minecraft_dimension_statistics_chart') }}"
+  class="mb-6 overflow-hidden rounded-lg border border-white/[0.07] bg-[#0d1320]">
+  <div class="grid min-h-[420px] xl:grid-cols-[minmax(0,1fr)_13rem]">
+    <div class="min-w-0 p-5 sm:p-6">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div class="text-[10px] font-medium uppercase tracking-wider text-cyan-300/70">Dimensionen</div>
+          <h2 data-chart-title class="mt-1 text-base font-semibold text-white">Overworld</h2>
+          <p data-chart-subtitle class="mt-1 text-xs text-slate-500">Spielzeit und Aktivität in dieser Dimension</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="inline-flex rounded-md border border-white/10 bg-[#0a0f1a] p-0.5">
+            <button type="button" data-chart-type="line" class="rounded px-2.5 py-1.5 text-[11px] font-medium text-slate-400 data-[active=true]:bg-cyan-500/15 data-[active=true]:text-cyan-300">Linie</button>
+            <button type="button" data-chart-type="bar" class="rounded px-2.5 py-1.5 text-[11px] font-medium text-slate-400 data-[active=true]:bg-cyan-500/15 data-[active=true]:text-cyan-300">Balken</button>
+          </div>
+          <select data-chart-days class="h-8 rounded-md border border-white/10 bg-[#151c2c] px-2.5 text-[11px] text-white outline-none focus:border-cyan-500">
+            <option value="7">7 Tage</option><option value="30" selected>30 Tage</option><option value="90">90 Tage</option><option value="365">1 Jahr</option><option value="0">Gesamt</option>
+          </select>
+        </div>
+      </div>
+      <div class="mt-4 grid grid-cols-2 gap-px overflow-hidden rounded-md border border-white/[0.06] bg-white/[0.06] sm:grid-cols-5">
+        <div class="bg-[#0a101c] p-3"><span class="text-[10px] uppercase text-slate-500">Spieler</span><strong data-chart-summary="players_display" class="mt-1 block text-base text-white">0</strong></div>
+        <div class="bg-[#0a101c] p-3"><span class="text-[10px] uppercase text-slate-500">Gesamt</span><strong data-chart-summary="total_display" class="mt-1 block text-base text-white">0m</strong></div>
+        <div class="bg-[#0a101c] p-3"><span class="text-[10px] uppercase text-slate-500">Aktiv</span><strong data-chart-summary="active_display" class="mt-1 block text-base text-emerald-300">0m</strong></div>
+        <div class="bg-[#0a101c] p-3"><span class="text-[10px] uppercase text-slate-500">AFK</span><strong data-chart-summary="afk_display" class="mt-1 block text-base text-amber-300">0m</strong></div>
+        <div class="bg-[#0a101c] p-3"><span class="text-[10px] uppercase text-slate-500">Tode</span><strong data-chart-summary="deaths_display" class="mt-1 block text-base text-rose-300">0</strong></div>
+      </div>
+      <div data-chart-legend class="mt-4 flex min-h-5 flex-wrap items-center gap-x-4 gap-y-2"></div>
+      <div data-chart-stage class="relative mt-2 h-[245px] min-w-0">
+        <canvas data-chart-canvas class="h-full w-full transition-opacity" role="img" aria-label="Dimensionsstatistik"></canvas>
+        <div data-chart-status class="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-slate-500">Diagramm wird geladen</div>
+        <div data-chart-tooltip class="pointer-events-none absolute z-10 hidden min-w-36 rounded-md border border-white/10 bg-[#080d18]/95 px-3 py-2 text-[11px] shadow-xl"></div>
+      </div>
+    </div>
+    <aside class="border-t border-white/[0.06] bg-[#0a101c] p-4 xl:border-l xl:border-t-0">
+      <div class="mb-3 text-[10px] font-medium uppercase tracking-wider text-slate-500">Dimension auswählen</div>
+      <div class="grid gap-1.5 sm:grid-cols-3 xl:grid-cols-1">
+        <button type="button" data-chart-dimension="OVERWORLD" class="rounded-md border border-transparent px-3 py-2.5 text-left text-xs font-medium text-slate-400 hover:bg-white/[0.04] data-[active=true]:border-cyan-500/20 data-[active=true]:bg-cyan-500/10 data-[active=true]:text-cyan-300">Overworld</button>
+        <button type="button" data-chart-dimension="NETHER" class="rounded-md border border-transparent px-3 py-2.5 text-left text-xs font-medium text-slate-400 hover:bg-white/[0.04] data-[active=true]:border-cyan-500/20 data-[active=true]:bg-cyan-500/10 data-[active=true]:text-cyan-300">Nether</button>
+        <button type="button" data-chart-dimension="END" class="rounded-md border border-transparent px-3 py-2.5 text-left text-xs font-medium text-slate-400 hover:bg-white/[0.04] data-[active=true]:border-cyan-500/20 data-[active=true]:bg-cyan-500/10 data-[active=true]:text-cyan-300">End</button>
       </div>
     </aside>
   </div>
@@ -240,101 +285,10 @@
   </div>
 </section>
 
-<section id="chat-messages" class="mt-6 scroll-mt-24 rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
-  <div class="mb-5 flex flex-wrap items-start justify-between gap-4">
-    <div>
-      <h2 class="text-sm font-semibold text-white">All-Chat-Nachrichten</h2>
-      <p class="mt-1 text-xs text-slate-500">Global- und MSG-Nachrichten. System-, Todes- und Achievement-Meldungen werden nicht gespeichert.</p>
-    </div>
-    <div class="flex flex-wrap gap-2 text-[10.5px]">
-      <span class="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-400">{{ chat_stats.total }} gesamt</span>
-      <span class="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1 text-cyan-300">{{ chat_stats.global }} Global</span>
-      <span class="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-amber-300">{{ chat_stats.msg }} MSG</span>
-    </div>
-  </div>
-
-  <form id="mc-chat-filter" class="mb-4 flex flex-wrap items-end justify-end gap-3">
-    <label class="block w-full sm:w-44">
-      <span class="mb-1 block text-[11px] font-medium text-slate-500">Art</span>
-      <select name="message_type" data-live-search class="w-full rounded-lg border border-white/10 bg-[#151c2c] px-3 py-2 text-sm text-white outline-none focus:border-cyan-500/50">
-        <option value="all">Global und MSG</option>
-        <option value="GLOBAL">Nur Global</option>
-        <option value="MSG">Nur MSG</option>
-      </select>
-    </label>
-    <div class="relative w-full sm:w-80" data-chat-search
-      data-player-endpoint="{{ url_for('panel_api_minecraft_players') }}">
-      <label class="block">
-        <span class="mb-1 block text-[11px] font-medium text-slate-500">Suche</span>
-        <span class="relative block">
-          <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke-width="1.7"/><path stroke-linecap="round" stroke-width="1.7" d="m16.5 16.5 4 4"/></svg>
-          <input type="search" name="q" data-live-search data-chat-search-input placeholder="Spieler, UUID oder Nachricht"
-            autocomplete="off" aria-haspopup="listbox" aria-expanded="false"
-            class="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-9 pr-3 text-sm text-white placeholder-slate-500 outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30">
-        </span>
-      </label>
-      <input type="hidden" name="search_field" value="all" data-live-search data-chat-search-field>
-      <div data-chat-search-menu role="listbox" aria-label="Suchbereich wählen"
-        class="absolute right-0 top-full z-30 mt-1 hidden w-full overflow-hidden rounded-lg border border-white/10 bg-[#111827] p-1.5 shadow-2xl">
-        <div data-chat-search-modes>
-        <button type="button" role="option" data-chat-search-option="uuid" data-placeholder="UUID eingeben"
-          class="flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left transition hover:bg-white/[0.06]">
-          <span class="mt-0.5 font-mono text-xs font-semibold text-cyan-300">ID</span>
-          <span><span class="block text-sm font-medium text-slate-200">Nach UUID suchen</span><span class="mt-0.5 block text-[11px] text-slate-500">Absender oder MSG-Empfänger eindeutig finden</span></span>
-        </button>
-        <button type="button" role="option" aria-selected="true" data-chat-search-option="username" data-placeholder="Username eingeben"
-          class="flex w-full items-start gap-3 rounded-md bg-cyan-500/[0.08] px-3 py-2.5 text-left transition hover:bg-white/[0.06]">
-          <svg class="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5" stroke-width="1.7"/><path stroke-linecap="round" stroke-width="1.7" d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>
-          <span><span class="block text-sm font-medium text-slate-200">Nach Username suchen</span><span class="mt-0.5 block text-[11px] text-slate-500">Spielernamen im Global- und MSG-Chat</span></span>
-        </button>
-        <button type="button" role="option" data-chat-search-option="message" data-placeholder="Nachrichteninhalt eingeben"
-          class="flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left transition hover:bg-white/[0.06]">
-          <svg class="mt-0.5 h-4 w-4 shrink-0 text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linejoin="round" stroke-width="1.7" d="M4 5h16v11H9l-5 4V5Z"/><path stroke-linecap="round" stroke-width="1.7" d="M8 9h8m-8 3h5"/></svg>
-          <span><span class="block text-sm font-medium text-slate-200">Im Nachrichteninhalt suchen</span><span class="mt-0.5 block text-[11px] text-slate-500">Begriffe und Gesprächsausschnitte auffinden</span></span>
-        </button>
-        </div>
-        <div data-chat-search-results class="hidden max-h-72 overflow-y-auto" aria-live="polite"></div>
-      </div>
-    </div>
-    <input type="hidden" name="sort" value="newest" data-live-search data-chat-sort-input>
-  </form>
-
-  <div data-paginated-table data-endpoint="{{ url_for('panel_api_minecraft_chat') }}" data-form="#mc-chat-filter"
-    data-page-size="25" data-auto-refresh-ms="15000" data-preserve-empty-rows="false">
-    <script type="application/json">
-      [
-        {"type":"user","nameKey":"player_name","subKey":"player_uuid_short","avatarKey":"player_head_url","urlKey":"player_detail_url","class":"px-3 py-2.5"},
-        {"key":"message","type":"message","deletedAtKey":"deleted_at","alwaysInteractive":true,"modalTitle":"Minecraft Chatnachricht","previewLength":180,"class":"px-3 py-2.5 min-w-[18rem]"},
-        {"key":"created_at","type":"date","class":"px-3 py-2.5 whitespace-nowrap"},
-        {"key":"message_type_label","type":"badge","variants":{"Global":"info","MSG":"warning"},"class":"px-3 py-2.5"}
-      ]
-    </script>
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-sm">
-        <thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
-          <th class="px-3 py-2.5"><button type="button" data-chat-sort-asc="player_asc" data-chat-sort-desc="player_desc" data-sort-state="0" class="inline-flex items-center gap-1 hover:text-white">Player <span data-sort-indicator></span></button></th>
-          <th class="px-3 py-2.5"><button type="button" data-chat-sort-asc="message_asc" data-chat-sort-desc="message_desc" data-sort-state="0" class="inline-flex items-center gap-1 hover:text-white">Nachricht <span data-sort-indicator></span></button></th>
-          <th class="px-3 py-2.5"><button type="button" data-chat-sort-asc="oldest" data-chat-sort-desc="newest" data-sort-state="0" class="inline-flex items-center gap-1 hover:text-white">Datum <span data-sort-indicator></span></button></th>
-          <th class="px-3 py-2.5"><button type="button" data-chat-sort-asc="type_asc" data-chat-sort-desc="type_desc" data-sort-state="0" class="inline-flex items-center gap-1 hover:text-white">Art <span data-sort-indicator></span></button></th>
-        </tr></thead>
-        <tbody data-table-body></tbody>
-      </table>
-    </div>
-    <div data-table-empty class="hidden">{{ empty_state("Keine Chatnachrichten", "Die gewählte Suche oder Nachrichtenart liefert keine Treffer.") }}</div>
-    <div class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
-      <label class="flex items-center gap-2 text-xs text-slate-500">Pro Seite
-        <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option>10</option><option selected>25</option><option>50</option><option>100</option></select>
-      </label>
-      <div data-table-pagination class="flex-1"></div>
-    </div>
-  </div>
-</section>
-
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
 <div class="hidden" data-playtime-live data-endpoint="{{ url_for('panel_api_minecraft_playtime_live') }}"></div>
 <script src="{{ url_for('static', filename='minecraft-chart.js') }}" defer></script>
 <script src="{{ url_for('static', filename='minecraft-live.js') }}" defer></script>
@@ -388,201 +342,6 @@
     const observer = new ResizeObserver(draw);
     observer.observe(canvas.parentElement);
 
-    const sortInput = document.querySelector("[data-chat-sort-input]");
-    const sortButtons = document.querySelectorAll("[data-chat-sort-asc]");
-    sortButtons.forEach((button) => {
-      button.addEventListener("click", () => {
-        const nextState = (Number(button.dataset.sortState || 0) + 1) % 3;
-        sortButtons.forEach((other) => {
-          other.dataset.sortState = "0";
-          other.querySelector("[data-sort-indicator]").textContent = "";
-        });
-        button.dataset.sortState = String(nextState);
-        sortInput.value = nextState === 1
-          ? button.dataset.chatSortAsc
-          : nextState === 2 ? button.dataset.chatSortDesc : "newest";
-        button.querySelector("[data-sort-indicator]").textContent = nextState === 1 ? "↑" : nextState === 2 ? "↓" : "";
-        sortInput.dispatchEvent(new Event("change", { bubbles: true }));
-      });
-    });
-
-    const search = document.querySelector("[data-chat-search]");
-    const searchInput = search?.querySelector("[data-chat-search-input]");
-    const searchField = search?.querySelector("[data-chat-search-field]");
-    const searchMenu = search?.querySelector("[data-chat-search-menu]");
-    const searchModes = search?.querySelector("[data-chat-search-modes]");
-    const searchResults = search?.querySelector("[data-chat-search-results]");
-    const searchOptions = search?.querySelectorAll("[data-chat-search-option]") || [];
-    let suggestionTimer;
-    let suggestionRequest;
-    let selectingSuggestion = false;
-
-    const showSearchMenu = () => {
-      searchMenu?.classList.remove("hidden");
-      searchInput?.setAttribute("aria-expanded", "true");
-    };
-    const hideSearchMenu = () => {
-      searchMenu?.classList.add("hidden");
-      searchInput?.setAttribute("aria-expanded", "false");
-    };
-
-    const showSearchModes = () => {
-      searchModes?.classList.remove("hidden");
-      searchResults?.classList.add("hidden");
-      searchResults?.replaceChildren();
-    };
-
-    const showResultStatus = (message) => {
-      if (!searchResults) return;
-      searchModes?.classList.add("hidden");
-      searchResults.classList.remove("hidden");
-      const status = document.createElement("div");
-      status.className = "px-3 py-4 text-center text-xs text-slate-500";
-      status.textContent = message;
-      searchResults.replaceChildren(status);
-    };
-
-    const selectSearch = (value, field) => {
-      selectingSuggestion = true;
-      searchInput.value = value;
-      searchField.value = field;
-      searchInput.dispatchEvent(new Event("input", { bubbles: true }));
-      selectingSuggestion = false;
-      hideSearchMenu();
-    };
-
-    const playerSuggestion = (player) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.role = "option";
-      button.className = "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left transition hover:bg-cyan-500/[0.08]";
-
-      if (player.player_head_url) {
-        const avatar = document.createElement("img");
-        avatar.src = player.player_head_url;
-        avatar.alt = "";
-        avatar.className = "h-8 w-8 shrink-0 rounded-md bg-slate-800";
-        button.append(avatar);
-      } else {
-        const avatar = document.createElement("span");
-        avatar.className = "flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-cyan-500/10 text-xs font-semibold text-cyan-300";
-        avatar.textContent = String(player.player_name || "?").slice(0, 2).toUpperCase();
-        button.append(avatar);
-      }
-
-      const details = document.createElement("span");
-      details.className = "min-w-0 flex-1";
-      const name = document.createElement("span");
-      name.className = "block truncate text-sm font-medium text-slate-200";
-      name.textContent = player.player_name;
-      const uuid = document.createElement("span");
-      uuid.className = "mt-0.5 block truncate font-mono text-[10px] text-slate-500";
-      uuid.textContent = player.player_uuid;
-      details.append(name, uuid);
-      button.append(details);
-      button.addEventListener("click", () => selectSearch(player.player_name, "username"));
-      return button;
-    };
-
-    const renderSuggestions = (payload, query) => {
-      if (!searchResults || searchInput.value.trim() !== query) return;
-      const players = Array.isArray(payload.items) ? payload.items : [];
-      const total = Number(payload.pagination?.total || players.length);
-      const content = document.createDocumentFragment();
-
-      const heading = document.createElement("div");
-      heading.className = "px-3 pb-1.5 pt-2 text-[10px] font-medium uppercase tracking-wider text-slate-500";
-      heading.textContent = total ? `${total} passende Spieler` : "Keine passenden Spieler";
-      content.append(heading);
-      players.forEach((player) => content.append(playerSuggestion(player)));
-
-      const messageButton = document.createElement("button");
-      messageButton.type = "button";
-      messageButton.className = "mt-1 flex w-full items-start gap-3 border-t border-white/[0.06] px-3 py-2.5 text-left text-slate-400 transition hover:bg-white/[0.04] hover:text-white";
-      const icon = document.createElement("span");
-      icon.className = "mt-0.5 font-mono text-[10px] font-semibold text-cyan-300";
-      icon.textContent = "MSG";
-      const label = document.createElement("span");
-      label.className = "min-w-0 text-xs";
-      label.textContent = `Nachrichteninhalt nach „${query}“ durchsuchen`;
-      messageButton.append(icon, label);
-      messageButton.addEventListener("click", () => selectSearch(query, "message"));
-      content.append(messageButton);
-
-      searchModes?.classList.add("hidden");
-      searchResults.classList.remove("hidden");
-      searchResults.replaceChildren(content);
-    };
-
-    const loadSuggestions = async (query) => {
-      suggestionRequest?.abort();
-      suggestionRequest = new AbortController();
-      try {
-        const url = new URL(search.dataset.playerEndpoint, window.location.origin);
-        url.searchParams.set("q", query);
-        url.searchParams.set("sort", "name");
-        url.searchParams.set("page_size", "100");
-        const response = await fetch(url, {
-          headers: { Accept: "application/json" },
-          signal: suggestionRequest.signal,
-        });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.error || "Spieler konnten nicht geladen werden.");
-        renderSuggestions(payload, query);
-      } catch (error) {
-        if (error.name !== "AbortError" && searchInput.value.trim() === query) {
-          showResultStatus("Vorschläge konnten nicht geladen werden.");
-        }
-      }
-    };
-
-    const updateAutomaticSearch = () => {
-      if (selectingSuggestion) return;
-      const query = searchInput.value.trim();
-      window.clearTimeout(suggestionTimer);
-      suggestionRequest?.abort();
-      showSearchMenu();
-      if (!query) {
-        searchField.value = "all";
-        showSearchModes();
-        return;
-      }
-
-      const compactUuid = query.replaceAll("-", "");
-      const looksLikeUuid = /^[0-9a-f-]+$/i.test(query)
-        && (query.includes("-") || compactUuid.length >= 16);
-      searchField.value = looksLikeUuid ? "uuid" : "all";
-      showResultStatus("Passende Spieler werden gesucht …");
-      suggestionTimer = window.setTimeout(() => loadSuggestions(query), 160);
-    };
-
-    searchInput?.addEventListener("focus", () => {
-      showSearchMenu();
-      if (searchInput.value.trim()) updateAutomaticSearch();
-      else showSearchModes();
-    });
-    searchInput?.addEventListener("click", showSearchMenu);
-    searchInput?.addEventListener("input", updateAutomaticSearch);
-    searchOptions.forEach((option) => {
-      option.addEventListener("click", () => {
-        searchField.value = option.dataset.chatSearchOption;
-        searchInput.placeholder = option.dataset.placeholder;
-        searchOptions.forEach((other) => {
-          const active = other === option;
-          other.setAttribute("aria-selected", String(active));
-          other.classList.toggle("bg-cyan-500/[0.08]", active);
-        });
-        searchField.dispatchEvent(new Event("change", { bubbles: true }));
-        searchInput.focus();
-        hideSearchMenu();
-      });
-    });
-    document.addEventListener("click", (event) => {
-      if (search && !search.contains(event.target)) hideSearchMenu();
-    });
-    searchInput?.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") hideSearchMenu();
-    });
   });
 </script>
 {% endblock %}

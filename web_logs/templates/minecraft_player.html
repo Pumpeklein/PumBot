@@ -38,6 +38,22 @@
   </div>
 </div>
 
+<div class="grid items-start gap-6 lg:grid-cols-[13rem_minmax(0,1fr)]">
+  <aside class="sticky top-6 hidden rounded-lg border border-white/[0.07] bg-[#0b1019] p-2 lg:block">
+    <nav class="space-y-1 text-sm" aria-label="Spielerprofil Bereiche">
+      {% if player.playtime or player.deaths %}<a href="#profile-playtime" class="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-slate-300 transition hover:bg-white/[0.05] hover:text-white"><span class="text-cyan-300">◷</span>Spielzeit</a>{% endif %}
+      {% if show_moderation and (mute or punishments or warnings) %}<a href="#profile-punishments" class="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-slate-300 transition hover:bg-white/[0.05] hover:text-white"><span class="text-rose-300">◇</span>Strafen</a>{% endif %}
+      {% if show_moderation and (reports_against or reports_by) %}<a href="#profile-history" class="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-slate-300 transition hover:bg-white/[0.05] hover:text-white"><span class="text-slate-400">↶</span>Verläufe</a>{% endif %}
+      {% if show_moderation and anticheat_events %}<a href="#profile-anticheat" class="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-slate-300 transition hover:bg-white/[0.05] hover:text-white"><span class="text-amber-300">⬡</span>AntiCheat</a>{% endif %}
+      {% if player_chat or chat_detections %}<a href="#profile-chat" class="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-slate-300 transition hover:bg-white/[0.05] hover:text-white"><span class="text-cyan-300">□</span>Chat</a>{% endif %}
+      {% if skills %}<a href="#profile-skills" class="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-slate-300 transition hover:bg-white/[0.05] hover:text-white"><span class="text-emerald-300">✣</span>Skills</a>{% endif %}
+      {% if show_moderation %}<a href="#profile-notes" class="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-slate-300 transition hover:bg-white/[0.05] hover:text-white"><span class="text-violet-300">≡</span>Notizen</a>{% endif %}
+    </nav>
+  </aside>
+  <div class="flex min-w-0 flex-col gap-6">
+
+{% if player.playtime or player.deaths %}
+<section id="profile-playtime" class="scroll-mt-24">
 <div class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
   {{ stat_tile("Gesamt", playtime_total, accent="cyan",
     sub=(player.playtime.updated_at|datetime_de if player.playtime else "Keine Daten"),
@@ -84,9 +100,11 @@
     <div data-chart-tooltip class="pointer-events-none absolute z-10 hidden min-w-36 rounded-md border border-white/10 bg-[#080d18]/95 px-3 py-2 text-[11px] shadow-xl backdrop-blur"></div>
   </div>
 </section>
+</section>
+{% endif %}
 
 {% if skills %}
-<div class="mb-6 rounded-2xl border border-white/[0.06] bg-[#0d1320] p-5">
+<section id="profile-skills" class="order-6 scroll-mt-24 rounded-lg border border-white/[0.06] bg-[#0d1320] p-5">
   {{ section_heading("Skills", "{} Punkte über alle Skills".format(skills_total|number_de)) }}
   <div class="grid gap-x-6 gap-y-4 sm:grid-cols-2">
     {% for entry in skills %}
@@ -119,12 +137,46 @@
     </a>
     {% endfor %}
   </div>
-</div>
+</section>
+{% endif %}
+
+{% if player_chat or chat_detections %}
+<section id="profile-chat" class="order-4 scroll-mt-24 rounded-lg border border-white/[0.06] bg-[#0d1320] p-5">
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    {{ section_heading("Chat", "Global-, MSG- und Chatfilter-Verlauf") }}
+    <div class="inline-flex rounded-md border border-white/10 bg-[#0a0f1a] p-0.5">
+      {% if player_chat %}<button type="button" data-profile-chat-tab="messages" class="rounded px-3 py-1.5 text-xs text-slate-400 data-[active=true]:bg-cyan-500/15 data-[active=true]:text-cyan-300">Nachrichten ({{ player_chat|length }})</button>{% endif %}
+      {% if chat_detections %}<button type="button" data-profile-chat-tab="detections" class="rounded px-3 py-1.5 text-xs text-slate-400 data-[active=true]:bg-amber-500/15 data-[active=true]:text-amber-300">Detected ({{ chat_detections|length }})</button>{% endif %}
+    </div>
+  </div>
+  {% if player_chat %}
+  <div data-profile-chat-panel="messages" class="max-h-[32rem] divide-y divide-white/[0.05] overflow-y-auto">
+    {% for entry in player_chat %}
+    <article class="grid gap-1 py-3 sm:grid-cols-[10rem_minmax(0,1fr)_auto] sm:gap-3">
+      <div><strong class="block truncate text-xs text-slate-200">{{ entry.player_name }}</strong><span class="text-[10px] text-slate-500">{{ entry.type_detail }}</span></div>
+      <p class="break-words text-sm text-slate-200">{{ "Diese Nachricht gibt's nimmer." if entry.deleted_at else entry.message }}</p>
+      <div class="flex items-center gap-2 text-[10px] text-slate-500">{{ mc_pill(entry.message_type_label, "info" if entry.message_type == "GLOBAL" else "warning") }}<span>{{ entry.created_at_display }}</span></div>
+    </article>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if chat_detections %}
+  <div data-profile-chat-panel="detections" class="hidden max-h-[32rem] divide-y divide-white/[0.05] overflow-y-auto">
+    {% for entry in chat_detections %}
+    <article class="grid gap-1 py-3 sm:grid-cols-[10rem_minmax(0,1fr)_auto] sm:gap-3">
+      <div><strong class="block truncate text-xs text-slate-200">{{ entry.player_name }}</strong><span class="text-[10px] text-slate-500">{{ entry.type_detail }}</span></div>
+      <div><p class="break-words text-sm text-slate-200">{{ entry.message }}</p><p class="mt-1 text-[10.5px] text-amber-300">{{ entry.block_reason_display }}</p></div>
+      <div class="flex items-center gap-2 text-[10px] text-slate-500">{{ mc_pill("Detected", "warning") }}<span>{{ entry.created_at_display }}</span></div>
+    </article>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
 {% endif %}
 
 {% if show_moderation %}
 
-<section class="mb-6 border-y border-white/[0.06] py-5">
+<section id="profile-notes" class="order-5 scroll-mt-24 border-y border-white/[0.06] py-5">
   <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
     <div>
       <h2 class="text-sm font-semibold text-white">Notizen & Auffälligkeiten</h2>
@@ -156,6 +208,10 @@
             <span class="font-medium text-slate-300">{{ note_label }}</span>
             <span>von {{ note.author_name }}</span>
             <span class="ml-auto">{{ note.created_at_display }}</span>
+            {% if mc_can_admin %}
+            <button type="button" data-delete-note data-endpoint="{{ url_for('panel_api_minecraft_player_note_delete', player_uuid=player.player_uuid, note_id=note.id) }}"
+              class="rounded border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-300 transition hover:bg-red-500/20">Löschen</button>
+            {% endif %}
           </div>
           <p class="mt-1.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-200">{{ note.note }}</p>
         </article>
@@ -166,7 +222,8 @@
       {% endif %}
     </div>
 
-    <div class="lg:border-l lg:border-white/[0.06] lg:pl-6">
+    {% if anticheat_events %}
+    <div id="profile-anticheat" class="scroll-mt-24 lg:border-l lg:border-white/[0.06] lg:pl-6">
       <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">AntiCheat-Historie</h3>
       {% if anticheat_events %}
       <div class="max-h-[32rem] space-y-2 overflow-y-auto pr-1">
@@ -182,10 +239,9 @@
         </article>
         {% endfor %}
       </div>
-      {% else %}
-      <div class="py-6 text-center text-sm text-slate-500">Keine AntiCheat-Auffälligkeiten gespeichert.</div>
       {% endif %}
     </div>
+    {% endif %}
   </div>
 </section>
 
@@ -228,8 +284,10 @@
   </form>
 </div>
 
+{% if mute or punishments or warnings %}
+<section id="profile-punishments" class="order-2 scroll-mt-24">
 {% if player.mute %}
-<div class="mb-6 rounded-xl border border-amber-500/25 bg-amber-500/[0.07] p-5">
+<div class="mb-4 rounded-xl border border-amber-500/25 bg-amber-500/[0.07] p-5">
   {{ section_heading("Aktiver Mute", "Der Spieler kann aktuell nicht schreiben") }}
   <div class="grid gap-3 text-sm sm:grid-cols-3">
     <div>
@@ -251,6 +309,7 @@
 <div class="grid gap-4 lg:grid-cols-2">
 
   {# ── Bans ── #}
+  {% if punishments %}
   <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
     {{ section_heading("Bans", "{} Einträge".format(punishments|length)) }}
     {% if punishments %}
@@ -276,8 +335,10 @@
     {{ empty_state("Keine Bans", "Dieser Spieler wurde nie gebannt.") }}
     {% endif %}
   </div>
+  {% endif %}
 
   {# ── Verwarnungen ── #}
+  {% if warnings %}
   <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
     {{ section_heading("Verwarnungen", "{} Einträge".format(warnings|length)) }}
     {% if warnings %}
@@ -297,8 +358,16 @@
     {{ empty_state("Keine Verwarnungen", "Dieser Spieler wurde nie verwarnt.") }}
     {% endif %}
   </div>
+  {% endif %}
+</div>
+</section>
+{% endif %}
 
+{% if reports_against or reports_by %}
+<section id="profile-history" class="order-3 scroll-mt-24">
+<div class="grid gap-4 lg:grid-cols-2">
   {# ── Reports gegen den Spieler ── #}
+  {% if reports_against %}
   <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
     {{ section_heading("Gemeldet worden", "{} Reports gegen diesen Spieler".format(reports_against|length)) }}
     {% if reports_against %}
@@ -318,8 +387,10 @@
     {{ empty_state("Keine Reports", "Dieser Spieler wurde nie gemeldet.") }}
     {% endif %}
   </div>
+  {% endif %}
 
   {# ── Eigene Reports ── #}
+  {% if reports_by %}
   <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
     {{ section_heading("Eigene Meldungen", "{} Reports von diesem Spieler".format(reports_by|length)) }}
     {% if reports_by %}
@@ -339,7 +410,10 @@
     {{ empty_state("Keine Meldungen", "Dieser Spieler hat noch niemanden gemeldet.") }}
     {% endif %}
   </div>
+  {% endif %}
 </div>
+</section>
+{% endif %}
 
 {% else %}
 <div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 text-sm text-slate-400">
@@ -348,6 +422,9 @@
 </div>
 {% endif %}
 
+  </div>
+</div>
+
 {% endif %}
 {% endblock %}
 
@@ -355,6 +432,18 @@
 <div class="hidden" data-playtime-live data-player-uuid="{{ player.player_uuid }}" data-endpoint="{{ url_for('panel_api_minecraft_playtime_live') }}"></div>
 <script src="{{ url_for('static', filename='minecraft-chart.js') }}" defer></script>
 <script src="{{ url_for('static', filename='minecraft-live.js') }}" defer></script>
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const tabs = document.querySelectorAll("[data-profile-chat-tab]");
+    const panels = document.querySelectorAll("[data-profile-chat-panel]");
+    const selectTab = (name) => {
+      tabs.forEach((tab) => tab.dataset.active = String(tab.dataset.profileChatTab === name));
+      panels.forEach((panel) => panel.classList.toggle("hidden", panel.dataset.profileChatPanel !== name));
+    };
+    if (tabs.length) selectTab(tabs[0].dataset.profileChatTab);
+    tabs.forEach((tab) => tab.addEventListener("click", () => selectTab(tab.dataset.profileChatTab)));
+  });
+</script>
 {% if show_moderation %}
 <script>
   document.addEventListener("DOMContentLoaded", () => {
@@ -378,6 +467,26 @@
     modal.addEventListener("click", (event) => { if (event.target === modal) closeModal(); });
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && !modal.classList.contains("hidden")) closeModal();
+    });
+    document.querySelectorAll("[data-delete-note]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        if (!window.confirm("Diese Teamnotiz wirklich löschen?")) return;
+        button.disabled = true;
+        try {
+          const response = await fetch(button.dataset.endpoint, {
+            method: "DELETE",
+            headers: { Accept: "application/json" },
+            credentials: "same-origin",
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) throw new Error(payload.error || "Notiz konnte nicht gelöscht werden.");
+          window.pumbotToast?.(payload.message || "Notiz gelöscht.", "success");
+          button.closest("article")?.remove();
+        } catch (error) {
+          button.disabled = false;
+          window.pumbotToast?.(error.message || "Notiz konnte nicht gelöscht werden.", "error");
+        }
+      });
     });
     form.addEventListener("submit", async (event) => {
       event.preventDefault();

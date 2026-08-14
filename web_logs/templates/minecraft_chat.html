@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% from "_macros.html" import page_header, empty_state %}
+{% from "_mc_macros.html" import mc_error_card %}
+
+{% block content %}
+{{ page_header("Minecraft", "Chat", "Global-, MSG- und vom Chatfilter erkannte Nachrichten.") }}
+{% if mc_error %}
+{{ mc_error_card(mc_error) }}
+{% else %}
+<section class="rounded-lg border border-white/[0.06] bg-[#0d1320] p-5">
+  <div class="mb-5 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex flex-wrap gap-2 text-[10.5px]">
+      <span class="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-slate-400">{{ chat_stats.total }} gesamt</span>
+      <span class="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1 text-cyan-300">{{ chat_stats.global }} Global</span>
+      <span class="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-amber-300">{{ chat_stats.msg }} MSG</span>
+      <span class="rounded-full border border-rose-500/20 bg-rose-500/10 px-2.5 py-1 text-rose-300">{{ chat_stats.detected }} Detected</span>
+    </div>
+
+    <form id="mc-chat-filter" class="flex w-full flex-wrap items-end justify-end gap-3 lg:w-auto">
+      <label class="block w-full sm:w-40">
+        <span class="mb-1 block text-[11px] font-medium text-slate-500">Status</span>
+        <select name="detection_status" data-live-search class="w-full rounded-md border border-white/10 bg-[#151c2c] px-3 py-2 text-sm text-white outline-none focus:border-cyan-500/50">
+          <option value="all">Alle</option>
+          <option value="accepted">Freigegeben</option>
+          <option value="detected">Detected</option>
+        </select>
+      </label>
+      <label class="block w-full sm:w-40">
+        <span class="mb-1 block text-[11px] font-medium text-slate-500">Art</span>
+        <select name="message_type" data-live-search class="w-full rounded-md border border-white/10 bg-[#151c2c] px-3 py-2 text-sm text-white outline-none focus:border-cyan-500/50">
+          <option value="all">Global und MSG</option>
+          <option value="GLOBAL">Nur Global</option>
+          <option value="MSG">Nur MSG</option>
+        </select>
+      </label>
+      <div class="relative w-full sm:w-80" data-chat-search data-player-endpoint="{{ url_for('panel_api_minecraft_players') }}">
+        <label class="block">
+          <span class="mb-1 block text-[11px] font-medium text-slate-500">Suche</span>
+          <span class="relative block">
+            <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" stroke-width="1.7"/><path stroke-linecap="round" stroke-width="1.7" d="m16.5 16.5 4 4"/></svg>
+            <input type="search" name="q" data-live-search data-chat-search-input placeholder="Username eingeben" autocomplete="off" aria-haspopup="listbox" aria-expanded="false"
+              class="w-full rounded-md border border-white/10 bg-white/5 py-2 pl-9 pr-3 text-sm text-white placeholder-slate-500 outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/30">
+          </span>
+        </label>
+        <input type="hidden" name="search_field" value="all" data-live-search data-chat-search-field>
+        <div data-chat-search-menu role="listbox" class="absolute right-0 top-full z-30 mt-1 hidden w-full overflow-hidden rounded-md border border-white/10 bg-[#111827] p-1.5 shadow-2xl">
+          <div data-chat-search-modes>
+            <button type="button" data-chat-search-option="uuid" data-placeholder="UUID eingeben" class="flex w-full items-start gap-3 rounded px-3 py-2.5 text-left hover:bg-white/[0.06]"><span class="font-mono text-xs font-semibold text-cyan-300">ID</span><span><strong class="block text-sm text-slate-200">Nach UUID suchen</strong><small class="text-slate-500">Absender oder MSG-Empfänger</small></span></button>
+            <button type="button" data-chat-search-option="username" data-placeholder="Username eingeben" class="flex w-full items-start gap-3 rounded bg-cyan-500/[0.08] px-3 py-2.5 text-left hover:bg-white/[0.06]"><span class="text-cyan-300">@</span><span><strong class="block text-sm text-slate-200">Nach Username suchen</strong><small class="text-slate-500">Spielernamen in Global und MSG</small></span></button>
+            <button type="button" data-chat-search-option="message" data-placeholder="Nachrichteninhalt eingeben" class="flex w-full items-start gap-3 rounded px-3 py-2.5 text-left hover:bg-white/[0.06]"><span class="text-cyan-300">#</span><span><strong class="block text-sm text-slate-200">Im Inhalt suchen</strong><small class="text-slate-500">Begriffe und Gespräche</small></span></button>
+          </div>
+          <div data-chat-search-results class="hidden max-h-72 overflow-y-auto" aria-live="polite"></div>
+        </div>
+      </div>
+      <input type="hidden" name="sort" value="newest" data-live-search data-chat-sort-input>
+    </form>
+  </div>
+
+  <div data-paginated-table data-endpoint="{{ url_for('panel_api_minecraft_chat') }}" data-form="#mc-chat-filter" data-page-size="25" data-auto-refresh-ms="15000">
+    <script type="application/json">[
+      {"type":"user","nameKey":"player_name","subKey":"player_uuid_short","avatarKey":"player_head_url","urlKey":"player_detail_url","class":"px-3 py-2.5"},
+      {"key":"message","type":"message","deletedAtKey":"deleted_at","alwaysInteractive":true,"modalTitle":"Minecraft Chatnachricht","previewLength":180,"class":"px-3 py-2.5 min-w-[18rem]"},
+      {"key":"created_at","type":"date","class":"px-3 py-2.5 whitespace-nowrap"},
+      {"key":"message_type_label","type":"badge","variants":{"Global":"info","MSG":"warning"},"class":"px-3 py-2.5"},
+      {"key":"status_label","type":"badge","variants":{"Freigegeben":"success","Detected":"warning"},"class":"px-3 py-2.5"},
+      {"key":"block_reason_display","class":"px-3 py-2.5 max-w-xs text-xs text-slate-400"}
+    ]</script>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead><tr class="border-b border-white/[0.06] text-xs uppercase tracking-wider text-slate-500">
+          <th class="px-3 py-2.5"><button type="button" data-chat-sort-asc="player_asc" data-chat-sort-desc="player_desc" data-sort-state="0" class="hover:text-white">Player <span data-sort-indicator></span></button></th>
+          <th class="px-3 py-2.5"><button type="button" data-chat-sort-asc="message_asc" data-chat-sort-desc="message_desc" data-sort-state="0" class="hover:text-white">Nachricht <span data-sort-indicator></span></button></th>
+          <th class="px-3 py-2.5"><button type="button" data-chat-sort-asc="oldest" data-chat-sort-desc="newest" data-sort-state="0" class="hover:text-white">Datum <span data-sort-indicator></span></button></th>
+          <th class="px-3 py-2.5"><button type="button" data-chat-sort-asc="type_asc" data-chat-sort-desc="type_desc" data-sort-state="0" class="hover:text-white">Art <span data-sort-indicator></span></button></th>
+          <th class="px-3 py-2.5">Status</th><th class="px-3 py-2.5">Erkennung</th>
+        </tr></thead>
+        <tbody data-table-body></tbody>
+      </table>
+    </div>
+    <div data-table-empty class="hidden">{{ empty_state("Keine Chatnachrichten", "Die gewählten Filter liefern keine Treffer.") }}</div>
+    <div class="mt-4 flex flex-col gap-3 border-t border-white/[0.06] pt-3 sm:flex-row sm:items-center">
+      <label class="flex items-center gap-2 text-xs text-slate-500">Pro Seite <select data-page-size class="rounded border border-white/10 bg-[#151c2c] px-2 py-1 text-white"><option>10</option><option selected>25</option><option>50</option><option>100</option></select></label>
+      <div data-table-pagination class="flex-1"></div>
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
+<script src="{{ url_for('static', filename='minecraft-chat.js') }}" defer></script>
+{% endblock %}

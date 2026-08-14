@@ -84,35 +84,6 @@
     {% endif %}
   </div>
 
-  {# ── Letzte Chatnachrichten ── #}
-  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5 lg:col-span-2">
-    <div class="mb-4 flex items-end justify-between gap-4">
-      <div>
-        <h2 class="text-sm font-semibold text-white">All-Chat-Nachrichten</h2>
-        <p class="mt-1 text-xs text-slate-500">Nur Global-Chat und private MSG-Nachrichten.</p>
-      </div>
-      <a href="{{ url_for('minecraft_statistics_page') }}#chat-messages" class="shrink-0 text-xs font-medium text-cyan-300 hover:text-cyan-200">Alle anzeigen</a>
-    </div>
-    {% if recent_chat %}
-    <div class="divide-y divide-white/[0.05]">
-      {% for entry in recent_chat %}
-      <div class="grid gap-1 py-2.5 first:pt-0 last:pb-0 sm:grid-cols-[10rem_minmax(0,1fr)_auto] sm:items-center sm:gap-3">
-        <div class="truncate text-xs font-medium text-slate-300">{{ entry.player_name }}</div>
-        <div class="min-w-0 truncate text-sm {{ 'italic text-slate-500' if entry.deleted_at else 'text-slate-200' }}">
-          {{ "Diese Nachricht gibt's nimmer." if entry.deleted_at else entry.message }}
-        </div>
-        <div class="flex items-center gap-2 text-[10.5px] text-slate-500 sm:justify-end">
-          {{ mc_pill(entry.message_type_label, "info" if entry.message_type == "GLOBAL" else "warning") }}
-          <span>{{ entry.created_at_display }}</span>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    {{ empty_state("Keine Chatnachrichten", "Nach Installation von PumpeChatControl erscheinen Global- und MSG-Nachrichten hier.") }}
-    {% endif %}
-  </div>
-
   {% if can_mc_moderation %}
   {# ── Letzte Moderationsaktionen ── #}
   <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">

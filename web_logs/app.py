@@ -3033,6 +3033,7 @@ def _mc_ctx() -> dict:
             has_permission(permission)
             for permission in MINECRAFT_MODERATION_PERMISSIONS
         ),
+        "mc_can_admin": has_permission("admin"),
     }
 
 
@@ -3166,6 +3167,9 @@ def _mc_chat_row(row: dict) -> dict:
         if message_type == "MSG" and item.get("recipient_name")
         else "Öffentlicher Chat" if message_type == "GLOBAL" else "Private Nachricht"
     )
+    item["detected"] = bool(item.get("blocked"))
+    item["status_label"] = "Detected" if item["detected"] else "Freigegeben"
+    item["block_reason_display"] = item.get("block_reason") or "—"
     return item
 
 
@@ -3181,7 +3185,6 @@ def minecraft_page():
         top_deaths = mc_db.get_top_deaths(5)
         recent_moderation = mc_db.get_recent_moderation(6)
         recent_reports = mc_db.get_recent_reports(5)
-        recent_chat = mc_db.get_recent_chat_messages(6)
     except mc_db.MinecraftDatabaseUnavailable as exc:
         return _mc_unavailable_page(
             "minecraft_overview.html", str(exc), "minecraft"
@@ -3220,7 +3223,6 @@ def minecraft_page():
             _mc_moderation_row(entry) for entry in recent_moderation
         ],
         recent_reports=[_mc_report_row(entry) for entry in recent_reports],
-        recent_chat=[_mc_chat_row(entry) for entry in recent_chat],
         active_page="minecraft",
         **_mc_ctx(),
         **_ctx(),
@@ -3238,7 +3240,6 @@ def minecraft_statistics_page():
         player_growth = mc_db.get_player_growth_summary(30)
         top_playtime = mc_db.get_top_playtime(8)
         top_deaths = mc_db.get_top_deaths(8)
-        chat_stats = mc_db.get_chat_stats()
     except mc_db.MinecraftDatabaseUnavailable as exc:
         return _mc_unavailable_page(
             "minecraft_statistics.html", str(exc), "minecraft_statistics"
@@ -3319,8 +3320,28 @@ def minecraft_statistics_page():
         },
         top_playtime=playtime_rows,
         top_deaths=death_rows,
-        chat_stats=chat_stats,
         active_page="minecraft_statistics",
+        **_mc_ctx(),
+        **_ctx(),
+    )
+
+
+# -- Minecraft: Chat --
+
+
+@app.get("/minecraft/chat")
+@permission_any_required(*MINECRAFT_PERMISSIONS)
+def minecraft_chat_page():
+    try:
+        chat_stats = mc_db.get_chat_stats()
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return _mc_unavailable_page(
+            "minecraft_chat.html", str(exc), "minecraft_chat", chat_stats={}
+        )
+    return render_template(
+        "minecraft_chat.html",
+        chat_stats=chat_stats,
+        active_page="minecraft_chat",
         **_mc_ctx(),
         **_ctx(),
     )
@@ -3446,6 +3467,26 @@ def minecraft_player_page(player_uuid: str):
     except mc_db.MinecraftDatabaseUnavailable:
         skills = []
 
+    player_chat = []
+    chat_detections = []
+    try:
+        if mc_db.chat_messages_supported():
+            player_chat = [
+                _mc_chat_row(row)
+                for row in mc_db.get_player_chat_messages(
+                    player_uuid, blocked=False, limit=50
+                )
+            ]
+            chat_detections = [
+                _mc_chat_row(row)
+                for row in mc_db.get_player_chat_messages(
+                    player_uuid, blocked=True, limit=50
+                )
+            ]
+    except mc_db.MinecraftDatabaseUnavailable:
+        player_chat = []
+        chat_detections = []
+
     return render_template(
         "minecraft_player.html",
         player=player,
@@ -3478,6 +3519,8 @@ def minecraft_player_page(player_uuid: str):
             }
             for row in player.get("anticheat_events", [])
         ],
+        player_chat=player_chat,
+        chat_detections=chat_detections,
         notes_supported=mc_db.moderation_notes_supported(),
         mute=(
             _mc_moderation_row(player["mute"], time_field="muted_at")
@@ -3681,6 +3724,20 @@ def panel_api_minecraft_statistics_chart():
         return jsonify({"ok": False, "error": str(exc)}), 503
 
 
+@app.get("/panel-api/minecraft/statistics/dimensions/chart")
+@permission_any_required(*MINECRAFT_PERMISSIONS)
+def panel_api_minecraft_dimension_statistics_chart():
+    dimension = request.args.get("dimension", "OVERWORLD").strip().upper()
+    try:
+        return jsonify(
+            mc_db.get_dimension_statistics_chart(
+                dimension, _minecraft_chart_days()
+            )
+        )
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+
+
 @app.get("/panel-api/minecraft/statistics/server/chart")
 @permission_any_required(*MINECRAFT_PERMISSIONS)
 def panel_api_minecraft_server_performance_chart():
@@ -3856,17 +3913,22 @@ def panel_api_minecraft_chat():
     message_type = request.args.get("message_type", "all").strip()
     search_field = request.args.get("search_field", "all").strip()
     sort = request.args.get("sort", "newest").strip()
+    detection_status = request.args.get("detection_status", "all").strip()
     try:
         rows = mc_db.list_chat_messages(
             q=q,
             message_type=message_type,
             search_field=search_field,
+            detection_status=detection_status,
             sort=sort,
             limit=page_size,
             offset=offset,
         )
         total = mc_db.count_chat_messages(
-            q=q, message_type=message_type, search_field=search_field
+            q=q,
+            message_type=message_type,
+            search_field=search_field,
+            detection_status=detection_status,
         )
     except mc_db.MinecraftDatabaseUnavailable as exc:
         return _mc_unavailable_api(exc, page, page_size)
@@ -3940,6 +4002,20 @@ def panel_api_minecraft_player_note_create(player_uuid: str):
             },
         }
     )
+
+
+@app.delete("/panel-api/minecraft/players/<player_uuid>/notes/<int:note_id>")
+@permission_any_required(*MINECRAFT_MODERATION_PERMISSIONS)
+def panel_api_minecraft_player_note_delete(player_uuid: str, note_id: int):
+    if not has_permission("admin"):
+        return jsonify({"ok": False, "error": "Nur Webadmins dürfen Notizen löschen."}), 403
+    try:
+        deleted = mc_db.delete_player_note(note_id, player_uuid)
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    if not deleted:
+        return jsonify({"ok": False, "error": "Notiz nicht gefunden."}), 404
+    return jsonify({"ok": True, "message": "Notiz gelöscht."})
 
 
 # --------------------------------------------------------

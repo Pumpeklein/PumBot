@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_macros.html" import page_header, stat_tile, empty_state, section_heading, id_chip %}
-{% from "_mc_macros.html" import mc_error_card, mc_pill, skill_icon, skill_meter, skill_level_badge %}
+{% from "_mc_macros.html" import mc_error_card, mc_pill, skill_icon, skill_meter, skill_level_badge, mc_tab_bar, mc_tab_panel %}
 
 {% block content %}
 {% if mc_error %}
@@ -8,7 +8,24 @@
 {{ mc_error_card(mc_error) }}
 {% else %}
 
-<div class="mb-6">
+{# ── Welche Bereiche hat dieser Spieler? ── #}
+{% set has_punishments = show_moderation and (mute or punishments or warnings) %}
+{% set has_reports = show_moderation and (reports_against or reports_by) %}
+{% set has_anticheat = show_moderation and anticheat_groups %}
+{% set has_chat = player_chat or chat_detections %}
+
+{% set tabs = [
+  {"id": "overview", "label": "Übersicht", "icon": "◷", "count": 0, "show": true},
+  {"id": "punishments", "label": "Strafen", "icon": "◇", "count": punishments|length + warnings|length, "show": has_punishments},
+  {"id": "reports", "label": "Reports", "icon": "↶", "count": reports_against|length + reports_by|length, "show": has_reports},
+  {"id": "anticheat", "label": "AntiCheat", "icon": "⬡", "count": anticheat_events|length, "show": has_anticheat},
+  {"id": "chat", "label": "Chat", "icon": "□", "count": player_chat|length + chat_detections|length, "show": has_chat},
+  {"id": "skills", "label": "Skills", "icon": "✣", "count": skills|length, "show": skills|length > 0},
+  {"id": "notes", "label": "Notizen", "icon": "≡", "count": player_notes|length, "show": show_moderation},
+]|selectattr("show")|list %}
+
+{# ── Kopfbereich ── #}
+<div class="mb-5">
   <a href="{{ url_for('minecraft_players_page') }}"
     class="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 transition hover:text-white">
     <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -39,174 +56,342 @@
   </div>
 </div>
 
-<div class="grid items-start gap-6 lg:grid-cols-[13rem_minmax(0,1fr)]">
-  <aside class="sticky top-6 hidden rounded-lg border border-white/[0.07] bg-[#0b1019] p-2 lg:block">
-    <nav class="space-y-1 text-sm" aria-label="Spielerprofil Bereiche">
-      {% if player.playtime or player.deaths %}<a href="#profile-playtime" class="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-slate-300 transition hover:bg-white/[0.05] hover:text-white"><span class="text-cyan-300">◷</span>Spielzeit</a>{% endif %}
-      {% if player_clan %}<a href="#profile-clan" class="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-slate-300 transition hover:bg-white/[0.05] hover:text-white"><span class="text-emerald-300">♜</span>Clan</a>{% endif %}
-      {% if show_moderation and (mute or punishments or warnings) %}<a href="#profile-punishments" class="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-slate-300 transition hover:bg-white/[0.05] hover:text-white"><span class="text-rose-300">◇</span>Strafen</a>{% endif %}
-      {% if show_moderation and (reports_against or reports_by) %}<a href="#profile-history" class="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-slate-300 transition hover:bg-white/[0.05] hover:text-white"><span class="text-slate-400">↶</span>Verläufe</a>{% endif %}
-      {% if show_moderation and anticheat_events %}<a href="#profile-anticheat" class="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-slate-300 transition hover:bg-white/[0.05] hover:text-white"><span class="text-amber-300">⬡</span>AntiCheat</a>{% endif %}
-      {% if player_chat or chat_detections %}<a href="#profile-chat" class="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-slate-300 transition hover:bg-white/[0.05] hover:text-white"><span class="text-cyan-300">□</span>Chat</a>{% endif %}
-      {% if skills %}<a href="#profile-skills" class="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-slate-300 transition hover:bg-white/[0.05] hover:text-white"><span class="text-emerald-300">✣</span>Skills</a>{% endif %}
-      {% if show_moderation %}<a href="#profile-notes" class="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-slate-300 transition hover:bg-white/[0.05] hover:text-white"><span class="text-violet-300">≡</span>Notizen</a>{% endif %}
-    </nav>
-  </aside>
-  <div class="flex min-w-0 flex-col gap-6">
+{# ── Tabs ── #}
+<div data-tabs data-tabs-hash class="min-w-0">
+  {{ mc_tab_bar(tabs, "Spielerprofil") }}
 
-{% if player.playtime or player.deaths %}
-<section id="profile-playtime" class="scroll-mt-24">
-<div class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-  {{ stat_tile("Gesamt", playtime_total, accent="cyan",
-    sub=(player.playtime.updated_at|datetime_de if player.playtime else "Keine Daten"),
-    value_attr='data-playtime-value="player.total"') }}
-  {{ stat_tile("Aktiv", playtime_active, accent="emerald", sub="Bewegung und Interaktion",
-    value_attr='data-playtime-value="player.active"') }}
-  {{ stat_tile("AFK", playtime_afk, accent="amber", sub="Erkannte Inaktivität",
-    value_attr='data-playtime-value="player.afk"') }}
-  {{ stat_tile("Tode", (player.deaths.death_count if player.deaths else 0), accent="amber",
-    sub=(player.deaths.updated_at|datetime_de if player.deaths else "Keine Daten")) }}
-  {% if show_moderation %}
-  {{ stat_tile("Strafen", punishments|length + warnings|length,
-    accent=("red" if (punishments or warnings) else "slate"),
-    sub="{} Bans · {} Verwarnungen".format(punishments|length, warnings|length)) }}
-  {% else %}
-  {{ stat_tile("Reports", reports_against|length, accent="slate", sub="Gegen diesen Spieler") }}
-  {% endif %}
-</div>
-
-{# ── Skills ── #}
-<section data-minecraft-chart data-default-metric="playtime" data-default-days="30" data-default-type="line" data-auto-refresh-ms="60000"
-  data-endpoint="{{ url_for('panel_api_minecraft_player_playtime_chart', player_uuid=player.player_uuid) }}"
-  class="mb-6 overflow-hidden rounded-lg border border-white/[0.06] bg-[#0d1320] p-5">
-  <div class="flex flex-wrap items-start justify-between gap-4">
-    <div>
-      <h2 data-chart-title class="text-sm font-semibold text-white">Playtime-Verlauf</h2>
-      <p data-chart-subtitle class="mt-1 text-xs text-slate-500">Gesamt, Aktiv und AFK pro Tag</p>
-    </div>
-    <div class="flex items-center gap-2">
-      <div data-chart-legend class="flex flex-wrap items-center gap-x-4 gap-y-2"></div>
-      <label class="sr-only" for="player-playtime-days">Zeitraum</label>
-      <select id="player-playtime-days" data-chart-days class="h-8 rounded-md border border-white/10 bg-[#151c2c] px-2.5 text-[11px] text-white outline-none focus:border-cyan-500">
-        <option value="7">7 Tage</option>
-        <option value="30" selected>30 Tage</option>
-        <option value="90">90 Tage</option>
-        <option value="365">1 Jahr</option>
-        <option value="0">Gesamt</option>
-      </select>
-    </div>
+  {# ═══ Übersicht ═══ #}
+  {% call mc_tab_panel("overview") %}
+  <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+    {{ stat_tile("Gesamt", playtime_total, accent="cyan",
+      sub=(player.playtime.updated_at|datetime_de if player.playtime else "Keine Daten"),
+      value_attr='data-playtime-value="player.total"') }}
+    {{ stat_tile("Aktiv", playtime_active, accent="emerald", sub="Bewegung und Interaktion",
+      value_attr='data-playtime-value="player.active"') }}
+    {{ stat_tile("AFK", playtime_afk, accent="amber", sub="Erkannte Inaktivität",
+      value_attr='data-playtime-value="player.afk"') }}
+    {{ stat_tile("Tode", (player.deaths.death_count if player.deaths else 0), accent="amber",
+      sub=(player.deaths.updated_at|datetime_de if player.deaths else "Keine Daten")) }}
+    {% if show_moderation %}
+    {{ stat_tile("Strafen", punishments|length + warnings|length,
+      accent=("red" if (punishments or warnings) else "slate"),
+      sub="{} Bans · {} Verwarnungen".format(punishments|length, warnings|length)) }}
+    {% else %}
+    {{ stat_tile("Reports", reports_against|length, accent="slate", sub="Gegen diesen Spieler") }}
+    {% endif %}
   </div>
-  <div data-chart-stage class="relative mt-3 h-[300px] min-w-0">
-    <canvas data-chart-canvas class="h-full w-full transition-opacity" role="img" aria-label="Playtime-Verlauf des Spielers"></canvas>
-    <div data-chart-status class="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-slate-500">Diagramm wird geladen</div>
-    <div data-chart-tooltip class="pointer-events-none absolute z-10 hidden min-w-36 rounded-md border border-white/10 bg-[#080d18]/95 px-3 py-2 text-[11px] shadow-xl backdrop-blur"></div>
-  </div>
-</section>
-</section>
-{% endif %}
 
-{% if player_clan %}
-<section id="profile-clan" class="order-1 scroll-mt-24 rounded-lg border border-white/[0.06] bg-[#0d1320] p-5">
-  {{ section_heading("Clan", "Mitgliedschaft und Clan-Daten") }}
-  <div class="mt-4 flex flex-wrap items-start justify-between gap-5 border-y border-white/[0.06] py-4">
-    <div>
-      <div class="text-xl font-bold text-white">{{ player_clan.clan_name }}</div>
-      <div class="mt-1 font-mono text-sm font-semibold" style="color: {{ player_clan.tag_color_hex }}">[{{ player_clan.clan_tag }}]</div>
-    </div>
-    <dl class="grid min-w-0 flex-1 gap-x-8 gap-y-4 sm:grid-cols-2 xl:grid-cols-4">
-      <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Rolle</dt><dd class="mt-1 text-sm font-medium text-white">{{ "Besitzer" if player_clan.member_role == "OWNER" else "Mitglied" }}</dd></div>
-      <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Mitglieder</dt><dd class="mt-1 text-sm font-medium text-white">{{ player_clan.member_count }}</dd></div>
-      <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Besitzer</dt><dd class="mt-1 truncate text-sm font-medium text-white">{{ player_clan.owner_name }}</dd></div>
-      <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Beigetreten</dt><dd class="mt-1 text-sm font-medium text-white">{{ player_clan.joined_at_display }}</dd></div>
-    </dl>
-  </div>
-</section>
-{% endif %}
-
-{% if skills %}
-<section id="profile-skills" class="order-6 scroll-mt-24 rounded-lg border border-white/[0.06] bg-[#0d1320] p-5">
-  {{ section_heading("Skills", "{} Punkte über alle Skills".format(skills_total|number_de)) }}
-  <div class="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-    {% for entry in skills %}
-    <a href="{{ url_for('minecraft_skill_page', skill_id=entry.id) }}"
-      class="group flex items-start gap-3 rounded-lg px-2 py-3 transition hover:bg-white/[0.03]">
-      {{ skill_icon(entry, size="h-9 w-9", text="text-base") }}
-      <div class="min-w-0 flex-1">
-        <div class="flex items-baseline justify-between gap-2">
-          <span class="truncate text-[13px] font-medium text-slate-200">{{ entry.name }}</span>
-          <span class="shrink-0 text-[11px] tabular-nums text-slate-500">
-            {{ entry.score|number_de }} gesamt
-            {% if entry.rank %}<span class="text-slate-600"> · #{{ entry.rank }}</span>{% endif %}
-          </span>
-        </div>
-        <div class="mt-1 flex items-center justify-between gap-3 text-[10px] tabular-nums text-slate-500">
-          {% if entry.next_level %}
-          <span>Level {{ entry.level }} → {{ entry.next_level }}</span>
-          <span>{{ entry.level_score|number_de }} / {{ entry.level_target|number_de }}</span>
-          {% else %}
-          <span class="text-amber-300">Maximales Level erreicht</span>
-          {% endif %}
-        </div>
-        <div class="mt-1.5">{{ skill_meter(entry.progress, entry.color, "h-2") }}</div>
-        <div class="mt-1 flex flex-wrap justify-between gap-x-3 text-[10px] text-slate-600">
-          {% if entry.next_level %}<span>noch {{ entry.to_next|number_de }} Punkte</span>{% endif %}
-          {% if entry.next_reward %}<span class="text-amber-300/75">Reward bei Lv {{ entry.next_reward.level }}</span>{% endif %}
-        </div>
+  {% if player_clan %}
+  <section class="rounded-lg border border-white/[0.06] bg-[#0d1320] p-5">
+    {{ section_heading("Clan", "Mitgliedschaft und Clan-Daten") }}
+    <div class="flex flex-wrap items-start justify-between gap-5 border-t border-white/[0.06] pt-4">
+      <div>
+        <div class="text-xl font-bold text-white">{{ player_clan.clan_name }}</div>
+        <div class="mt-1 font-mono text-sm font-semibold" style="color: {{ player_clan.tag_color_hex }}">[{{ player_clan.clan_tag }}]</div>
       </div>
-      {{ skill_level_badge(entry.level, entry.color) }}
-    </a>
-    {% endfor %}
-  </div>
-</section>
-{% endif %}
+      <dl class="grid min-w-0 flex-1 gap-x-8 gap-y-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Rolle</dt><dd class="mt-1 text-sm font-medium text-white">{{ "Besitzer" if player_clan.member_role == "OWNER" else "Mitglied" }}</dd></div>
+        <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Mitglieder</dt><dd class="mt-1 text-sm font-medium text-white">{{ player_clan.member_count }}</dd></div>
+        <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Besitzer</dt><dd class="mt-1 truncate text-sm font-medium text-white">{{ player_clan.owner_name }}</dd></div>
+        <div><dt class="text-[10px] uppercase tracking-wider text-slate-500">Beigetreten</dt><dd class="mt-1 text-sm font-medium text-white">{{ player_clan.joined_at_display }}</dd></div>
+      </dl>
+    </div>
+  </section>
+  {% endif %}
 
-{% if player_chat or chat_detections %}
-<section id="profile-chat" class="order-4 scroll-mt-24 rounded-lg border border-white/[0.06] bg-[#0d1320] p-5">
-  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-    {{ section_heading("Chat", "Global-, MSG- und Chatfilter-Verlauf") }}
+  <section data-minecraft-chart data-default-metric="playtime" data-default-days="30" data-default-type="line" data-auto-refresh-ms="60000"
+    data-endpoint="{{ url_for('panel_api_minecraft_player_playtime_chart', player_uuid=player.player_uuid) }}"
+    class="overflow-hidden rounded-lg border border-white/[0.06] bg-[#0d1320] p-5">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <h2 data-chart-title class="text-sm font-semibold text-white">Playtime-Verlauf</h2>
+        <p data-chart-subtitle class="mt-1 text-xs text-slate-500">Gesamt, Aktiv und AFK pro Tag</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <div data-chart-legend class="flex flex-wrap items-center gap-x-4 gap-y-2"></div>
+        <label class="sr-only" for="player-playtime-days">Zeitraum</label>
+        <select id="player-playtime-days" data-chart-days class="h-8 rounded-md border border-white/10 bg-[#151c2c] px-2.5 text-[11px] text-white outline-none focus:border-cyan-500">
+          <option value="7">7 Tage</option>
+          <option value="30" selected>30 Tage</option>
+          <option value="90">90 Tage</option>
+          <option value="365">1 Jahr</option>
+          <option value="0">Gesamt</option>
+        </select>
+      </div>
+    </div>
+    <div data-chart-stage class="relative mt-3 h-[300px] min-w-0">
+      <canvas data-chart-canvas class="h-full w-full transition-opacity" role="img" aria-label="Playtime-Verlauf des Spielers"></canvas>
+      <div data-chart-status class="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-slate-500">Diagramm wird geladen</div>
+      <div data-chart-tooltip class="pointer-events-none absolute z-10 hidden min-w-36 rounded-md border border-white/10 bg-[#080d18]/95 px-3 py-2 text-[11px] shadow-xl backdrop-blur"></div>
+    </div>
+  </section>
+
+  {% if not show_moderation %}
+  <div class="rounded-lg border border-white/[0.06] bg-white/[0.02] p-5 text-sm text-slate-400">
+    Für Strafen, Reports und AntiCheat fehlt dir die Berechtigung
+    <span class="font-mono text-slate-300">minecraft.moderation.view</span>.
+  </div>
+  {% endif %}
+  {% endcall %}
+
+  {# ═══ Strafen ═══ #}
+  {% if has_punishments %}
+  {% call mc_tab_panel("punishments") %}
+  {% if mute %}
+  <section class="rounded-xl border border-amber-500/25 bg-amber-500/[0.07] p-5">
+    {{ section_heading("Aktiver Mute", "Der Spieler kann aktuell nicht schreiben") }}
+    <div class="grid gap-3 text-sm sm:grid-cols-3">
+      <div>
+        <div class="text-[11px] uppercase tracking-wider text-amber-200/50">Grund</div>
+        <div class="mt-0.5 text-amber-100">{{ mute.reason }}</div>
+      </div>
+      <div>
+        <div class="text-[11px] uppercase tracking-wider text-amber-200/50">Von</div>
+        <div class="mt-0.5 text-amber-100">{{ mute.staff_name }}</div>
+      </div>
+      <div>
+        <div class="text-[11px] uppercase tracking-wider text-amber-200/50">Läuft ab</div>
+        <div class="mt-0.5 text-amber-100">{{ mute.expires_at_display }}</div>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <div class="grid gap-4 lg:grid-cols-2">
+    <section class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+      {{ section_heading("Bans", "{} Einträge".format(punishments|length)) }}
+      {% if punishments %}
+      <div class="space-y-2">
+        {% for entry in punishments %}
+        <article class="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+          <div class="flex flex-wrap items-center gap-2">
+            {{ mc_pill(entry.punishment_type, "danger" if entry.status == "Aktiv" else "default") }}
+            {{ mc_pill(entry.status, "danger" if entry.status == "Aktiv" else "success" if entry.status == "Aufgehoben" else "default") }}
+            <span class="font-mono text-[10.5px] text-slate-500">{{ entry.punishment_id }}</span>
+            <span class="ml-auto text-[10.5px] text-slate-500">{{ entry.created_at_display }}</span>
+          </div>
+          <p class="mt-2 break-words text-sm text-slate-200">{{ entry.reason }}</p>
+          <div class="mt-2 flex flex-wrap gap-x-4 text-[10.5px] text-slate-500">
+            <span>Von {{ entry.staff_name }}</span>
+            <span>Läuft ab: {{ entry.expires_at_display }}</span>
+            {% if entry.revoked_by %}<span>Aufgehoben von {{ entry.revoked_by }}</span>{% endif %}
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      {{ empty_state("Keine Bans", "Dieser Spieler wurde nie gebannt.") }}
+      {% endif %}
+    </section>
+
+    <section class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+      {{ section_heading("Verwarnungen", "{} Einträge".format(warnings|length)) }}
+      {% if warnings %}
+      <div class="space-y-2">
+        {% for entry in warnings %}
+        <article class="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+          <div class="flex flex-wrap items-center gap-2">
+            {{ mc_pill("WARN", "info") }}
+            <span class="ml-auto text-[10.5px] text-slate-500">{{ entry.created_at_display }}</span>
+          </div>
+          <p class="mt-2 break-words text-sm text-slate-200">{{ entry.reason }}</p>
+          <div class="mt-2 text-[10.5px] text-slate-500">Von {{ entry.staff_name }}</div>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      {{ empty_state("Keine Verwarnungen", "Dieser Spieler wurde nie verwarnt.") }}
+      {% endif %}
+    </section>
+  </div>
+  {% endcall %}
+  {% endif %}
+
+  {# ═══ Reports ═══ #}
+  {% if has_reports %}
+  {% call mc_tab_panel("reports") %}
+  <div class="grid gap-4 lg:grid-cols-2">
+    <section class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+      {{ section_heading("Gemeldet worden", "{} Reports gegen diesen Spieler".format(reports_against|length)) }}
+      {% if reports_against %}
+      <div class="space-y-2">
+        {% for entry in reports_against %}
+        <article class="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+          <div class="flex flex-wrap items-center gap-2">
+            {{ mc_pill("Offen" if entry.is_open else "Geschlossen", "danger" if entry.is_open else "success") }}
+            <span class="text-[10.5px] text-slate-500">von {{ entry.reporter_name }}</span>
+            <span class="ml-auto text-[10.5px] text-slate-500">{{ entry.created_at_display }}</span>
+          </div>
+          <p class="mt-2 break-words text-sm text-slate-200">{{ entry.reason }}</p>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      {{ empty_state("Keine Reports", "Dieser Spieler wurde nie gemeldet.") }}
+      {% endif %}
+    </section>
+
+    <section class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+      {{ section_heading("Eigene Meldungen", "{} Reports von diesem Spieler".format(reports_by|length)) }}
+      {% if reports_by %}
+      <div class="space-y-2">
+        {% for entry in reports_by %}
+        <article class="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+          <div class="flex flex-wrap items-center gap-2">
+            {{ mc_pill("Offen" if entry.is_open else "Geschlossen", "danger" if entry.is_open else "success") }}
+            <span class="text-[10.5px] text-slate-500">gegen {{ entry.target_name }}</span>
+            <span class="ml-auto text-[10.5px] text-slate-500">{{ entry.created_at_display }}</span>
+          </div>
+          <p class="mt-2 break-words text-sm text-slate-200">{{ entry.reason }}</p>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      {{ empty_state("Keine Meldungen", "Dieser Spieler hat noch niemanden gemeldet.") }}
+      {% endif %}
+    </section>
+  </div>
+  {% endcall %}
+  {% endif %}
+
+  {# ═══ AntiCheat ═══ #}
+  {% if has_anticheat %}
+  {% call mc_tab_panel("anticheat") %}
+  <section class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    {{ section_heading("AntiCheat-Historie",
+      "{} Ereignisse in {} Gruppen · zuletzt {}".format(
+        anticheat_events|length, anticheat_groups|length, anticheat_groups[0].created_at_display)) }}
+    <div class="space-y-2">
+      {% for group in anticheat_groups %}
+      {% if group.count == 1 %}
+      <article class="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
+        <div class="flex flex-wrap items-center gap-2">
+          {{ mc_pill(group.check_type, "danger") }}
+          <span class="text-[10.5px] font-medium text-red-300">VL {{ group.latest.violation_level_display }}</span>
+          <span class="text-[10.5px] text-slate-500">{{ group.platform }}</span>
+          <span class="ml-auto text-[10.5px] text-slate-500">{{ group.created_at_display }}</span>
+        </div>
+        <p class="mt-2 break-words text-sm text-slate-200">{{ group.latest.detail }}</p>
+      </article>
+      {% else %}
+      <details class="group rounded-lg border border-white/[0.06] bg-white/[0.02] p-3 open:border-red-500/20 open:bg-red-500/[0.04]">
+        <summary class="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+          <span class="flex flex-wrap items-center gap-2">
+            {{ mc_pill(group.check_type, "danger") }}
+            <span class="inline-flex items-center rounded-full border border-red-500/25 bg-red-500/15 px-2 py-0.5 text-[10.5px] font-semibold text-red-200">×{{ group.count }}</span>
+            <span class="text-[10.5px] font-medium text-red-300">VL max {{ group.max_violation_level_display }}</span>
+            <span class="text-[10.5px] text-slate-500">{{ group.platform }}</span>
+            <span class="ml-auto text-[10.5px] text-slate-500">{{ group.created_at_display }}</span>
+          </span>
+          <span class="mt-2 block break-words text-sm text-slate-200">{{ group.latest.detail }}</span>
+          <span class="mt-2 inline-flex items-center gap-1.5 text-[10.5px] text-cyan-300/80 transition group-hover:text-cyan-300">
+            <span class="transition group-open:rotate-90" aria-hidden="true">▸</span>
+            <span class="group-open:hidden">{{ group.count - 1 }} weitere Treffer in {{ group.span_display }} anzeigen</span>
+            <span class="hidden group-open:inline">Einklappen</span>
+          </span>
+        </summary>
+        <div class="mt-3 space-y-1.5 border-t border-white/[0.06] pt-3">
+          {% for event in group.events %}
+          <div class="grid gap-x-3 sm:grid-cols-[4.5rem_minmax(0,1fr)_auto]">
+            <span class="text-[10.5px] font-medium text-red-300">VL {{ event.violation_level_display }}</span>
+            <p class="break-words text-[13px] text-slate-400">{{ event.detail }}</p>
+            <span class="text-[10.5px] text-slate-500">{{ event.created_at_display }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </details>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </section>
+  {% endcall %}
+  {% endif %}
+
+  {# ═══ Chat ═══ #}
+  {% if has_chat %}
+  {% call mc_tab_panel("chat") %}
+  <section data-tabs class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    {% set chat_switch %}
     <div class="inline-flex rounded-md border border-white/10 bg-[#0a0f1a] p-0.5">
-      {% if player_chat %}<button type="button" data-profile-chat-tab="messages" class="rounded px-3 py-1.5 text-xs text-slate-400 data-[active=true]:bg-cyan-500/15 data-[active=true]:text-cyan-300">Nachrichten ({{ player_chat|length }})</button>{% endif %}
-      {% if chat_detections %}<button type="button" data-profile-chat-tab="detections" class="rounded px-3 py-1.5 text-xs text-slate-400 data-[active=true]:bg-amber-500/15 data-[active=true]:text-amber-300">Detected ({{ chat_detections|length }})</button>{% endif %}
+      {% if player_chat %}<button type="button" data-tab="messages" class="rounded px-3 py-1.5 text-xs text-slate-400 transition data-[active=true]:bg-cyan-500/15 data-[active=true]:text-cyan-300">Nachrichten ({{ player_chat|length }})</button>{% endif %}
+      {% if chat_detections %}<button type="button" data-tab="detections" class="rounded px-3 py-1.5 text-xs text-slate-400 transition data-[active=true]:bg-amber-500/15 data-[active=true]:text-amber-300">Detected ({{ chat_detections|length }})</button>{% endif %}
     </div>
-  </div>
-  {% if player_chat %}
-  <div data-profile-chat-panel="messages" class="max-h-[32rem] divide-y divide-white/[0.05] overflow-y-auto">
-    {% for entry in player_chat %}
-    <article class="grid gap-1 py-3 sm:grid-cols-[10rem_minmax(0,1fr)_auto] sm:gap-3">
-      <div><strong class="block truncate text-xs text-slate-200">{{ entry.player_name }}</strong><span class="text-[10px] text-slate-500">{{ entry.type_detail }}</span></div>
-      <p class="break-words text-sm text-slate-200">{{ "Diese Nachricht gibt's nimmer." if entry.deleted_at else entry.message }}</p>
-      <div class="flex items-center gap-2 text-[10px] text-slate-500">{{ mc_pill(entry.message_type_label, "info" if entry.message_type == "GLOBAL" else "warning") }}<span>{{ entry.created_at_display }}</span></div>
-    </article>
-    {% endfor %}
-  </div>
-  {% endif %}
-  {% if chat_detections %}
-  <div data-profile-chat-panel="detections" class="hidden max-h-[32rem] divide-y divide-white/[0.05] overflow-y-auto">
-    {% for entry in chat_detections %}
-    <article class="grid gap-1 py-3 sm:grid-cols-[10rem_minmax(0,1fr)_auto] sm:gap-3">
-      <div><strong class="block truncate text-xs text-slate-200">{{ entry.player_name }}</strong><span class="text-[10px] text-slate-500">{{ entry.type_detail }}</span></div>
-      <div><p class="break-words text-sm text-slate-200">{{ entry.message }}</p><p class="mt-1 text-[10.5px] text-amber-300">{{ entry.block_reason_display }}</p></div>
-      <div class="flex items-center gap-2 text-[10px] text-slate-500">{{ mc_pill("Detected", "warning") }}<span>{{ entry.created_at_display }}</span></div>
-    </article>
-    {% endfor %}
-  </div>
-  {% endif %}
-</section>
-{% endif %}
-
-{% if show_moderation %}
-
-<section id="profile-notes" class="order-5 scroll-mt-24 border-y border-white/[0.06] py-5">
-  <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
-    <div>
-      <h2 class="text-sm font-semibold text-white">Notizen & Auffälligkeiten</h2>
-      <p class="mt-0.5 text-xs text-slate-500">Interne Moderationshistorie für {{ player.player_name }}</p>
+    {% endset %}
+    {{ section_heading("Chat", "Global-, MSG- und Chatfilter-Verlauf", chat_switch) }}
+    {% if player_chat %}
+    <div data-tab-panel="messages" class="hidden max-h-[36rem] divide-y divide-white/[0.05] overflow-y-auto">
+      {% for entry in player_chat %}
+      <article class="grid gap-1 py-3 sm:grid-cols-[10rem_minmax(0,1fr)_auto] sm:gap-3">
+        <div><strong class="block truncate text-xs text-slate-200">{{ entry.player_name }}</strong><span class="text-[10px] text-slate-500">{{ entry.type_detail }}</span></div>
+        <p class="break-words text-sm text-slate-200">{{ "Diese Nachricht gibt's nimmer." if entry.deleted_at else entry.message }}</p>
+        <div class="flex items-center gap-2 text-[10px] text-slate-500">{{ mc_pill(entry.message_type_label, "info" if entry.message_type == "GLOBAL" else "warning") }}<span>{{ entry.created_at_display }}</span></div>
+      </article>
+      {% endfor %}
     </div>
-    <div class="flex flex-wrap items-center justify-end gap-3">
-      <div class="flex items-center gap-2 text-[10.5px] text-slate-500">
-        <span>{{ player_notes|length }} Notizen</span>
-        <span class="text-slate-700">•</span>
-        <span>{{ anticheat_events|length }} AntiCheat-Ereignisse{% if anticheat_groups and anticheat_groups|length != anticheat_events|length %} in {{ anticheat_groups|length }} Gruppen{% endif %}</span>
+    {% endif %}
+    {% if chat_detections %}
+    <div data-tab-panel="detections" class="hidden max-h-[36rem] divide-y divide-white/[0.05] overflow-y-auto">
+      {% for entry in chat_detections %}
+      <article class="grid gap-1 py-3 sm:grid-cols-[10rem_minmax(0,1fr)_auto] sm:gap-3">
+        <div><strong class="block truncate text-xs text-slate-200">{{ entry.player_name }}</strong><span class="text-[10px] text-slate-500">{{ entry.type_detail }}</span></div>
+        <div><p class="break-words text-sm text-slate-200">{{ entry.message }}</p><p class="mt-1 text-[10.5px] text-amber-300">{{ entry.block_reason_display }}</p></div>
+        <div class="flex items-center gap-2 text-[10px] text-slate-500">{{ mc_pill("Detected", "warning") }}<span>{{ entry.created_at_display }}</span></div>
+      </article>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+  {% endcall %}
+  {% endif %}
+
+  {# ═══ Skills ═══ #}
+  {% if skills %}
+  {% call mc_tab_panel("skills") %}
+  <section class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    {{ section_heading("Skills", "{} Punkte über alle Skills".format(skills_total|number_de)) }}
+    <div class="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+      {% for entry in skills %}
+      <a href="{{ url_for('minecraft_skill_page', skill_id=entry.id) }}"
+        class="group flex items-start gap-3 rounded-lg px-2 py-3 transition hover:bg-white/[0.03]">
+        {{ skill_icon(entry, size="h-9 w-9", text="text-base") }}
+        <div class="min-w-0 flex-1">
+          <div class="flex items-baseline justify-between gap-2">
+            <span class="truncate text-[13px] font-medium text-slate-200">{{ entry.name }}</span>
+            <span class="shrink-0 text-[11px] tabular-nums text-slate-500">
+              {{ entry.score|number_de }} gesamt
+              {% if entry.rank %}<span class="text-slate-600"> · #{{ entry.rank }}</span>{% endif %}
+            </span>
+          </div>
+          <div class="mt-1 flex items-center justify-between gap-3 text-[10px] tabular-nums text-slate-500">
+            {% if entry.next_level %}
+            <span>Level {{ entry.level }} → {{ entry.next_level }}</span>
+            <span>{{ entry.level_score|number_de }} / {{ entry.level_target|number_de }}</span>
+            {% else %}
+            <span class="text-amber-300">Maximales Level erreicht</span>
+            {% endif %}
+          </div>
+          <div class="mt-1.5">{{ skill_meter(entry.progress, entry.color, "h-2") }}</div>
+          <div class="mt-1 flex flex-wrap justify-between gap-x-3 text-[10px] text-slate-600">
+            {% if entry.next_level %}<span>noch {{ entry.to_next|number_de }} Punkte</span>{% endif %}
+            {% if entry.next_reward %}<span class="text-amber-300/75">Reward bei Lv {{ entry.next_reward.level }}</span>{% endif %}
+          </div>
+        </div>
+        {{ skill_level_badge(entry.level, entry.color) }}
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endcall %}
+  {% endif %}
+
+  {# ═══ Notizen ═══ #}
+  {% if show_moderation %}
+  {% call mc_tab_panel("notes") %}
+  <section class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+    <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h2 class="text-sm font-semibold text-white">Teamnotizen</h2>
+        <p class="mt-0.5 text-xs text-slate-500">Interne Moderationshistorie für {{ player.player_name }}</p>
       </div>
       <button type="button" data-open-note-modal
         class="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-xs font-medium text-cyan-300 transition hover:bg-cyan-500/20">
@@ -214,84 +399,33 @@
         Neue Notiz
       </button>
     </div>
-  </div>
-
-  <div class="grid gap-6 lg:grid-cols-2">
-    <div>
-      <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Teamnotizen</h3>
-      {% if player_notes %}
-      <div class="space-y-2">
-        {% for note in player_notes %}
-        {% set note_label = {"GENERAL":"Allgemein", "BEHAVIOR":"Verhalten", "ANTICHEAT":"AntiCheat"}.get(note.category, note.category) %}
-        <article class="border-l-2 {{ 'border-red-400/60' if note.category == 'ANTICHEAT' else 'border-amber-400/50' if note.category == 'BEHAVIOR' else 'border-cyan-400/40' }} py-1 pl-3">
-          <div class="flex flex-wrap items-center gap-2 text-[10.5px] text-slate-500">
-            <span class="font-medium text-slate-300">{{ note_label }}</span>
-            <span>von {{ note.author_name }}</span>
-            <span class="ml-auto">{{ note.created_at_display }}</span>
-            {% if mc_can_admin %}
-            <button type="button" data-delete-note data-endpoint="{{ url_for('panel_api_minecraft_player_note_delete', player_uuid=player.player_uuid, note_id=note.id) }}"
-              class="rounded border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-300 transition hover:bg-red-500/20">Löschen</button>
-            {% endif %}
-          </div>
-          <p class="mt-1.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-200">{{ note.note }}</p>
-        </article>
-        {% endfor %}
-      </div>
-      {% else %}
-      <div class="py-6 text-center text-sm text-slate-500">Keine Teamnotizen vorhanden.</div>
-      {% endif %}
+    {% if player_notes %}
+    <div class="space-y-2">
+      {% for note in player_notes %}
+      {% set note_label = {"GENERAL":"Allgemein", "BEHAVIOR":"Verhalten", "ANTICHEAT":"AntiCheat"}.get(note.category, note.category) %}
+      <article class="rounded-lg border-l-2 {{ 'border-red-400/60' if note.category == 'ANTICHEAT' else 'border-amber-400/50' if note.category == 'BEHAVIOR' else 'border-cyan-400/40' }} bg-white/[0.02] px-3 py-2.5">
+        <div class="flex flex-wrap items-center gap-2 text-[10.5px] text-slate-500">
+          <span class="font-medium text-slate-300">{{ note_label }}</span>
+          <span>von {{ note.author_name }}</span>
+          <span class="ml-auto">{{ note.created_at_display }}</span>
+          {% if mc_can_admin %}
+          <button type="button" data-delete-note data-endpoint="{{ url_for('panel_api_minecraft_player_note_delete', player_uuid=player.player_uuid, note_id=note.id) }}"
+            class="rounded border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-300 transition hover:bg-red-500/20">Löschen</button>
+          {% endif %}
+        </div>
+        <p class="mt-1.5 whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-200">{{ note.note }}</p>
+      </article>
+      {% endfor %}
     </div>
-
-    {% if anticheat_groups %}
-    <div id="profile-anticheat" class="scroll-mt-24 lg:border-l lg:border-white/[0.06] lg:pl-6">
-      <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">AntiCheat-Historie</h3>
-      <div class="max-h-[32rem] space-y-2 overflow-y-auto pr-1">
-        {% for group in anticheat_groups %}
-        {% if group.count == 1 %}
-        <article class="border-l-2 border-red-400/50 py-1 pl-3">
-          <div class="flex flex-wrap items-center gap-2">
-            {{ mc_pill(group.check_type, "danger") }}
-            <span class="text-[10.5px] font-medium text-red-300">VL {{ group.latest.violation_level_display }}</span>
-            <span class="text-[10.5px] text-slate-500">{{ group.platform }}</span>
-            <span class="ml-auto text-[10.5px] text-slate-500">{{ group.created_at_display }}</span>
-          </div>
-          <p class="mt-1.5 break-words text-sm text-slate-300">{{ group.latest.detail }}</p>
-        </article>
-        {% else %}
-        <details class="group border-l-2 border-red-400/50 py-1 pl-3">
-          <summary class="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-            <span class="flex flex-wrap items-center gap-2">
-              {{ mc_pill(group.check_type, "danger") }}
-              <span class="inline-flex items-center rounded-full border border-red-500/25 bg-red-500/15 px-2 py-0.5 text-[10.5px] font-semibold text-red-200">×{{ group.count }}</span>
-              <span class="text-[10.5px] font-medium text-red-300">VL max {{ group.max_violation_level_display }}</span>
-              <span class="text-[10.5px] text-slate-500">{{ group.platform }}</span>
-              <span class="ml-auto text-[10.5px] text-slate-500">{{ group.created_at_display }}</span>
-            </span>
-            <span class="mt-1.5 block break-words text-sm text-slate-300">{{ group.latest.detail }}</span>
-            <span class="mt-1 inline-flex items-center gap-1.5 text-[10.5px] text-cyan-300/80 transition group-hover:text-cyan-300">
-              <span class="transition group-open:rotate-90" aria-hidden="true">▸</span>
-              <span class="group-open:hidden">{{ group.count - 1 }} weitere in {{ group.span_display }} anzeigen</span>
-              <span class="hidden group-open:inline">Einklappen</span>
-            </span>
-          </summary>
-          <div class="mt-2 space-y-2 border-l border-white/[0.08] pl-3">
-            {% for event in group.events %}
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="text-[10.5px] font-medium text-red-300">VL {{ event.violation_level_display }}</span>
-              <span class="ml-auto text-[10.5px] text-slate-500">{{ event.created_at_display }}</span>
-              <p class="w-full break-words text-[13px] text-slate-400">{{ event.detail }}</p>
-            </div>
-            {% endfor %}
-          </div>
-        </details>
-        {% endif %}
-        {% endfor %}
-      </div>
-    </div>
+    {% else %}
+    {{ empty_state("Keine Teamnotizen", "Halte Auffälligkeiten zu diesem Spieler intern fest.") }}
     {% endif %}
-  </div>
-</section>
+  </section>
+  {% endcall %}
+  {% endif %}
+</div>
 
+{% if show_moderation %}
 <div data-note-modal role="dialog" aria-modal="true" aria-labelledby="mc-note-modal-title"
   class="fixed inset-0 z-50 hidden items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm">
   <form id="mc-player-note-form" data-endpoint="{{ url_for('panel_api_minecraft_player_note_create', player_uuid=player.player_uuid) }}"
@@ -330,167 +464,17 @@
     </div>
   </form>
 </div>
-
-{% if mute or punishments or warnings %}
-<section id="profile-punishments" class="order-2 scroll-mt-24">
-{% if player.mute %}
-<div class="mb-4 rounded-xl border border-amber-500/25 bg-amber-500/[0.07] p-5">
-  {{ section_heading("Aktiver Mute", "Der Spieler kann aktuell nicht schreiben") }}
-  <div class="grid gap-3 text-sm sm:grid-cols-3">
-    <div>
-      <div class="text-[11px] uppercase tracking-wider text-amber-200/50">Grund</div>
-      <div class="mt-0.5 text-amber-100">{{ mute.reason }}</div>
-    </div>
-    <div>
-      <div class="text-[11px] uppercase tracking-wider text-amber-200/50">Von</div>
-      <div class="mt-0.5 text-amber-100">{{ mute.staff_name }}</div>
-    </div>
-    <div>
-      <div class="text-[11px] uppercase tracking-wider text-amber-200/50">Läuft ab</div>
-      <div class="mt-0.5 text-amber-100">{{ mute.expires_at_display }}</div>
-    </div>
-  </div>
-</div>
 {% endif %}
-
-<div class="grid gap-4 lg:grid-cols-2">
-
-  {# ── Bans ── #}
-  {% if punishments %}
-  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
-    {{ section_heading("Bans", "{} Einträge".format(punishments|length)) }}
-    {% if punishments %}
-    <div class="space-y-2">
-      {% for entry in punishments %}
-      <div class="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
-        <div class="flex flex-wrap items-center gap-2">
-          {{ mc_pill(entry.punishment_type, "danger" if entry.status == "Aktiv" else "default") }}
-          {{ mc_pill(entry.status, "danger" if entry.status == "Aktiv" else "success" if entry.status == "Aufgehoben" else "default") }}
-          <span class="font-mono text-[10.5px] text-slate-500">{{ entry.punishment_id }}</span>
-          <span class="ml-auto text-[10.5px] text-slate-500">{{ entry.created_at_display }}</span>
-        </div>
-        <p class="mt-2 break-words text-sm text-slate-200">{{ entry.reason }}</p>
-        <div class="mt-2 flex flex-wrap gap-x-4 text-[10.5px] text-slate-500">
-          <span>Von {{ entry.staff_name }}</span>
-          <span>Läuft ab: {{ entry.expires_at_display }}</span>
-          {% if entry.revoked_by %}<span>Aufgehoben von {{ entry.revoked_by }}</span>{% endif %}
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    {{ empty_state("Keine Bans", "Dieser Spieler wurde nie gebannt.") }}
-    {% endif %}
-  </div>
-  {% endif %}
-
-  {# ── Verwarnungen ── #}
-  {% if warnings %}
-  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
-    {{ section_heading("Verwarnungen", "{} Einträge".format(warnings|length)) }}
-    {% if warnings %}
-    <div class="space-y-2">
-      {% for entry in warnings %}
-      <div class="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
-        <div class="flex flex-wrap items-center gap-2">
-          {{ mc_pill("WARN", "info") }}
-          <span class="ml-auto text-[10.5px] text-slate-500">{{ entry.created_at_display }}</span>
-        </div>
-        <p class="mt-2 break-words text-sm text-slate-200">{{ entry.reason }}</p>
-        <div class="mt-2 text-[10.5px] text-slate-500">Von {{ entry.staff_name }}</div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    {{ empty_state("Keine Verwarnungen", "Dieser Spieler wurde nie verwarnt.") }}
-    {% endif %}
-  </div>
-  {% endif %}
-</div>
-</section>
-{% endif %}
-
-{% if reports_against or reports_by %}
-<section id="profile-history" class="order-3 scroll-mt-24">
-<div class="grid gap-4 lg:grid-cols-2">
-  {# ── Reports gegen den Spieler ── #}
-  {% if reports_against %}
-  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
-    {{ section_heading("Gemeldet worden", "{} Reports gegen diesen Spieler".format(reports_against|length)) }}
-    {% if reports_against %}
-    <div class="space-y-2">
-      {% for entry in reports_against %}
-      <div class="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
-        <div class="flex flex-wrap items-center gap-2">
-          {{ mc_pill("Offen" if entry.is_open else "Geschlossen", "danger" if entry.is_open else "success") }}
-          <span class="text-[10.5px] text-slate-500">von {{ entry.reporter_name }}</span>
-          <span class="ml-auto text-[10.5px] text-slate-500">{{ entry.created_at_display }}</span>
-        </div>
-        <p class="mt-2 break-words text-sm text-slate-200">{{ entry.reason }}</p>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    {{ empty_state("Keine Reports", "Dieser Spieler wurde nie gemeldet.") }}
-    {% endif %}
-  </div>
-  {% endif %}
-
-  {# ── Eigene Reports ── #}
-  {% if reports_by %}
-  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
-    {{ section_heading("Eigene Meldungen", "{} Reports von diesem Spieler".format(reports_by|length)) }}
-    {% if reports_by %}
-    <div class="space-y-2">
-      {% for entry in reports_by %}
-      <div class="rounded-lg border border-white/[0.06] bg-white/[0.02] p-3">
-        <div class="flex flex-wrap items-center gap-2">
-          {{ mc_pill("Offen" if entry.is_open else "Geschlossen", "danger" if entry.is_open else "success") }}
-          <span class="text-[10.5px] text-slate-500">gegen {{ entry.target_name }}</span>
-          <span class="ml-auto text-[10.5px] text-slate-500">{{ entry.created_at_display }}</span>
-        </div>
-        <p class="mt-2 break-words text-sm text-slate-200">{{ entry.reason }}</p>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    {{ empty_state("Keine Meldungen", "Dieser Spieler hat noch niemanden gemeldet.") }}
-    {% endif %}
-  </div>
-  {% endif %}
-</div>
-</section>
-{% endif %}
-
-{% else %}
-<div class="rounded-xl border border-white/[0.06] bg-white/[0.02] p-5 text-sm text-slate-400">
-  Für Strafen und Reports fehlt dir die Berechtigung
-  <span class="font-mono text-slate-300">minecraft.moderation.view</span>.
-</div>
-{% endif %}
-
-  </div>
-</div>
 
 {% endif %}
 {% endblock %}
 
 {% block scripts %}
+{% if not mc_error %}
 <div class="hidden" data-playtime-live data-player-uuid="{{ player.player_uuid }}" data-endpoint="{{ url_for('panel_api_minecraft_playtime_live') }}"></div>
+<script src="{{ url_for('static', filename='tabs.js') }}" defer></script>
 <script src="{{ url_for('static', filename='minecraft-chart.js') }}" defer></script>
 <script src="{{ url_for('static', filename='minecraft-live.js') }}" defer></script>
-<script>
-  document.addEventListener("DOMContentLoaded", () => {
-    const tabs = document.querySelectorAll("[data-profile-chat-tab]");
-    const panels = document.querySelectorAll("[data-profile-chat-panel]");
-    const selectTab = (name) => {
-      tabs.forEach((tab) => tab.dataset.active = String(tab.dataset.profileChatTab === name));
-      panels.forEach((panel) => panel.classList.toggle("hidden", panel.dataset.profileChatPanel !== name));
-    };
-    if (tabs.length) selectTab(tabs[0].dataset.profileChatTab);
-    tabs.forEach((tab) => tab.addEventListener("click", () => selectTab(tab.dataset.profileChatTab)));
-  });
-</script>
 {% if show_moderation %}
 <script>
   document.addEventListener("DOMContentLoaded", () => {
@@ -561,5 +545,6 @@
     });
   });
 </script>
+{% endif %}
 {% endif %}
 {% endblock %}

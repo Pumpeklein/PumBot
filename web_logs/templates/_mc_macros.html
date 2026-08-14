@@ -187,3 +187,25 @@
   </select>
 </div>
 {% endmacro %}
+
+{# Tab-Leiste für Detailseiten. items = [{id, label, icon?, count?}] #}
+{% macro mc_tab_bar(items, label="Bereiche") %}
+<div role="tablist" aria-label="{{ label }}" data-tab-list>
+  {% for item in items %}
+  <button type="button" role="tab" data-tab="{{ item.id }}" id="tab-{{ item.id }}"
+    aria-controls="panel-{{ item.id }}" aria-selected="false" tabindex="-1"
+    class="group inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-t-lg border-b-2 border-transparent px-3.5 py-2.5 text-[13px] font-medium text-slate-400 transition hover:bg-white/[0.03] hover:text-slate-200 data-[active=true]:border-cyan-400 data-[active=true]:text-white">
+    {% if item.icon %}<span aria-hidden="true" class="text-slate-500 transition group-hover:text-slate-300 group-data-[active=true]:text-cyan-300">{{ item.icon }}</span>{% endif %}
+    <span>{{ item.label }}</span>
+    {% if item.count %}<span class="rounded-full bg-white/[0.07] px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-slate-400 transition group-data-[active=true]:bg-cyan-500/15 group-data-[active=true]:text-cyan-300">{{ item.count }}</span>{% endif %}
+  </button>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{# Panel zur Tab-Leiste; per default versteckt, tabs.js schaltet um #}
+{% macro mc_tab_panel(id) %}
+<div role="tabpanel" id="panel-{{ id }}" aria-labelledby="tab-{{ id }}" data-tab-panel="{{ id }}" class="hidden space-y-6 pt-6">
+  {{ caller() }}
+</div>
+{% endmacro %}

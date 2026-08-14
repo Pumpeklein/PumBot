@@ -61,6 +61,25 @@
       border-bottom-color: rgba(255,255,255,.06);
       box-shadow: 0 10px 30px -20px rgba(0,0,0,.6);
     }
+
+    /* ── Sticky Tab-Leiste ── */
+    [data-tab-list] {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      gap: .125rem;
+      overflow-x: auto;
+      scrollbar-width: none;
+      margin: 0 -1rem;
+      padding: .35rem 1rem 0;
+      background-color: rgba(10, 15, 26, .92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+    [data-tab-list]::-webkit-scrollbar { display: none; }
+    @media (min-width: 640px) { [data-tab-list] { margin: 0 -1.5rem; padding-left: 1.5rem; padding-right: 1.5rem; } }
+    @media (min-width: 1024px) { [data-tab-list] { margin: 0 -2rem; padding-left: 2rem; padding-right: 2rem; } }
   </style>
 </head>
 

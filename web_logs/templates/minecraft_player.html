@@ -55,6 +55,32 @@
 </div>
 
 {# ── Skills ── #}
+<section data-minecraft-chart data-default-metric="playtime" data-default-days="30" data-default-type="line"
+  data-endpoint="{{ url_for('panel_api_minecraft_player_playtime_chart', player_uuid=player.player_uuid) }}"
+  class="mb-6 overflow-hidden rounded-lg border border-white/[0.06] bg-[#0d1320] p-5">
+  <div class="flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <h2 data-chart-title class="text-sm font-semibold text-white">Playtime-Verlauf</h2>
+      <p data-chart-subtitle class="mt-1 text-xs text-slate-500">Gesamt, Aktiv und AFK pro Tag</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <div data-chart-legend class="flex flex-wrap items-center gap-x-4 gap-y-2"></div>
+      <label class="sr-only" for="player-playtime-days">Zeitraum</label>
+      <select id="player-playtime-days" data-chart-days class="h-8 rounded-md border border-white/10 bg-[#151c2c] px-2.5 text-[11px] text-white outline-none focus:border-cyan-500">
+        <option value="7">7 Tage</option>
+        <option value="30" selected>30 Tage</option>
+        <option value="90">90 Tage</option>
+        <option value="365">1 Jahr</option>
+      </select>
+    </div>
+  </div>
+  <div data-chart-stage class="relative mt-3 h-[300px] min-w-0">
+    <canvas data-chart-canvas class="h-full w-full transition-opacity" role="img" aria-label="Playtime-Verlauf des Spielers"></canvas>
+    <div data-chart-status class="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-slate-500">Diagramm wird geladen</div>
+    <div data-chart-tooltip class="pointer-events-none absolute z-10 hidden min-w-36 rounded-md border border-white/10 bg-[#080d18]/95 px-3 py-2 text-[11px] shadow-xl backdrop-blur"></div>
+  </div>
+</section>
+
 {% if skills %}
 <div class="mb-6 rounded-2xl border border-white/[0.06] bg-[#0d1320] p-5">
   {{ section_heading("Skills", "{} Punkte über alle Skills".format(skills_total|number_de)) }}
@@ -310,6 +336,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='minecraft-chart.js') }}" defer></script>
 {% if show_moderation %}
 <script>
   document.addEventListener("DOMContentLoaded", () => {

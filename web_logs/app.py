@@ -3244,6 +3244,7 @@ def minecraft_page():
 def minecraft_statistics_page():
     try:
         overview = mc_db.get_overview()
+        player_growth = mc_db.get_player_growth_summary(30)
         top_playtime = mc_db.get_top_playtime(8)
         top_deaths = mc_db.get_top_deaths(8)
         chat_stats = mc_db.get_chat_stats()
@@ -3306,6 +3307,7 @@ def minecraft_statistics_page():
     return render_template(
         "minecraft_statistics.html",
         overview=overview,
+        player_growth=player_growth,
         total_playtime=mc_db.format_duration(total_seconds),
         average_playtime=mc_db.format_duration(
             total_seconds // tracked_players if tracked_players else 0
@@ -3331,6 +3333,14 @@ def minecraft_statistics_page():
         **_mc_ctx(),
         **_ctx(),
     )
+
+
+def _minecraft_chart_days() -> int:
+    try:
+        days = int(request.args.get("days", "30"))
+    except (TypeError, ValueError):
+        return 30
+    return days if days in mc_db.CHART_DAYS else 30
 
 
 # -- Minecraft: Spieler --
@@ -3604,6 +3614,31 @@ def minecraft_reports_page():
 
 
 # -- Minecraft: Panel-API --
+
+
+@app.get("/panel-api/minecraft/statistics/chart")
+@permission_any_required(*MINECRAFT_PERMISSIONS)
+def panel_api_minecraft_statistics_chart():
+    metric = request.args.get("metric", "players").strip().lower()
+    if metric in mc_db.MODERATION_CHART_METRICS and not any(
+        has_permission(permission) for permission in MINECRAFT_MODERATION_PERMISSIONS
+    ):
+        return jsonify({"ok": False, "error": "Keine Berechtigung."}), 403
+    try:
+        return jsonify(mc_db.get_statistics_chart(metric, _minecraft_chart_days()))
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+
+
+@app.get("/panel-api/minecraft/players/<player_uuid>/playtime-chart")
+@permission_any_required(*MINECRAFT_PLAYER_PERMISSIONS)
+def panel_api_minecraft_player_playtime_chart(player_uuid: str):
+    try:
+        return jsonify(
+            mc_db.get_player_playtime_chart(player_uuid, _minecraft_chart_days())
+        )
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
 
 
 @app.get("/panel-api/minecraft/players")

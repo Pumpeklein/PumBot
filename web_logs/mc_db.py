@@ -12,7 +12,7 @@ import logging
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import pymysql
@@ -557,6 +557,233 @@ def get_overview() -> dict:
 
 
 # ══════════ Players ══════════
+
+CHART_DAYS = (7, 30, 90, 365)
+MODERATION_CHART_METRICS = {"reports", "bans", "warnings", "mutes"}
+
+
+def _chart_dates(days: int) -> list[date]:
+    safe_days = days if days in CHART_DAYS else 30
+    today = date.today()
+    return [today - timedelta(days=offset) for offset in range(safe_days - 1, -1, -1)]
+
+
+def _date_key(value: Any) -> str:
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    return str(value)
+
+
+def get_player_growth_summary(days: int = 30) -> dict:
+    dates = _chart_dates(days)
+    start_ms = int(datetime.combine(dates[0], datetime.min.time()).timestamp() * 1000)
+    has_platform = _column_supported("pc_players", "platform")
+    platform_sql = "platform" if has_platform else "'UNKNOWN'"
+    with _connect() as conn:
+        row = conn.query_one(
+            f"""SELECT COUNT(*) AS total,
+                       SUM({platform_sql} = 'JAVA') AS java_count,
+                       SUM({platform_sql} = 'BEDROCK') AS bedrock_count,
+                       SUM({platform_sql} NOT IN ('JAVA', 'BEDROCK')) AS unknown_count,
+                       SUM(first_seen >= %s) AS growth
+                  FROM pc_players""",
+            (start_ms,),
+        ) or {}
+    return {
+        "total": int(row.get("total") or 0),
+        "java": int(row.get("java_count") or 0),
+        "bedrock": int(row.get("bedrock_count") or 0),
+        "unknown": int(row.get("unknown_count") or 0),
+        "growth": int(row.get("growth") or 0),
+        "days": len(dates),
+    }
+
+
+def _event_chart(metric: str, dates: list[date]) -> dict:
+    definitions = {
+        "chat": ("pc_chat_messages", "created_at", "Chatnachrichten", "#22d3ee"),
+        "reports": ("pc_reports", "created_at", "Reports", "#fb7185"),
+        "bans": ("pc_punishments", "created_at", "Bans", "#f87171"),
+        "warnings": ("pc_warnings", "created_at", "Verwarnungen", "#fbbf24"),
+        "mutes": ("pc_mutes", "muted_at", "Mutes", "#c084fc"),
+    }
+    table, time_column, label, color = definitions[metric]
+    values = {day.isoformat(): 0 for day in dates}
+    if not _table_supported(table):
+        return {"label": label, "color": color, "values": list(values.values())}
+    start_ms = int(datetime.combine(dates[0], datetime.min.time()).timestamp() * 1000)
+    end_ms = int(
+        datetime.combine(dates[-1] + timedelta(days=1), datetime.min.time()).timestamp()
+        * 1000
+    )
+    with _connect() as conn:
+        rows = conn.query(
+            f"""SELECT DATE(FROM_UNIXTIME({time_column} / 1000)) AS event_date,
+                       COUNT(*) AS event_count
+                  FROM {table}
+                 WHERE {time_column} >= %s AND {time_column} < %s
+                 GROUP BY event_date""",
+            (start_ms, end_ms),
+        )
+    for row in rows:
+        key = _date_key(row.get("event_date"))
+        if key in values:
+            values[key] = int(row.get("event_count") or 0)
+    return {"label": label, "color": color, "values": list(values.values())}
+
+
+def _player_growth_chart(dates: list[date]) -> list[dict]:
+    has_platform = _column_supported("pc_players", "platform")
+    platform_sql = "platform" if has_platform else "'UNKNOWN'"
+    end_ms = int(
+        datetime.combine(dates[-1] + timedelta(days=1), datetime.min.time()).timestamp()
+        * 1000
+    )
+    with _connect() as conn:
+        rows = conn.query(
+            f"""SELECT DATE(FROM_UNIXTIME(first_seen / 1000)) AS first_seen_date,
+                       {platform_sql} AS platform,
+                       COUNT(*) AS player_count
+                  FROM pc_players
+                 WHERE first_seen > 0 AND first_seen < %s
+                 GROUP BY first_seen_date, {platform_sql}
+                 ORDER BY first_seen_date""",
+            (end_ms,),
+        )
+
+    start_key = dates[0].isoformat()
+    additions: dict[str, dict[str, int]] = {}
+    totals = {"JAVA": 0, "BEDROCK": 0, "UNKNOWN": 0}
+    for row in rows:
+        key = _date_key(row.get("first_seen_date"))
+        platform = str(row.get("platform") or "UNKNOWN").upper()
+        if platform not in totals:
+            platform = "UNKNOWN"
+        count = int(row.get("player_count") or 0)
+        if key < start_key:
+            totals[platform] += count
+        else:
+            additions.setdefault(key, {}).setdefault(platform, 0)
+            additions[key][platform] += count
+
+    output = {platform: [] for platform in totals}
+    output["TOTAL"] = []
+    for day in dates:
+        for platform, count in additions.get(day.isoformat(), {}).items():
+            totals[platform] += count
+        for platform in totals:
+            output[platform].append(totals[platform])
+        output["TOTAL"].append(sum(totals.values()))
+
+    series = [
+        {"label": "Gesamt", "color": "#22d3ee", "values": output["TOTAL"]},
+        {"label": "Java", "color": "#34d399", "values": output["JAVA"]},
+        {"label": "Bedrock", "color": "#fbbf24", "values": output["BEDROCK"]},
+    ]
+    if any(output["UNKNOWN"]):
+        series.append(
+            {"label": "Unbekannt", "color": "#94a3b8", "values": output["UNKNOWN"]}
+        )
+    return series
+
+
+def _playtime_chart(dates: list[date], player_uuid: str | None = None) -> list[dict]:
+    if not _table_supported("pc_playtime_history"):
+        return []
+    params: list[Any] = [dates[-1]]
+    player_filter = ""
+    if player_uuid:
+        player_filter = " AND player_uuid = %s"
+        params.append(player_uuid)
+    with _connect() as conn:
+        rows = conn.query(
+            f"""SELECT player_uuid, snapshot_date, total_seconds,
+                       active_seconds, afk_seconds
+                  FROM pc_playtime_history
+                 WHERE snapshot_date <= %s{player_filter}
+                 ORDER BY snapshot_date, player_uuid""",
+            tuple(params),
+        )
+
+    by_day: dict[str, list[dict]] = {}
+    latest: dict[str, dict] = {}
+    start_key = dates[0].isoformat()
+    for row in rows:
+        key = _date_key(row.get("snapshot_date"))
+        if key < start_key:
+            latest[str(row["player_uuid"])] = row
+        else:
+            by_day.setdefault(key, []).append(row)
+
+    totals: list[int | None] = []
+    active: list[int | None] = []
+    afk: list[int | None] = []
+    for day in dates:
+        for row in by_day.get(day.isoformat(), []):
+            latest[str(row["player_uuid"])] = row
+        if not latest:
+            totals.append(None)
+            active.append(None)
+            afk.append(None)
+            continue
+        totals.append(sum(int(row.get("total_seconds") or 0) for row in latest.values()))
+        active.append(sum(int(row.get("active_seconds") or 0) for row in latest.values()))
+        afk.append(sum(int(row.get("afk_seconds") or 0) for row in latest.values()))
+
+    return [
+        {"label": "Gesamt", "color": "#22d3ee", "values": totals},
+        {"label": "Aktiv", "color": "#34d399", "values": active},
+        {"label": "AFK", "color": "#fbbf24", "values": afk},
+    ]
+
+
+def get_statistics_chart(metric: str = "players", days: int = 30) -> dict:
+    safe_days = days if days in CHART_DAYS else 30
+    valid_metrics = {"players", "playtime", "chat"} | MODERATION_CHART_METRICS
+    safe_metric = metric if metric in valid_metrics else "players"
+    dates = _chart_dates(safe_days)
+    metadata = {
+        "players": ("Spielerzuwachs", "Registrierte Spieler", "count"),
+        "playtime": ("Playtime", "Kumulierte Server-Spielzeit", "seconds"),
+        "chat": ("Chataktivität", "Nachrichten pro Tag", "count"),
+        "reports": ("Reports", "Neue Reports pro Tag", "count"),
+        "bans": ("Bans", "Ausgesprochene Bans pro Tag", "count"),
+        "warnings": ("Verwarnungen", "Verwarnungen pro Tag", "count"),
+        "mutes": ("Mutes", "Ausgesprochene Mutes pro Tag", "count"),
+    }
+    title, subtitle, unit = metadata[safe_metric]
+    if safe_metric == "players":
+        series = _player_growth_chart(dates)
+    elif safe_metric == "playtime":
+        series = _playtime_chart(dates)
+    else:
+        series = [_event_chart(safe_metric, dates)]
+    return {
+        "metric": safe_metric,
+        "days": safe_days,
+        "title": title,
+        "subtitle": subtitle,
+        "unit": unit,
+        "labels": [day.isoformat() for day in dates],
+        "series": series,
+    }
+
+
+def get_player_playtime_chart(player_uuid: str, days: int = 30) -> dict:
+    safe_days = days if days in CHART_DAYS else 30
+    dates = _chart_dates(safe_days)
+    return {
+        "metric": "playtime",
+        "days": safe_days,
+        "title": "Playtime-Verlauf",
+        "subtitle": "Gesamt, Aktiv und AFK pro Tag",
+        "unit": "seconds",
+        "labels": [day.isoformat() for day in dates],
+        "series": _playtime_chart(dates, player_uuid),
+    }
+
 
 _PLAYER_UNIVERSE = """
     SELECT player_uuid, NULL AS player_name FROM pc_playtime

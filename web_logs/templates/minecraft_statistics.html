@@ -10,6 +10,46 @@
 {% else %}
 
 <div class="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+  <a href="#trend-analysis" data-stat-metric="players"
+    class="group rounded-lg border border-cyan-500/20 bg-cyan-500/[0.045] p-4 transition hover:border-cyan-400/40 hover:bg-cyan-500/[0.08]">
+    <div class="text-[10px] font-medium uppercase tracking-wider text-cyan-300/70">Spielerzuwachs · 30 Tage</div>
+    <div class="mt-2 text-2xl font-bold text-white group-hover:text-cyan-300">+{{ player_growth.growth }}</div>
+    <div class="mt-2 text-[11px] leading-relaxed text-slate-500">
+      {{ player_growth.total }} Spieler insgesamt
+      <span class="block"><span class="text-emerald-300">{{ player_growth.java }} Java</span> · <span class="text-amber-300">{{ player_growth.bedrock }} Bedrock</span>{% if player_growth.unknown %} · {{ player_growth.unknown }} unbekannt{% endif %}</span>
+    </div>
+  </a>
+
+  <a href="#trend-analysis" data-stat-metric="playtime"
+    class="group rounded-lg border border-emerald-500/20 bg-emerald-500/[0.045] p-4 transition hover:border-emerald-400/40 hover:bg-emerald-500/[0.08]">
+    <div class="text-[10px] font-medium uppercase tracking-wider text-emerald-300/70">Gesamtspielzeit</div>
+    <div class="mt-2 text-2xl font-bold text-white group-hover:text-emerald-300">{{ total_playtime }}</div>
+    <div class="mt-2 text-[11px] text-slate-500">{{ active_playtime }} aktiv · {{ afk_playtime }} AFK</div>
+  </a>
+
+  <a href="#death-details"
+    class="group rounded-lg border border-amber-500/20 bg-amber-500/[0.045] p-4 transition hover:border-amber-400/40 hover:bg-amber-500/[0.08]">
+    <div class="text-[10px] font-medium uppercase tracking-wider text-amber-300/70">Tode</div>
+    <div class="mt-2 text-2xl font-bold text-white group-hover:text-amber-300">{{ overview.total_deaths }}</div>
+    <div class="mt-2 text-[11px] text-slate-500">Von {{ overview.death_players }} Spielern · {{ chat_stats.total }} Chatnachrichten</div>
+  </a>
+
+  <div class="rounded-lg border border-rose-500/20 bg-rose-500/[0.04] p-4">
+    <div class="text-[10px] font-medium uppercase tracking-wider text-rose-300/70">Moderation</div>
+    {% if mc_can_moderation %}
+    <div class="mt-3 grid grid-cols-4 gap-2">
+      <a href="#trend-analysis" data-stat-metric="reports" class="group min-w-0 text-center"><strong class="block text-xl text-white group-hover:text-rose-300">{{ overview.reports_total }}</strong><span class="block truncate text-[9px] text-slate-500">Reports</span></a>
+      <a href="#trend-analysis" data-stat-metric="bans" class="group min-w-0 text-center"><strong class="block text-xl text-white group-hover:text-red-300">{{ overview.bans_total }}</strong><span class="block truncate text-[9px] text-slate-500">Bans</span></a>
+      <a href="#trend-analysis" data-stat-metric="warnings" class="group min-w-0 text-center"><strong class="block text-xl text-white group-hover:text-amber-300">{{ overview.warnings_total }}</strong><span class="block truncate text-[9px] text-slate-500">Warnungen</span></a>
+      <a href="#trend-analysis" data-stat-metric="mutes" class="group min-w-0 text-center"><strong class="block text-xl text-white group-hover:text-purple-300">{{ overview.mutes_total }}</strong><span class="block truncate text-[9px] text-slate-500">Mutes</span></a>
+    </div>
+    {% else %}
+    <div class="mt-3 text-sm text-slate-500">Keine Einsicht</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="hidden">
   {{ stat_tile("Spieler", "{:,}".format(overview.players).replace(",", "."), accent="cyan", sub="{} mit Playtime".format(overview.playtime_players)) }}
   {{ stat_tile("Gesamtspielzeit", total_playtime, accent="emerald", sub="Über alle Spieler") }}
   {{ stat_tile("Ø Spielzeit", average_playtime, accent="amber", sub="Je erfasstem Spieler") }}
@@ -17,6 +57,57 @@
 </div>
 
 <script id="mc-playtime-chart-data" type="application/json">{{ playtime_chart|tojson }}</script>
+
+<section id="trend-analysis" data-minecraft-chart data-default-metric="players" data-default-days="30" data-default-type="line"
+  data-endpoint="{{ url_for('panel_api_minecraft_statistics_chart') }}"
+  class="mb-6 scroll-mt-24 overflow-hidden rounded-lg border border-white/[0.07] bg-[#0d1320]">
+  <div class="grid min-h-[440px] xl:grid-cols-[minmax(0,1fr)_15rem]">
+    <div class="min-w-0 p-5 sm:p-6">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 data-chart-title class="text-base font-semibold text-white">Spielerzuwachs</h2>
+          <p data-chart-subtitle class="mt-1 text-xs text-slate-500">Registrierte Spieler</p>
+        </div>
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          <div class="inline-flex rounded-md border border-white/10 bg-[#0a0f1a] p-0.5" aria-label="Diagrammtyp">
+            <button type="button" data-chart-type="line" aria-pressed="true" title="Liniendiagramm"
+              class="rounded px-2.5 py-1.5 text-[11px] font-medium text-slate-400 transition data-[active=true]:bg-cyan-500/15 data-[active=true]:text-cyan-300">Linie</button>
+            <button type="button" data-chart-type="bar" aria-pressed="false" title="Balkendiagramm"
+              class="rounded px-2.5 py-1.5 text-[11px] font-medium text-slate-400 transition data-[active=true]:bg-cyan-500/15 data-[active=true]:text-cyan-300">Balken</button>
+          </div>
+          <label class="sr-only" for="mc-chart-days">Zeitraum</label>
+          <select id="mc-chart-days" data-chart-days class="h-8 rounded-md border border-white/10 bg-[#151c2c] px-2.5 text-[11px] text-white outline-none focus:border-cyan-500">
+            <option value="7">7 Tage</option>
+            <option value="30" selected>30 Tage</option>
+            <option value="90">90 Tage</option>
+            <option value="365">1 Jahr</option>
+          </select>
+        </div>
+      </div>
+      <div data-chart-legend class="mt-4 flex min-h-5 flex-wrap items-center gap-x-4 gap-y-2"></div>
+      <div data-chart-stage class="relative mt-2 h-[330px] min-w-0">
+        <canvas data-chart-canvas class="h-full w-full transition-opacity" role="img" aria-label="Minecraft Statistikdiagramm"></canvas>
+        <div data-chart-status class="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-slate-500">Diagramm wird geladen</div>
+        <div data-chart-tooltip class="pointer-events-none absolute z-10 hidden min-w-36 rounded-md border border-white/10 bg-[#080d18]/95 px-3 py-2 text-[11px] shadow-xl backdrop-blur"></div>
+      </div>
+    </div>
+
+    <aside class="border-t border-white/[0.06] bg-[#0a101c] p-4 xl:border-l xl:border-t-0">
+      <div class="mb-3 text-[10px] font-medium uppercase tracking-wider text-slate-500">Statistik auswählen</div>
+      <div class="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-1">
+        <button type="button" data-chart-metric="players" class="rounded-md border border-transparent px-3 py-2.5 text-left text-xs font-medium text-slate-400 transition hover:bg-white/[0.04] hover:text-white data-[active=true]:border-cyan-500/20 data-[active=true]:bg-cyan-500/10 data-[active=true]:text-cyan-300">Spielerzuwachs</button>
+        <button type="button" data-chart-metric="playtime" class="rounded-md border border-transparent px-3 py-2.5 text-left text-xs font-medium text-slate-400 transition hover:bg-white/[0.04] hover:text-white data-[active=true]:border-cyan-500/20 data-[active=true]:bg-cyan-500/10 data-[active=true]:text-cyan-300">Playtime</button>
+        <button type="button" data-chart-metric="chat" class="rounded-md border border-transparent px-3 py-2.5 text-left text-xs font-medium text-slate-400 transition hover:bg-white/[0.04] hover:text-white data-[active=true]:border-cyan-500/20 data-[active=true]:bg-cyan-500/10 data-[active=true]:text-cyan-300">Chataktivität</button>
+        {% if mc_can_moderation %}
+        <button type="button" data-chart-metric="reports" class="rounded-md border border-transparent px-3 py-2.5 text-left text-xs font-medium text-slate-400 transition hover:bg-white/[0.04] hover:text-white data-[active=true]:border-cyan-500/20 data-[active=true]:bg-cyan-500/10 data-[active=true]:text-cyan-300">Reports</button>
+        <button type="button" data-chart-metric="bans" class="rounded-md border border-transparent px-3 py-2.5 text-left text-xs font-medium text-slate-400 transition hover:bg-white/[0.04] hover:text-white data-[active=true]:border-cyan-500/20 data-[active=true]:bg-cyan-500/10 data-[active=true]:text-cyan-300">Bans</button>
+        <button type="button" data-chart-metric="warnings" class="rounded-md border border-transparent px-3 py-2.5 text-left text-xs font-medium text-slate-400 transition hover:bg-white/[0.04] hover:text-white data-[active=true]:border-cyan-500/20 data-[active=true]:bg-cyan-500/10 data-[active=true]:text-cyan-300">Verwarnungen</button>
+        <button type="button" data-chart-metric="mutes" class="rounded-md border border-transparent px-3 py-2.5 text-left text-xs font-medium text-slate-400 transition hover:bg-white/[0.04] hover:text-white data-[active=true]:border-cyan-500/20 data-[active=true]:bg-cyan-500/10 data-[active=true]:text-cyan-300">Mutes</button>
+        {% endif %}
+      </div>
+    </aside>
+  </div>
+</section>
 
 <section class="mb-6 grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
   <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
@@ -94,7 +185,7 @@
 </section>
 
 <section class="grid gap-5 xl:grid-cols-2">
-  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+  <div id="playtime-details" class="scroll-mt-24 rounded-lg border border-white/[0.06] bg-[#0d1320] p-5">
     <div class="mb-4 flex items-end justify-between gap-4">
       <div><h2 class="text-sm font-semibold text-white">Meiste Spielzeit</h2><p class="mt-1 text-xs text-slate-500">Aktiv- und AFK-Anteil je Spieler.</p></div>
       <span class="text-[10px] uppercase tracking-wider text-slate-500">Top {{ top_playtime|length }}</span>
@@ -122,7 +213,7 @@
     {% endif %}
   </div>
 
-  <div class="rounded-xl border border-white/[0.06] bg-[#0d1320] p-5">
+  <div id="death-details" class="scroll-mt-24 rounded-lg border border-white/[0.06] bg-[#0d1320] p-5">
     <div class="mb-4 flex items-end justify-between gap-4">
       <div><h2 class="text-sm font-semibold text-white">Meiste Tode</h2><p class="mt-1 text-xs text-slate-500">Serverweite Todesstatistik nach Spielern.</p></div>
       <span class="text-[10px] uppercase tracking-wider text-slate-500">Top {{ top_deaths|length }}</span>
@@ -237,6 +328,7 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
+<script src="{{ url_for('static', filename='minecraft-chart.js') }}" defer></script>
 <script>
   document.addEventListener("DOMContentLoaded", () => {
     const canvas = document.querySelector("[data-mc-playtime-chart]");

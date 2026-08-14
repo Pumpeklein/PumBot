@@ -4,6 +4,8 @@
 
 {% block content %}
 {{ page_header("Minecraft", "Statistiken", "Spieleraktivität, Spielzeitverteilung und serverweite Ranglisten.") }}
+{% set statistics_tab = "overview" %}
+{% include "_minecraft_statistics_tabs.html" %}
 
 {% if mc_error %}
 {{ mc_error_card(mc_error) }}
@@ -23,8 +25,8 @@
   <a href="#trend-analysis" data-stat-metric="playtime"
     class="group rounded-lg border border-emerald-500/20 bg-emerald-500/[0.045] p-4 transition hover:border-emerald-400/40 hover:bg-emerald-500/[0.08]">
     <div class="text-[10px] font-medium uppercase tracking-wider text-emerald-300/70">Gesamtspielzeit</div>
-    <div class="mt-2 text-2xl font-bold text-white group-hover:text-emerald-300">{{ total_playtime }}</div>
-    <div class="mt-2 text-[11px] text-slate-500">{{ active_playtime }} aktiv · {{ afk_playtime }} AFK</div>
+    <div data-playtime-value="server.total" class="mt-2 text-2xl font-bold text-white group-hover:text-emerald-300">{{ total_playtime }}</div>
+    <div data-playtime-summary="server" class="mt-2 text-[11px] text-slate-500">Aktiv {{ active_playtime }} · AFK {{ afk_playtime }}</div>
   </a>
 
   <a href="#death-details"
@@ -58,7 +60,7 @@
 
 <script id="mc-playtime-chart-data" type="application/json">{{ playtime_chart|tojson }}</script>
 
-<section id="trend-analysis" data-minecraft-chart data-default-metric="players" data-default-days="30" data-default-type="line"
+<section id="trend-analysis" data-minecraft-chart data-default-metric="players" data-default-days="30" data-default-type="line" data-auto-refresh-ms="60000"
   data-endpoint="{{ url_for('panel_api_minecraft_statistics_chart') }}"
   class="mb-6 scroll-mt-24 overflow-hidden rounded-lg border border-white/[0.07] bg-[#0d1320]">
   <div class="grid min-h-[440px] xl:grid-cols-[minmax(0,1fr)_15rem]">
@@ -124,7 +126,7 @@
         aria-label="Spielzeitanteil: {{ active_percent }} Prozent aktiv und {{ afk_percent }} Prozent AFK"></canvas>
       <div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
         <span class="text-[10px] font-medium uppercase tracking-wider text-slate-500">Playtime</span>
-        <strong class="mt-1 text-xl font-bold text-white">{{ total_playtime }}</strong>
+        <strong data-playtime-value="server.total" class="mt-1 text-xl font-bold text-white">{{ total_playtime }}</strong>
         <span class="mt-1 text-[11px] text-slate-500">100 %</span>
       </div>
     </div>
@@ -132,11 +134,11 @@
     <div class="mt-4 grid gap-2 sm:grid-cols-2">
       <div class="flex items-center justify-between gap-3 rounded-lg border border-cyan-500/15 bg-cyan-500/[0.05] px-3 py-2.5">
         <span class="flex items-center gap-2 text-xs text-slate-300"><span class="h-2.5 w-2.5 rounded-full bg-cyan-400"></span>Aktiv</span>
-        <span class="text-right"><strong class="block text-sm text-white">{{ active_playtime }}</strong><span class="text-[10px] text-cyan-300">{{ active_percent }} %</span></span>
+        <span class="text-right"><strong data-playtime-value="server.active" class="block text-sm text-white">{{ active_playtime }}</strong><span data-playtime-value="server.active_percent" data-playtime-suffix=" %" class="text-[10px] text-cyan-300">{{ active_percent }} %</span></span>
       </div>
       <div class="flex items-center justify-between gap-3 rounded-lg border border-amber-500/15 bg-amber-500/[0.05] px-3 py-2.5">
         <span class="flex items-center gap-2 text-xs text-slate-300"><span class="h-2.5 w-2.5 rounded-full bg-amber-400"></span>AFK</span>
-        <span class="text-right"><strong class="block text-sm text-white">{{ afk_playtime }}</strong><span class="text-[10px] text-amber-300">{{ afk_percent }} %</span></span>
+        <span class="text-right"><strong data-playtime-value="server.afk" class="block text-sm text-white">{{ afk_playtime }}</strong><span data-playtime-value="server.afk_percent" data-playtime-suffix=" %" class="text-[10px] text-amber-300">{{ afk_percent }} %</span></span>
       </div>
     </div>
   </div>
@@ -159,9 +161,9 @@
       <div>
         <div class="mb-2 flex items-end justify-between gap-4">
           <div><div class="text-xs font-medium text-slate-300">Aktiver Zeitanteil</div><div class="mt-0.5 text-[11px] text-slate-500">Spielzeit außerhalb des AFK-Status</div></div>
-          <span class="text-sm font-semibold text-white">{{ active_percent }} %</span>
+          <span data-playtime-value="server.active_percent" data-playtime-suffix=" %" class="text-sm font-semibold text-white">{{ active_percent }} %</span>
         </div>
-        <div class="h-2 overflow-hidden rounded-full bg-white/[0.05]"><div class="h-full rounded-full bg-cyan-400" style="width: {{ active_percent }}%"></div></div>
+        <div class="h-2 overflow-hidden rounded-full bg-white/[0.05]"><div data-playtime-width="server.active_percent" class="h-full rounded-full bg-cyan-400" style="width: {{ active_percent }}%"></div></div>
       </div>
 
       <div class="grid gap-px overflow-hidden rounded-lg border border-white/[0.06] bg-white/[0.06] sm:grid-cols-2">
@@ -332,7 +334,9 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
+<div class="hidden" data-playtime-live data-endpoint="{{ url_for('panel_api_minecraft_playtime_live') }}"></div>
 <script src="{{ url_for('static', filename='minecraft-chart.js') }}" defer></script>
+<script src="{{ url_for('static', filename='minecraft-live.js') }}" defer></script>
 <script>
   document.addEventListener("DOMContentLoaded", () => {
     const canvas = document.querySelector("[data-mc-playtime-chart]");

@@ -159,6 +159,44 @@ def format_duration(seconds: Any, fallback: str = "0m") -> str:
     return " ".join(parts)
 
 
+def format_bytes(value: Any, fallback: str = "—") -> str:
+    try:
+        size = max(0, int(value or 0))
+    except (TypeError, ValueError):
+        return fallback
+    if size <= 0:
+        return fallback
+    units = ("B", "KB", "MB", "GB", "TB")
+    amount = float(size)
+    unit = units[0]
+    for candidate in units:
+        unit = candidate
+        if amount < 1024.0 or candidate == units[-1]:
+            break
+        amount /= 1024.0
+    precision = 0 if amount >= 100 else 1
+    return f"{amount:.{precision}f} {unit}".replace(".", ",")
+
+
+def format_uptime(seconds: Any, fallback: str = "—") -> str:
+    try:
+        total = max(0, int(seconds or 0))
+    except (TypeError, ValueError):
+        return fallback
+    if total <= 0:
+        return fallback
+    days, rest = divmod(total, 86400)
+    hours, rest = divmod(rest, 3600)
+    minutes = rest // 60
+    parts = []
+    if days:
+        parts.append(f"{days}d")
+    if hours:
+        parts.append(f"{hours}h")
+    parts.append(f"{minutes}m")
+    return " ".join(parts)
+
+
 def head_url(player_uuid: str | None, size: int = 64) -> str | None:
     """Minecraft head render for a UUID (external avatar service)."""
     if not player_uuid or not Config.MC_HEAD_BASE_URL:
@@ -559,6 +597,7 @@ def get_overview() -> dict:
 # ══════════ Players ══════════
 
 CHART_DAYS = (7, 30, 90, 365)
+SERVER_CHART_HOURS = (1, 6, 24, 168)
 MODERATION_CHART_METRICS = {"reports", "bans", "warnings", "mutes"}
 
 
@@ -782,6 +821,174 @@ def get_player_playtime_chart(player_uuid: str, days: int = 30) -> dict:
         "unit": "seconds",
         "labels": [day.isoformat() for day in dates],
         "series": _playtime_chart(dates, player_uuid),
+    }
+
+
+def get_playtime_live(player_uuid: str | None = None) -> dict:
+    with _connect() as conn:
+        server = conn.query_one(
+            """SELECT COALESCE(SUM(total_seconds), 0) AS total_seconds,
+                      COALESCE(SUM(active_seconds), 0) AS active_seconds,
+                      COALESCE(SUM(afk_seconds), 0) AS afk_seconds,
+                      MAX(updated_at) AS updated_at
+                 FROM pc_playtime"""
+        ) or {}
+        player = None
+        if player_uuid:
+            player = conn.query_one(
+                """SELECT total_seconds, active_seconds, afk_seconds, updated_at
+                     FROM pc_playtime
+                    WHERE player_uuid = %s""",
+                (player_uuid,),
+            )
+    return {"server": server, "player": player}
+
+
+def server_metrics_supported() -> bool:
+    return _table_supported("pc_server_specs") and _table_supported(
+        "pc_server_metrics"
+    )
+
+
+def _float_or_none(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def get_server_performance() -> dict:
+    if not server_metrics_supported():
+        return {"supported": False, "latest": None, "specs": None, "summary": {}}
+    since = now_ms() - 24 * 60 * 60 * 1000
+    with _connect() as conn:
+        latest = conn.query_one(
+            "SELECT * FROM pc_server_metrics ORDER BY captured_at DESC LIMIT 1"
+        )
+        specs = conn.query_one("SELECT * FROM pc_server_specs WHERE server_id = 1")
+        summary = conn.query_one(
+            """SELECT COUNT(*) AS samples,
+                      AVG(tps_1m) AS average_tps,
+                      MIN(tps_1m) AS minimum_tps,
+                      AVG(mspt) AS average_mspt,
+                      MAX(mspt) AS maximum_mspt,
+                      SUM(tps_1m < 18 OR mspt > 50) AS lag_samples
+                 FROM pc_server_metrics
+                WHERE captured_at >= %s""",
+            (since,),
+        ) or {}
+
+    if latest:
+        for key in (
+            "tps_1m", "tps_5m", "tps_15m", "mspt",
+            "process_cpu_percent", "system_cpu_percent",
+        ):
+            latest[key] = _float_or_none(latest.get(key))
+        memory_max = int(latest.get("memory_max_bytes") or 0)
+        disk_total = int(latest.get("disk_total_bytes") or 0)
+        latest["memory_percent"] = round(
+            int(latest.get("memory_used_bytes") or 0) / memory_max * 100, 1
+        ) if memory_max else 0.0
+        latest["disk_percent"] = round(
+            int(latest.get("disk_used_bytes") or 0) / disk_total * 100, 1
+        ) if disk_total else 0.0
+        tps = float(latest.get("tps_1m") or 0)
+        mspt = float(latest.get("mspt") or 0)
+        if tps < 15 or mspt >= 70:
+            latest["status"] = "critical"
+            latest["status_label"] = "Kritisch"
+        elif tps < 18 or mspt >= 50:
+            latest["status"] = "warning"
+            latest["status_label"] = "Belastet"
+        else:
+            latest["status"] = "healthy"
+            latest["status_label"] = "Stabil"
+
+    for key in ("average_tps", "minimum_tps", "average_mspt", "maximum_mspt"):
+        summary[key] = _float_or_none(summary.get(key))
+    summary["samples"] = int(summary.get("samples") or 0)
+    summary["lag_samples"] = int(summary.get("lag_samples") or 0)
+    return {"supported": True, "latest": latest, "specs": specs, "summary": summary}
+
+
+def get_server_performance_chart(metric: str = "tps", hours: int = 6) -> dict:
+    safe_hours = hours if hours in SERVER_CHART_HOURS else 6
+    valid_metrics = {"tps", "mspt", "cpu", "memory", "players", "chunks", "entities"}
+    safe_metric = metric if metric in valid_metrics else "tps"
+    metadata = {
+        "tps": ("TPS-Verlauf", "Ticks pro Sekunde", "decimal"),
+        "mspt": ("MSPT-Verlauf", "Millisekunden pro Tick", "ms"),
+        "cpu": ("CPU-Auslastung", "Java-Prozess und Gesamtsystem", "percent"),
+        "memory": ("RAM-Auslastung", "Belegter Java-Heap", "percent"),
+        "players": ("Online-Spieler", "Spieler pro Messpunkt", "count"),
+        "chunks": ("Geladene Chunks", "Chunks über alle Welten", "count"),
+        "entities": ("Geladene Entities", "Entities über alle Welten", "count"),
+    }
+    title, subtitle, unit = metadata[safe_metric]
+    if not server_metrics_supported():
+        return {
+            "metric": safe_metric, "hours": safe_hours, "title": title,
+            "subtitle": subtitle, "unit": unit, "label_format": "datetime",
+            "labels": [], "series": [],
+        }
+
+    bucket_minutes = {1: 1, 6: 2, 24: 5, 168: 30}[safe_hours]
+    bucket_ms = bucket_minutes * 60 * 1000
+    since = now_ms() - safe_hours * 60 * 60 * 1000
+    expressions = {
+        "tps": (
+            ("1 Minute", "AVG(tps_1m)", "#22d3ee"),
+            ("5 Minuten", "AVG(tps_5m)", "#34d399"),
+            ("15 Minuten", "AVG(tps_15m)", "#fbbf24"),
+        ),
+        "mspt": (("MSPT", "AVG(mspt)", "#fbbf24"),),
+        "cpu": (
+            ("Java-Prozess", "AVG(process_cpu_percent)", "#22d3ee"),
+            ("System", "AVG(system_cpu_percent)", "#fb7185"),
+        ),
+        "memory": (("RAM", "AVG(memory_used_bytes / NULLIF(memory_max_bytes, 0) * 100)", "#c084fc"),),
+        "players": (("Spieler", "AVG(online_players)", "#34d399"),),
+        "chunks": (("Chunks", "AVG(loaded_chunks)", "#60a5fa"),),
+        "entities": (("Entities", "AVG(entity_count)", "#fb7185"),),
+    }[safe_metric]
+    select_values = ",\n".join(
+        f"{expression} AS value_{index}" for index, (_, expression, _) in enumerate(expressions)
+    )
+    with _connect() as conn:
+        rows = conn.query(
+            f"""SELECT FLOOR(captured_at / %s) * %s AS bucket_at,
+                       {select_values}
+                  FROM pc_server_metrics
+                 WHERE captured_at >= %s
+                 GROUP BY bucket_at
+                 ORDER BY bucket_at""",
+            (bucket_ms, bucket_ms, since),
+        )
+
+    labels = [
+        datetime.fromtimestamp(int(row["bucket_at"]) / 1000, tz=timezone.utc).isoformat()
+        for row in rows
+    ]
+    series = []
+    for index, (label, _, color) in enumerate(expressions):
+        series.append(
+            {
+                "label": label,
+                "color": color,
+                "values": [_float_or_none(row.get(f"value_{index}")) for row in rows],
+            }
+        )
+    return {
+        "metric": safe_metric,
+        "hours": safe_hours,
+        "title": title,
+        "subtitle": subtitle,
+        "unit": unit,
+        "label_format": "datetime",
+        "labels": labels,
+        "series": series,
     }
 
 

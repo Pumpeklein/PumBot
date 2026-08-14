@@ -3195,21 +3195,12 @@ def minecraft_page():
             overview["active_seconds"], fallback="—"
         ),
         afk_playtime=mc_db.format_duration(overview["afk_seconds"], fallback="—"),
-        nonafk_playtime=mc_db.format_duration(
-            overview["nonafk_seconds"], fallback="—"
-        ),
         top_playtime=[
             {
                 **player,
                 "playtime": mc_db.format_duration(player.get("total_seconds")),
                 "active_time": mc_db.format_duration(player.get("active_seconds")),
-                "nonafk_time": mc_db.format_duration(
-                    max(
-                        0,
-                        int(player.get("total_seconds") or 0)
-                        - int(player.get("afk_seconds") or 0),
-                    )
-                ),
+                "afk_time": mc_db.format_duration(player.get("afk_seconds")),
                 "detail_url": url_for(
                     "minecraft_player_page", player_uuid=player["player_uuid"]
                 ),
@@ -3343,6 +3334,59 @@ def _minecraft_chart_days() -> int:
     return days if days in mc_db.CHART_DAYS else 30
 
 
+def _minecraft_server_chart_hours() -> int:
+    try:
+        hours = int(request.args.get("hours", "6"))
+    except (TypeError, ValueError):
+        return 6
+    return hours if hours in mc_db.SERVER_CHART_HOURS else 6
+
+
+@app.get("/minecraft/statistiken/server")
+@permission_any_required(*MINECRAFT_PERMISSIONS)
+def minecraft_server_performance_page():
+    try:
+        performance = mc_db.get_server_performance()
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return _mc_unavailable_page(
+            "minecraft_server_performance.html",
+            str(exc),
+            "minecraft_statistics",
+            performance={"supported": False, "latest": None, "specs": None, "summary": {}},
+        )
+
+    latest = dict(performance.get("latest") or {})
+    specs = dict(performance.get("specs") or {})
+    summary = dict(performance.get("summary") or {})
+    if latest:
+        latest.update(
+            {
+                "captured_at_display": mc_db.format_epoch_millis(latest.get("captured_at")),
+                "memory_used_display": mc_db.format_bytes(latest.get("memory_used_bytes")),
+                "memory_max_display": mc_db.format_bytes(latest.get("memory_max_bytes")),
+                "disk_used_display": mc_db.format_bytes(latest.get("disk_used_bytes")),
+                "disk_total_display": mc_db.format_bytes(latest.get("disk_total_bytes")),
+                "uptime_display": mc_db.format_uptime(latest.get("uptime_seconds")),
+            }
+        )
+    if specs:
+        specs["max_memory_display"] = mc_db.format_bytes(specs.get("max_memory_bytes"))
+        specs["updated_at_display"] = mc_db.format_epoch_millis(specs.get("updated_at"))
+    performance = {
+        **performance,
+        "latest": latest or None,
+        "specs": specs or None,
+        "summary": summary,
+    }
+    return render_template(
+        "minecraft_server_performance.html",
+        performance=performance,
+        active_page="minecraft_statistics",
+        **_mc_ctx(),
+        **_ctx(),
+    )
+
+
 # -- Minecraft: Spieler --
 
 
@@ -3401,14 +3445,6 @@ def minecraft_player_page(player_uuid: str):
         playtime_total=mc_db.format_duration(playtime.get("total_seconds"), "—"),
         playtime_active=mc_db.format_duration(playtime.get("active_seconds"), "—"),
         playtime_afk=mc_db.format_duration(playtime.get("afk_seconds"), "—"),
-        playtime_nonafk=mc_db.format_duration(
-            max(
-                0,
-                int(playtime.get("total_seconds") or 0)
-                - int(playtime.get("afk_seconds") or 0),
-            ),
-            "—",
-        ),
         punishments=[
             {**_mc_moderation_row(row), "status": mc_db.ban_status(row)}
             for row in player.get("punishments", [])
@@ -3628,6 +3664,61 @@ def panel_api_minecraft_statistics_chart():
         return jsonify(mc_db.get_statistics_chart(metric, _minecraft_chart_days()))
     except mc_db.MinecraftDatabaseUnavailable as exc:
         return jsonify({"ok": False, "error": str(exc)}), 503
+
+
+@app.get("/panel-api/minecraft/statistics/server/chart")
+@permission_any_required(*MINECRAFT_PERMISSIONS)
+def panel_api_minecraft_server_performance_chart():
+    metric = request.args.get("metric", "tps").strip().lower()
+    try:
+        return jsonify(
+            mc_db.get_server_performance_chart(
+                metric,
+                _minecraft_server_chart_hours(),
+            )
+        )
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+
+
+def _playtime_live_row(row: dict | None) -> dict | None:
+    if not row:
+        return None
+    total = max(0, int(row.get("total_seconds") or 0))
+    active = min(total, max(0, int(row.get("active_seconds") or 0)))
+    afk = min(total, max(0, int(row.get("afk_seconds") or 0)))
+    return {
+        "total_seconds": total,
+        "active_seconds": active,
+        "afk_seconds": afk,
+        "total": mc_db.format_duration(total),
+        "active": mc_db.format_duration(active),
+        "afk": mc_db.format_duration(afk),
+        "active_percent": round(active / total * 100, 1) if total else 0,
+        "afk_percent": round(afk / total * 100, 1) if total else 0,
+        "updated_at": (
+            format_berlin_datetime(row.get("updated_at"), fallback="—")
+            if row.get("updated_at")
+            else "—"
+        ),
+    }
+
+
+@app.get("/panel-api/minecraft/playtime/live")
+@permission_any_required(*MINECRAFT_PERMISSIONS)
+def panel_api_minecraft_playtime_live():
+    player_uuid = request.args.get("player_uuid", "").strip() or None
+    try:
+        playtime = mc_db.get_playtime_live(player_uuid)
+    except mc_db.MinecraftDatabaseUnavailable as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 503
+    return jsonify(
+        {
+            "ok": True,
+            "server": _playtime_live_row(playtime.get("server")),
+            "player": _playtime_live_row(playtime.get("player")),
+        }
+    )
 
 
 @app.get("/panel-api/minecraft/players/<player_uuid>/playtime-chart")

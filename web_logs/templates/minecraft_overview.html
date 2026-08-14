@@ -16,7 +16,8 @@
   {{ stat_tile("Spieler", "{:,}".format(overview.players).replace(",", "."), accent="cyan",
     sub="{} mit Spielzeit-Tracking".format(overview.playtime_players)) }}
   {{ stat_tile("Gesamte Spielzeit", total_playtime, accent="violet",
-    sub="Nicht AFK {} · Aktiv {} · AFK {}".format(nonafk_playtime, active_playtime, afk_playtime)) }}
+    sub="Aktiv {} · AFK {}".format(active_playtime, afk_playtime),
+    value_attr='data-playtime-value="server.total"', sub_attr='data-playtime-summary="server"') }}
   {{ stat_tile("Tode gesamt", "{:,}".format(overview.total_deaths).replace(",", "."), accent="amber",
     sub="{} Spieler mit Toden".format(overview.death_players)) }}
   {% if can_mc_moderation %}
@@ -48,7 +49,7 @@
         </div>
         <div class="shrink-0 text-right">
           <div class="text-sm font-semibold text-white">{{ player.playtime }}</div>
-          <div class="text-[10.5px] text-slate-500">nicht AFK {{ player.nonafk_time }}</div>
+          <div class="text-[10.5px] text-slate-500">Aktiv {{ player.active_time }} · AFK {{ player.afk_time }}</div>
         </div>
       </li>
       {% endfor %}
@@ -207,4 +208,8 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='paginated-table.js') }}" defer></script>
+{% if not mc_error %}
+<div class="hidden" data-playtime-live data-endpoint="{{ url_for('panel_api_minecraft_playtime_live') }}"></div>
+<script src="{{ url_for('static', filename='minecraft-live.js') }}" defer></script>
+{% endif %}
 {% endblock %}

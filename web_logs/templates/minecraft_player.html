@@ -38,11 +38,14 @@
   </div>
 </div>
 
-<div class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-  {{ stat_tile("Spielzeit", playtime_total, accent="cyan",
-    sub=(player.playtime.updated_at|datetime_de if player.playtime else "Keine Daten")) }}
-  {{ stat_tile("Nicht AFK", playtime_nonafk, accent="emerald",
-    sub="Aktiv (Bewegung) {} · AFK {}".format(playtime_active, playtime_afk)) }}
+<div class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+  {{ stat_tile("Gesamt", playtime_total, accent="cyan",
+    sub=(player.playtime.updated_at|datetime_de if player.playtime else "Keine Daten"),
+    value_attr='data-playtime-value="player.total"') }}
+  {{ stat_tile("Aktiv", playtime_active, accent="emerald", sub="Bewegung und Interaktion",
+    value_attr='data-playtime-value="player.active"') }}
+  {{ stat_tile("AFK", playtime_afk, accent="amber", sub="Erkannte Inaktivität",
+    value_attr='data-playtime-value="player.afk"') }}
   {{ stat_tile("Tode", (player.deaths.death_count if player.deaths else 0), accent="amber",
     sub=(player.deaths.updated_at|datetime_de if player.deaths else "Keine Daten")) }}
   {% if show_moderation %}
@@ -55,7 +58,7 @@
 </div>
 
 {# ── Skills ── #}
-<section data-minecraft-chart data-default-metric="playtime" data-default-days="30" data-default-type="line"
+<section data-minecraft-chart data-default-metric="playtime" data-default-days="30" data-default-type="line" data-auto-refresh-ms="60000"
   data-endpoint="{{ url_for('panel_api_minecraft_player_playtime_chart', player_uuid=player.player_uuid) }}"
   class="mb-6 overflow-hidden rounded-lg border border-white/[0.06] bg-[#0d1320] p-5">
   <div class="flex flex-wrap items-start justify-between gap-4">
@@ -336,7 +339,9 @@
 {% endblock %}
 
 {% block scripts %}
+<div class="hidden" data-playtime-live data-player-uuid="{{ player.player_uuid }}" data-endpoint="{{ url_for('panel_api_minecraft_playtime_live') }}"></div>
 <script src="{{ url_for('static', filename='minecraft-chart.js') }}" defer></script>
+<script src="{{ url_for('static', filename='minecraft-live.js') }}" defer></script>
 {% if show_moderation %}
 <script>
   document.addEventListener("DOMContentLoaded", () => {

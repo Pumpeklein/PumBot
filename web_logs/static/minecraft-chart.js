@@ -3,6 +3,9 @@
 
   const formatters = {
     count: (value) => Math.round(value).toLocaleString("de-DE"),
+    decimal: (value) => Number(value).toLocaleString("de-DE", { maximumFractionDigits: 2 }),
+    ms: (value) => `${Number(value).toLocaleString("de-DE", { maximumFractionDigits: 2 })} ms`,
+    percent: (value) => `${Number(value).toLocaleString("de-DE", { maximumFractionDigits: 1 })} %`,
     seconds: (value) => {
       const seconds = Math.max(0, Math.round(value));
       const days = Math.floor(seconds / 86400);
@@ -14,11 +17,12 @@
     },
   };
 
-  const dateLabel = (value, withYear = false) => {
-    const date = new Date(`${value}T12:00:00`);
+  const dateLabel = (value, withYear = false, labelFormat = "date") => {
+    const date = labelFormat === "datetime" ? new Date(value) : new Date(`${value}T12:00:00`);
     return new Intl.DateTimeFormat("de-DE", {
       day: "2-digit",
       month: "short",
+      ...(labelFormat === "datetime" ? { hour: "2-digit", minute: "2-digit" } : {}),
       ...(withYear ? { year: "numeric" } : {}),
     }).format(date);
   };
@@ -42,8 +46,11 @@
       this.status = root.querySelector("[data-chart-status]");
       this.tooltip = root.querySelector("[data-chart-tooltip]");
       this.metric = root.dataset.defaultMetric || "players";
-      this.days = Number(root.dataset.defaultDays || 30);
+      this.periodParam = root.dataset.periodParam || "days";
+      this.period = Number(root.dataset.defaultPeriod || root.dataset.defaultDays || 30);
       this.type = root.dataset.defaultType || "line";
+      this.labelFormat = "date";
+      this.hasValues = false;
       this.data = null;
       this.hoverIndex = null;
       this.loadToken = 0;
@@ -51,6 +58,12 @@
       this.resizeObserver = new ResizeObserver(() => this.draw());
       this.resizeObserver.observe(this.stage);
       this.load();
+      const refreshMs = Number(root.dataset.autoRefreshMs || 0);
+      if (refreshMs > 0) {
+        this.refreshTimer = window.setInterval(() => {
+          if (!document.hidden) this.load();
+        }, refreshMs);
+      }
     }
 
     bind() {
@@ -64,8 +77,8 @@
           this.draw();
         });
       });
-      this.root.querySelector("[data-chart-days]")?.addEventListener("change", (event) => {
-        this.days = Number(event.target.value || 30);
+      this.root.querySelector("[data-chart-period], [data-chart-days]")?.addEventListener("change", (event) => {
+        this.period = Number(event.target.value || 30);
         this.load();
       });
       this.canvas.addEventListener("mousemove", (event) => this.onPointerMove(event));
@@ -107,7 +120,7 @@
       this.updateControls();
       try {
         const url = new URL(this.root.dataset.endpoint, window.location.origin);
-        url.searchParams.set("days", String(this.days));
+        url.searchParams.set(this.periodParam, String(this.period));
         if (this.root.querySelector("[data-chart-metric]")) {
           url.searchParams.set("metric", this.metric);
         }
@@ -119,6 +132,8 @@
         if (token !== this.loadToken) return;
         this.data = payload;
         this.metric = payload.metric || this.metric;
+        this.labelFormat = payload.label_format || "date";
+        this.hasValues = (payload.series || []).some((series) => series.values.some(Number.isFinite));
         this.title.textContent = payload.title || "Statistik";
         this.subtitle.textContent = payload.subtitle || "";
         this.renderLegend();
@@ -130,7 +145,11 @@
         this.status.textContent = error.message || "Diagrammdaten konnten nicht geladen werden.";
         this.status.classList.remove("hidden");
       } finally {
-        if (token === this.loadToken && this.data) this.status?.classList.add("hidden");
+        if (token === this.loadToken && this.data && this.hasValues) this.status?.classList.add("hidden");
+        if (token === this.loadToken && this.data && !this.hasValues && this.status) {
+          this.status.textContent = "Noch keine Messdaten vorhanden.";
+          this.status.classList.remove("hidden");
+        }
         if (token === this.loadToken) this.canvas.classList.remove("opacity-40");
       }
     }
@@ -172,7 +191,9 @@
       const plot = { left: 52, top: 16, right: width - 18, bottom: height - 34 };
       const values = this.data.series.flatMap((series) => series.values).filter(Number.isFinite);
       const rawMaximum = Math.max(1, ...values);
-      const maximum = this.data.unit === "count" && rawMaximum <= 8
+      const maximum = this.data.unit === "percent"
+        ? 100
+        : this.data.unit === "count" && rawMaximum <= 8
         ? Math.max(4, Math.ceil(rawMaximum / 4) * 4)
         : niceMaximum(rawMaximum);
       const y = (value) => plot.bottom - (value / maximum) * (plot.bottom - plot.top);
@@ -201,7 +222,7 @@
       ctx.fillStyle = "#64748b";
       ctx.textAlign = "center";
       for (const index of labelIndexes) {
-        ctx.fillText(dateLabel(this.data.labels[index], this.days >= 365), x(index), height - 13);
+        ctx.fillText(dateLabel(this.data.labels[index], this.period >= 365, this.labelFormat), x(index), height - 13);
       }
 
       if (this.type === "bar") this.drawBars(ctx, plot, x, y);
@@ -294,7 +315,7 @@
         .filter((series) => Number.isFinite(series.values[this.hoverIndex]))
         .map((series) => `<div class="mt-1 flex items-center justify-between gap-5"><span class="flex items-center gap-1.5 text-slate-400"><i class="h-1.5 w-1.5 rounded-full" style="background:${series.color}"></i>${series.label}</span><strong class="text-white">${formatter(series.values[this.hoverIndex])}</strong></div>`)
         .join("");
-      this.tooltip.innerHTML = `<div class="text-[10px] font-medium uppercase tracking-wider text-slate-500">${dateLabel(this.data.labels[this.hoverIndex], true)}</div>${rows}`;
+      this.tooltip.innerHTML = `<div class="text-[10px] font-medium uppercase tracking-wider text-slate-500">${dateLabel(this.data.labels[this.hoverIndex], true, this.labelFormat)}</div>${rows}`;
       this.tooltip.classList.remove("hidden");
       const stageRect = this.stage.getBoundingClientRect();
       const left = Math.min(stageRect.width - this.tooltip.offsetWidth - 8, Math.max(8, event.clientX - stageRect.left + 12));

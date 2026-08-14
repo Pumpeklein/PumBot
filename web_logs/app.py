@@ -3154,6 +3154,63 @@ def _mc_report_row(row: dict) -> dict:
     return item
 
 
+_ANTICHEAT_BURST_WINDOW_MS = 60_000
+
+
+def _mc_anticheat_row(row: dict) -> dict:
+    item = dict(row)
+    item["created_at_display"] = mc_db.format_epoch_millis(item.get("created_at"))
+    item["violation_level_display"] = f"{float(item.get('violation_level') or 0):.1f}"
+    return item
+
+
+def _mc_burst_span(start_ms: int, end_ms: int) -> str:
+    seconds = max(0, end_ms - start_ms) // 1000
+    if seconds < 60:
+        return f"{seconds}s"
+    minutes, rest = divmod(seconds, 60)
+    if minutes < 60:
+        return f"{minutes}m {rest}s" if rest else f"{minutes}m"
+    hours, minutes = divmod(minutes, 60)
+    return f"{hours}h {minutes}m" if minutes else f"{hours}h"
+
+
+def _mc_anticheat_groups(events: list[dict]) -> list[dict]:
+    """Stack alerts of the same check that fired in quick succession."""
+    groups: list[dict] = []
+    for event in events:
+        created_at = int(event.get("created_at") or 0)
+        current = groups[-1] if groups else None
+        if (
+            current
+            and current["check_type"] == event.get("check_type")
+            and current["platform"] == event.get("platform")
+            and current["oldest_at"] - created_at <= _ANTICHEAT_BURST_WINDOW_MS
+        ):
+            current["events"].append(event)
+            current["oldest_at"] = created_at
+            continue
+        groups.append(
+            {
+                "check_type": event.get("check_type"),
+                "platform": event.get("platform"),
+                "events": [event],
+                "newest_at": created_at,
+                "oldest_at": created_at,
+            }
+        )
+    for group in groups:
+        levels = [float(row.get("violation_level") or 0) for row in group["events"]]
+        group.update(
+            count=len(group["events"]),
+            latest=group["events"][0],
+            max_violation_level_display=f"{max(levels):.1f}",
+            created_at_display=mc_db.format_epoch_millis(group["newest_at"]),
+            span_display=_mc_burst_span(group["oldest_at"], group["newest_at"]),
+        )
+    return groups
+
+
 def _mc_chat_row(row: dict) -> dict:
     item = dict(row)
     message_type = str(item.get("message_type") or "GLOBAL").upper()
@@ -3501,6 +3558,11 @@ def minecraft_player_page(player_uuid: str):
     except mc_db.MinecraftDatabaseUnavailable:
         skills = []
 
+    anticheat_events = [
+        _mc_anticheat_row(row) for row in player.get("anticheat_events", [])
+    ]
+    anticheat_groups = _mc_anticheat_groups(anticheat_events)
+
     player_chat = []
     chat_detections = []
     try:
@@ -3546,14 +3608,8 @@ def minecraft_player_page(player_uuid: str):
             }
             for row in player.get("notes", [])
         ],
-        anticheat_events=[
-            {
-                **row,
-                "created_at_display": mc_db.format_epoch_millis(row.get("created_at")),
-                "violation_level_display": f"{float(row.get('violation_level') or 0):.1f}",
-            }
-            for row in player.get("anticheat_events", [])
-        ],
+        anticheat_events=anticheat_events,
+        anticheat_groups=anticheat_groups,
         player_chat=player_chat,
         chat_detections=chat_detections,
         notes_supported=mc_db.moderation_notes_supported(),

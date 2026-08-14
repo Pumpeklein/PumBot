@@ -1172,6 +1172,10 @@ def get_server_performance_chart(
     }
 
 
+# AntiCheat fires in bursts; the panel stacks them into groups, so the profile
+# can load a full history instead of the last handful of alerts.
+_ANTICHEAT_EVENT_LIMIT = 2000
+
 _PLAYER_UNIVERSE = """
     SELECT player_uuid, NULL AS player_name FROM pc_playtime
     UNION ALL SELECT player_uuid, NULL FROM pc_death_counts
@@ -1336,10 +1340,10 @@ def get_player(player_uuid: str) -> dict | None:
         )
         anticheat_events = (
             conn.query(
-                """SELECT * FROM pc_anticheat_events
-                    WHERE player_uuid = %s
-                    ORDER BY created_at DESC, id DESC
-                    LIMIT 100""",
+                f"""SELECT * FROM pc_anticheat_events
+                     WHERE player_uuid = %s
+                     ORDER BY created_at DESC, id DESC
+                     LIMIT {_ANTICHEAT_EVENT_LIMIT}""",
                 (player_uuid,),
             )
             if has_moderation_notes

@@ -206,7 +206,7 @@
       <div class="flex items-center gap-2 text-[10.5px] text-slate-500">
         <span>{{ player_notes|length }} Notizen</span>
         <span class="text-slate-700">•</span>
-        <span>{{ anticheat_events|length }} AntiCheat-Ereignisse</span>
+        <span>{{ anticheat_events|length }} AntiCheat-Ereignisse{% if anticheat_groups and anticheat_groups|length != anticheat_events|length %} in {{ anticheat_groups|length }} Gruppen{% endif %}</span>
       </div>
       <button type="button" data-open-note-modal
         class="inline-flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-xs font-medium text-cyan-300 transition hover:bg-cyan-500/20">
@@ -242,24 +242,51 @@
       {% endif %}
     </div>
 
-    {% if anticheat_events %}
+    {% if anticheat_groups %}
     <div id="profile-anticheat" class="scroll-mt-24 lg:border-l lg:border-white/[0.06] lg:pl-6">
       <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">AntiCheat-Historie</h3>
-      {% if anticheat_events %}
       <div class="max-h-[32rem] space-y-2 overflow-y-auto pr-1">
-        {% for event in anticheat_events %}
+        {% for group in anticheat_groups %}
+        {% if group.count == 1 %}
         <article class="border-l-2 border-red-400/50 py-1 pl-3">
           <div class="flex flex-wrap items-center gap-2">
-            {{ mc_pill(event.check_type, "danger") }}
-            <span class="text-[10.5px] font-medium text-red-300">VL {{ event.violation_level_display }}</span>
-            <span class="text-[10.5px] text-slate-500">{{ event.platform }}</span>
-            <span class="ml-auto text-[10.5px] text-slate-500">{{ event.created_at_display }}</span>
+            {{ mc_pill(group.check_type, "danger") }}
+            <span class="text-[10.5px] font-medium text-red-300">VL {{ group.latest.violation_level_display }}</span>
+            <span class="text-[10.5px] text-slate-500">{{ group.platform }}</span>
+            <span class="ml-auto text-[10.5px] text-slate-500">{{ group.created_at_display }}</span>
           </div>
-          <p class="mt-1.5 break-words text-sm text-slate-300">{{ event.detail }}</p>
+          <p class="mt-1.5 break-words text-sm text-slate-300">{{ group.latest.detail }}</p>
         </article>
+        {% else %}
+        <details class="group border-l-2 border-red-400/50 py-1 pl-3">
+          <summary class="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+            <span class="flex flex-wrap items-center gap-2">
+              {{ mc_pill(group.check_type, "danger") }}
+              <span class="inline-flex items-center rounded-full border border-red-500/25 bg-red-500/15 px-2 py-0.5 text-[10.5px] font-semibold text-red-200">×{{ group.count }}</span>
+              <span class="text-[10.5px] font-medium text-red-300">VL max {{ group.max_violation_level_display }}</span>
+              <span class="text-[10.5px] text-slate-500">{{ group.platform }}</span>
+              <span class="ml-auto text-[10.5px] text-slate-500">{{ group.created_at_display }}</span>
+            </span>
+            <span class="mt-1.5 block break-words text-sm text-slate-300">{{ group.latest.detail }}</span>
+            <span class="mt-1 inline-flex items-center gap-1.5 text-[10.5px] text-cyan-300/80 transition group-hover:text-cyan-300">
+              <span class="transition group-open:rotate-90" aria-hidden="true">▸</span>
+              <span class="group-open:hidden">{{ group.count - 1 }} weitere in {{ group.span_display }} anzeigen</span>
+              <span class="hidden group-open:inline">Einklappen</span>
+            </span>
+          </summary>
+          <div class="mt-2 space-y-2 border-l border-white/[0.08] pl-3">
+            {% for event in group.events %}
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="text-[10.5px] font-medium text-red-300">VL {{ event.violation_level_display }}</span>
+              <span class="ml-auto text-[10.5px] text-slate-500">{{ event.created_at_display }}</span>
+              <p class="w-full break-words text-[13px] text-slate-400">{{ event.detail }}</p>
+            </div>
+            {% endfor %}
+          </div>
+        </details>
+        {% endif %}
         {% endfor %}
       </div>
-      {% endif %}
     </div>
     {% endif %}
   </div>

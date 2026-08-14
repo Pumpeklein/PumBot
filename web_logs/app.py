@@ -4,7 +4,7 @@ import asyncio
 import json
 import re
 import subprocess
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from html import escape
 from pathlib import Path
@@ -274,6 +274,13 @@ ensure_dirs()
 
 app = Flask(__name__)
 app.secret_key = Config.FLASK_SECRET_KEY
+app.config.update(
+    PERMANENT_SESSION_LIFETIME=timedelta(days=Config.SESSION_LIFETIME_DAYS),
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=Config.BASE_URL.lower().startswith("https://"),
+    SESSION_REFRESH_EACH_REQUEST=True,
+)
 app.jinja_env.filters["date_de"] = format_berlin_date
 app.jinja_env.filters["datetime_de"] = format_berlin_datetime
 app.jinja_env.filters["permission_label"] = permission_label
@@ -362,6 +369,7 @@ def _refresh_session_permissions():
         return None
     if "discord_id" not in session:
         return None
+    session.permanent = True
     if refresh_current_user_permissions():
         return None
 

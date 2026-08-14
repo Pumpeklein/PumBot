@@ -15,6 +15,7 @@ DEFAULT_ADMIN_ROLE_ID = os.getenv("DEFAULT_ADMIN_ROLE_ID", "1441253029432262787"
 
 class Config:
     FLASK_SECRET_KEY: str = os.getenv("FLASK_SECRET_KEY", "dev-secret-change-me")
+    SESSION_LIFETIME_DAYS: int = max(1, int(os.getenv("SESSION_LIFETIME_DAYS", "30")))
     LOG_API_KEY: str = os.getenv("LOG_API_KEY", "")
     BASE_URL: str = os.getenv("BASE_URL", "http://127.0.0.1:3000")
     PORT: int = int(os.getenv("PORT", "3000"))

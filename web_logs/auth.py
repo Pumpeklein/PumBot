@@ -143,19 +143,25 @@ def _discord_asset_url(user_id: str, asset_hash: str | None, asset_type: str) ->
     return f"https://cdn.discordapp.com/{asset_type}/{user_id}/{asset_hash}.{ext}"
 
 
-def fetch_guild_member_roles(discord_user_id: str) -> list[str]:
+def fetch_guild_member_roles(discord_user_id: str) -> list[str] | None:
     bot_token = Config.DISCORD_BOT_TOKEN
     if not bot_token:
         logger.warning("fetch_guild_member_roles: no bot token configured")
+        return None
+    try:
+        resp = requests.get(
+            f"{DISCORD_API}/guilds/{DEFAULT_GUILD_ID}/members/{discord_user_id}",
+            headers={"Authorization": f"Bot {bot_token}"},
+            timeout=10,
+        )
+    except requests.RequestException:
+        logger.exception("fetch_guild_member_roles request failed")
+        return None
+    if resp.status_code == 404:
         return []
-    resp = requests.get(
-        f"{DISCORD_API}/guilds/{DEFAULT_GUILD_ID}/members/{discord_user_id}",
-        headers={"Authorization": f"Bot {bot_token}"},
-        timeout=10,
-    )
     if resp.status_code != 200:
         logger.error("fetch_guild_member_roles failed: %d %s", resp.status_code, resp.text)
-        return []
+        return None
     return resp.json().get("roles", [])
 
 
@@ -262,13 +268,15 @@ def login_user_from_oauth(code: str) -> bool:
         )
         replace_user_connections(discord_id, fetch_discord_connections(access_token))
 
-        guild_roles = fetch_guild_member_roles(discord_id)
+        guild_roles = fetch_guild_member_roles(discord_id) or []
         permissions = get_permissions_for_discord_roles(DEFAULT_GUILD_ID, guild_roles)
 
         if not permissions:
             logger.warning("login_user_from_oauth: no permissions for user %s (roles: %s)", discord_id, guild_roles)
             return False
 
+        session.clear()
+        session.permanent = True
         session["discord_id"] = discord_id
         session["discord_username"] = username
         session["discord_avatar"] = avatar_url
@@ -286,6 +294,8 @@ def refresh_current_user_permissions() -> bool:
         return False
 
     guild_roles = fetch_guild_member_roles(str(discord_id))
+    if guild_roles is None:
+        guild_roles = [str(role_id) for role_id in session.get("discord_roles", [])]
     permissions = get_permissions_for_discord_roles(DEFAULT_GUILD_ID, guild_roles)
     session["discord_roles"] = guild_roles
     session["permissions"] = list(permissions)

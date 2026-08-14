@@ -399,6 +399,7 @@ Die wichtigsten Variablen stehen in [.env.example](./.env.example).
 - `DISCORD_TOKEN`
 - `DISCORD_GUILD_ID`
 - `FLASK_SECRET_KEY`
+- `SESSION_LIFETIME_DAYS` (dauerhafter Web-Login, Standard: 30 Tage)
 - `LOG_API_KEY`
 - `DISCORD_CLIENT_ID`
 - `DISCORD_CLIENT_SECRET`

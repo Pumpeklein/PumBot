@@ -50,6 +50,7 @@
       this.period = Number(root.dataset.defaultPeriod || root.dataset.defaultDays || 30);
       this.type = root.dataset.defaultType || "line";
       this.labelFormat = "date";
+      this.isAllTime = false;
       this.hasValues = false;
       this.data = null;
       this.hoverIndex = null;
@@ -133,6 +134,7 @@
         this.data = payload;
         this.metric = payload.metric || this.metric;
         this.labelFormat = payload.label_format || "date";
+        this.isAllTime = payload.all_time === true;
         this.hasValues = (payload.series || []).some((series) => series.values.some(Number.isFinite));
         this.title.textContent = payload.title || "Statistik";
         this.subtitle.textContent = payload.subtitle || "";
@@ -222,7 +224,11 @@
       ctx.fillStyle = "#64748b";
       ctx.textAlign = "center";
       for (const index of labelIndexes) {
-        ctx.fillText(dateLabel(this.data.labels[index], this.period >= 365, this.labelFormat), x(index), height - 13);
+        ctx.fillText(
+          dateLabel(this.data.labels[index], this.isAllTime || this.period >= 365, this.labelFormat),
+          x(index),
+          height - 13,
+        );
       }
 
       if (this.type === "bar") this.drawBars(ctx, plot, x, y);

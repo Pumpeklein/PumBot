@@ -20,10 +20,10 @@ from pymysql.cursors import DictCursor
 
 try:
     from .config import Config
-    from .datetime_format import format_berlin_datetime
+    from .datetime_format import BERLIN_TZ, berlin_today, format_berlin_datetime
 except ImportError:  # pragma: no cover - direct script execution
     from config import Config
-    from datetime_format import format_berlin_datetime
+    from datetime_format import BERLIN_TZ, berlin_today, format_berlin_datetime
 
 logger = logging.getLogger("web_logs.mc_db")
 
@@ -600,13 +600,26 @@ def get_overview() -> dict:
 # ══════════ Players ══════════
 
 CHART_DAYS = (7, 30, 90, 365)
+ALL_TIME_CHART_DAYS = 0
 SERVER_CHART_HOURS = (1, 6, 24, 168)
+ALL_TIME_CHART_HOURS = 0
 MODERATION_CHART_METRICS = {"reports", "bans", "warnings", "mutes"}
+EVENT_CHART_DEFINITIONS = {
+    "chat": ("pc_chat_messages", "created_at", "Chatnachrichten", "#22d3ee"),
+    "reports": ("pc_reports", "created_at", "Reports", "#fb7185"),
+    "bans": ("pc_punishments", "created_at", "Bans", "#f87171"),
+    "warnings": ("pc_warnings", "created_at", "Verwarnungen", "#fbbf24"),
+    "mutes": ("pc_mutes", "muted_at", "Mutes", "#c084fc"),
+}
 
 
-def _chart_dates(days: int) -> list[date]:
-    safe_days = days if days in CHART_DAYS else 30
-    today = date.today()
+def _chart_dates(days: int, earliest: date | None = None) -> list[date]:
+    today = berlin_today()
+    if days == ALL_TIME_CHART_DAYS:
+        start = min(earliest or today, today)
+        safe_days = (today - start).days + 1
+    else:
+        safe_days = days if days in CHART_DAYS else 30
     return [today - timedelta(days=offset) for offset in range(safe_days - 1, -1, -1)]
 
 
@@ -616,6 +629,48 @@ def _date_key(value: Any) -> str:
     if isinstance(value, date):
         return value.isoformat()
     return str(value)
+
+
+def _epoch_millis_date(value: Any) -> date | None:
+    try:
+        millis = int(value)
+    except (TypeError, ValueError):
+        return None
+    if millis <= 0:
+        return None
+    return datetime.fromtimestamp(millis / 1000, tz=timezone.utc).astimezone(
+        BERLIN_TZ
+    ).date()
+
+
+def _first_chart_date(metric: str, player_uuid: str | None = None) -> date | None:
+    params: tuple[Any, ...] = ()
+    if metric == "players":
+        sql = "SELECT MIN(first_seen) AS first_value FROM pc_players WHERE first_seen > 0"
+        epoch_millis = True
+    elif metric == "playtime":
+        if not _table_supported("pc_playtime_history"):
+            return None
+        player_filter = " WHERE player_uuid = %s" if player_uuid else ""
+        params = (player_uuid,) if player_uuid else ()
+        sql = f"SELECT MIN(snapshot_date) AS first_value FROM pc_playtime_history{player_filter}"
+        epoch_millis = False
+    else:
+        definition = EVENT_CHART_DEFINITIONS.get(metric)
+        if definition is None or not _table_supported(definition[0]):
+            return None
+        table, time_column, _, _ = definition
+        sql = f"SELECT MIN({time_column}) AS first_value FROM {table}"
+        epoch_millis = True
+
+    with _connect() as conn:
+        row = conn.query_one(sql, params) or {}
+    value = row.get("first_value")
+    if epoch_millis:
+        return _epoch_millis_date(value)
+    if isinstance(value, datetime):
+        return value.date()
+    return value if isinstance(value, date) else None
 
 
 def get_player_growth_summary(days: int = 30) -> dict:
@@ -644,14 +699,7 @@ def get_player_growth_summary(days: int = 30) -> dict:
 
 
 def _event_chart(metric: str, dates: list[date]) -> dict:
-    definitions = {
-        "chat": ("pc_chat_messages", "created_at", "Chatnachrichten", "#22d3ee"),
-        "reports": ("pc_reports", "created_at", "Reports", "#fb7185"),
-        "bans": ("pc_punishments", "created_at", "Bans", "#f87171"),
-        "warnings": ("pc_warnings", "created_at", "Verwarnungen", "#fbbf24"),
-        "mutes": ("pc_mutes", "muted_at", "Mutes", "#c084fc"),
-    }
-    table, time_column, label, color = definitions[metric]
+    table, time_column, label, color = EVENT_CHART_DEFINITIONS[metric]
     values = {day.isoformat(): 0 for day in dates}
     if not _table_supported(table):
         return {"label": label, "color": color, "values": list(values.values())}
@@ -782,10 +830,18 @@ def _playtime_chart(dates: list[date], player_uuid: str | None = None) -> list[d
 
 
 def get_statistics_chart(metric: str = "players", days: int = 30) -> dict:
-    safe_days = days if days in CHART_DAYS else 30
+    safe_days = (
+        days
+        if days in CHART_DAYS or days == ALL_TIME_CHART_DAYS
+        else 30
+    )
     valid_metrics = {"players", "playtime", "chat"} | MODERATION_CHART_METRICS
     safe_metric = metric if metric in valid_metrics else "players"
-    dates = _chart_dates(safe_days)
+    first_date = _first_chart_date(safe_metric)
+    dates = _chart_dates(
+        safe_days,
+        earliest=first_date if safe_days == ALL_TIME_CHART_DAYS else None,
+    )
     metadata = {
         "players": ("Spielerzuwachs", "Registrierte Spieler", "count"),
         "playtime": ("Playtime", "Kumulierte Server-Spielzeit", "seconds"),
@@ -796,6 +852,8 @@ def get_statistics_chart(metric: str = "players", days: int = 30) -> dict:
         "mutes": ("Mutes", "Ausgesprochene Mutes pro Tag", "count"),
     }
     title, subtitle, unit = metadata[safe_metric]
+    if safe_metric == "playtime" and first_date is not None:
+        subtitle += f" · Verlauf seit {first_date:%d.%m.%Y}"
     if safe_metric == "players":
         series = _player_growth_chart(dates)
     elif safe_metric == "playtime":
@@ -805,6 +863,8 @@ def get_statistics_chart(metric: str = "players", days: int = 30) -> dict:
     return {
         "metric": safe_metric,
         "days": safe_days,
+        "all_time": safe_days == ALL_TIME_CHART_DAYS,
+        "history_start": first_date.isoformat() if first_date else None,
         "title": title,
         "subtitle": subtitle,
         "unit": unit,
@@ -814,13 +874,26 @@ def get_statistics_chart(metric: str = "players", days: int = 30) -> dict:
 
 
 def get_player_playtime_chart(player_uuid: str, days: int = 30) -> dict:
-    safe_days = days if days in CHART_DAYS else 30
-    dates = _chart_dates(safe_days)
+    safe_days = (
+        days
+        if days in CHART_DAYS or days == ALL_TIME_CHART_DAYS
+        else 30
+    )
+    first_date = _first_chart_date("playtime", player_uuid)
+    dates = _chart_dates(
+        safe_days,
+        earliest=first_date if safe_days == ALL_TIME_CHART_DAYS else None,
+    )
+    subtitle = "Gesamt, Aktiv und AFK pro Tag"
+    if first_date is not None:
+        subtitle += f" · Verlauf seit {first_date:%d.%m.%Y}"
     return {
         "metric": "playtime",
         "days": safe_days,
+        "all_time": safe_days == ALL_TIME_CHART_DAYS,
+        "history_start": first_date.isoformat() if first_date else None,
         "title": "Playtime-Verlauf",
-        "subtitle": "Gesamt, Aktiv und AFK pro Tag",
+        "subtitle": subtitle,
         "unit": "seconds",
         "labels": [day.isoformat() for day in dates],
         "series": _playtime_chart(dates, player_uuid),
@@ -917,7 +990,11 @@ def get_server_performance() -> dict:
 
 
 def get_server_performance_chart(metric: str = "tps", hours: int = 6) -> dict:
-    safe_hours = hours if hours in SERVER_CHART_HOURS else 6
+    safe_hours = (
+        hours
+        if hours in SERVER_CHART_HOURS or hours == ALL_TIME_CHART_HOURS
+        else 6
+    )
     valid_metrics = {"tps", "mspt", "cpu", "memory", "players", "chunks", "entities"}
     safe_metric = metric if metric in valid_metrics else "tps"
     metadata = {
@@ -934,12 +1011,38 @@ def get_server_performance_chart(metric: str = "tps", hours: int = 6) -> dict:
         return {
             "metric": safe_metric, "hours": safe_hours, "title": title,
             "subtitle": subtitle, "unit": unit, "label_format": "datetime",
+            "all_time": safe_hours == ALL_TIME_CHART_HOURS,
             "labels": [], "series": [],
         }
 
-    bucket_minutes = {1: 1, 6: 2, 24: 5, 168: 30}[safe_hours]
+    current_ms = now_ms()
+    if safe_hours == ALL_TIME_CHART_HOURS:
+        with _connect() as conn:
+            first_captured = int(
+                conn.scalar(
+                    "SELECT MIN(captured_at) AS first_captured FROM pc_server_metrics",
+                    default=current_ms,
+                )
+                or current_ms
+            )
+        since = min(first_captured, current_ms)
+        span_hours = max(1, (current_ms - since + 3_599_999) // 3_600_000)
+    else:
+        span_hours = safe_hours
+        since = current_ms - safe_hours * 60 * 60 * 1000
+    if span_hours <= 1:
+        bucket_minutes = 1
+    elif span_hours <= 6:
+        bucket_minutes = 2
+    elif span_hours <= 24:
+        bucket_minutes = 5
+    elif span_hours <= 168:
+        bucket_minutes = 30
+    elif span_hours <= 720:
+        bucket_minutes = 120
+    else:
+        bucket_minutes = 1440
     bucket_ms = bucket_minutes * 60 * 1000
-    since = now_ms() - safe_hours * 60 * 60 * 1000
     expressions = {
         "tps": (
             ("1 Minute", "AVG(tps_1m)", "#22d3ee"),
@@ -986,6 +1089,7 @@ def get_server_performance_chart(metric: str = "tps", hours: int = 6) -> dict:
     return {
         "metric": safe_metric,
         "hours": safe_hours,
+        "all_time": safe_hours == ALL_TIME_CHART_HOURS,
         "title": title,
         "subtitle": subtitle,
         "unit": unit,

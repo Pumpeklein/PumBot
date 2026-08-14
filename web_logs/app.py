@@ -3331,7 +3331,11 @@ def _minecraft_chart_days() -> int:
         days = int(request.args.get("days", "30"))
     except (TypeError, ValueError):
         return 30
-    return days if days in mc_db.CHART_DAYS else 30
+    return (
+        days
+        if days in mc_db.CHART_DAYS or days == mc_db.ALL_TIME_CHART_DAYS
+        else 30
+    )
 
 
 def _minecraft_server_chart_hours() -> int:
@@ -3339,7 +3343,12 @@ def _minecraft_server_chart_hours() -> int:
         hours = int(request.args.get("hours", "6"))
     except (TypeError, ValueError):
         return 6
-    return hours if hours in mc_db.SERVER_CHART_HOURS else 6
+    return (
+        hours
+        if hours in mc_db.SERVER_CHART_HOURS
+        or hours == mc_db.ALL_TIME_CHART_HOURS
+        else 6
+    )
 
 
 @app.get("/minecraft/statistiken/server")

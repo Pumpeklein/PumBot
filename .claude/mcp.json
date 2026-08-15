@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "pterodactyl": {
+      "command": "npx",
+      "args": ["@duruma/pterodactyl-mcp", "--stdio"],
+      "env": {
+        "PTERODACTYL_URL": "https://panel.pumpe-klein.de",
+        "PTERODACTYL_APP_KEY": "ptla_tMyn9DfRACNbnQhbId7hp0x3xE1RSrvmBCsnrYY2TGW",
+        "PTERODACTYL_CLIENT_KEY": "ptlc_7Ggl2RZzs2a7nLfW8VGqt7iJtyWQwnjyv2jy3ubIiOs"
+      }
+    }
+  }
+}

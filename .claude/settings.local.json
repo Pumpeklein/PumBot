@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mv pumpebot-next-scaffold/* pumpebot-next-scaffold/.[!.]* PumpeBot_Next/)",
+      "Bash(rmdir pumpebot-next-scaffold *)",
+      "Bash(rm -rf node_modules)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm add *)",
+      "Bash(rmdir \"src/app/api/bot/guild/[guildId]/members/sync\")",
+      "Bash(npx next *)",
+      "Bash(pnpm typecheck *)",
+      "Bash(sed -i 's|\\(env, permissions, navigation, tickets\\)|\\(env, permissions, navigation.tsx, tickets\\)|' CLAUDE.md)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(pnpm lint *)",
+      "Bash(pnpm build *)",
+      "Bash(xargs -I{} echo \"Build erfolgreich: {} Routen\")",
+      "Bash(cd /c/Development/PumpeBot_Next && echo \"=== Wird ui/sidebar oder ui/pagination irgendwo importiert? ===\" && grep -rn \"ui/sidebar\\\\|ui/pagination\" src --include=*.tsx --include=*.ts | grep -v \"^src/components/ui/\" || echo \"  nein\"; echo; rm -f src/components/ui/sidebar.tsx src/components/ui/pagination.tsx && echo \"Entfernt: ui/sidebar.tsx, ui/pagination.tsx \\(durch eigene Panel-Bausteine ersetzt\\)\" && pnpm typecheck 2>&1 | tail -3)",
+      "Bash(cd /c/Development/PumpeBot_Next *)",
+      "Bash(grep -vE \"^\\\\s*$\")",
+      "Bash(grep -vE \"^\\\\s*$\" web_logs/templates/server_stats.html)"
+    ],
+    "additionalDirectories": [
+      "c:\\Development\\PumBot\\src\\components\\ui",
+      "c:\\Development\\PumBot"
+    ]
+  }
+}

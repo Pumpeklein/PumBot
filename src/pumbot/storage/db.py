@@ -7,24 +7,15 @@ from typing import Any
 import pymysql
 from pymysql.cursors import DictCursor
 
-try:
-    from .config import (
-        BASE_DIR,
-        Config,
-        ensure_dirs,
-        DEFAULT_GUILD_ID,
-        DEFAULT_ADMIN_ROLE_ID,
-    )
-    from .datetime_format import berlin_today
-except ImportError:
-    from config import (
-        BASE_DIR,
-        Config,
-        ensure_dirs,
-        DEFAULT_GUILD_ID,
-        DEFAULT_ADMIN_ROLE_ID,
-    )
-    from datetime_format import berlin_today
+from src.pumbot.utils.datetime_format import berlin_today
+
+from .config import (
+    BASE_DIR,
+    Config,
+    DEFAULT_ADMIN_ROLE_ID,
+    DEFAULT_GUILD_ID,
+    ensure_dirs,
+)
 
 
 class DatabaseConnection:

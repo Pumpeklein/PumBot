@@ -5,20 +5,16 @@ import contextlib
 import logging
 import os
 from pathlib import Path
-from threading import Thread
 from typing import Any, Final, Optional
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 from dotenv import load_dotenv
-from werkzeug.serving import make_server
 
 from src.pumbot import config
 from src.pumbot.services.api_client import ApiClient
-from web_logs.app import create_app
-from web_logs.config import Config as WebConfig
-from web_logs.db import (
+from src.pumbot.storage.db import (
     get_all_log_channels,
     get_permissions_for_discord_roles,
     mark_guild_member_left,
@@ -695,29 +691,7 @@ async def on_app_command_error(
     await reply_ephemeral(interaction, "Da ist ein Fehler passiert.")
 
 
-class WebServerThread(Thread):
-    def __init__(self, host: str, port: int, discord_bot=None):
-        super().__init__(name="flask-web", daemon=True)
-        self.host = host
-        self.port = port
-        self._bot = discord_bot
-        self._server = None
-
-    def run(self) -> None:
-        flask_app = create_app()
-        flask_app.config["DISCORD_BOT"] = self._bot
-        self._server = make_server(self.host, self.port, flask_app, threaded=True)
-        logger.info("Web-Interface gestartet auf http://%s:%s", self.host, self.port)
-        self._server.serve_forever()
-
-    def shutdown(self) -> None:
-        if self._server is not None:
-            self._server.shutdown()
-
-
 async def main() -> None:
-    web_server = WebServerThread("0.0.0.0", WebConfig.PORT, discord_bot=bot)
-    web_server.start()
     try:
         async with bot:
             await bot.start(TOKEN)
@@ -726,8 +700,6 @@ async def main() -> None:
         raise
     finally:
         await bot.api.close()
-        web_server.shutdown()
-        web_server.join(timeout=5)
 
 
 if __name__ == "__main__":

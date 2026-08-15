@@ -1,11 +1,11 @@
 # PumBot
 
-PumBot ist ein Discord-Bot für Community- und Server-Management mit integriertem Web-Panel. Das Projekt kombiniert einen `discord.py`-Bot mit einer lokalen Flask-Anwendung, die gleichzeitig als Admin-Oberfläche, interne API und Ticket-Archiv dient.
+PumBot ist ein Discord-Bot für Community- und Server-Management. Der Bot spricht direkt mit der MySQL-Datenbank; die Admin-Oberfläche ist seit August 2026 ein eigener Dienst (PumpeBot_Next) und läuft nicht mehr in diesem Prozess.
 
 Der aktuelle Stand des Projekts ist kein reiner Chat-Bot, sondern ein kleines Gesamtsystem:
 
 - Der Bot führt Slash-Commands, Event-Handler und Hintergrundjobs aus.
-- Das Web-Panel verwaltet Konfigurationen, Tickets, Feature-Daten und Rollen-/Rechtezuordnung.
+- Konfiguration, Tickets, Feature-Daten und Rollenrechte liegen in der MySQL-Datenbank, die sich Bot und Panel teilen.
 - Beide Komponenten teilen sich dieselbe MySQL/MariaDB-Datenbank und kommunizieren zusätzlich über eine interne HTTP-API.
 
 ## Gesamtkonzept
@@ -18,19 +18,11 @@ Die Architektur besteht aus drei Schichten:
 - Startet alle Command-Cogs, registriert persistente Views für Ticket-Buttons und synchronisiert Slash-Commands.
 - Nutzt `discord.py`, Message-/Member-/Reaction-Events sowie einzelne `tasks.loop`-Jobs.
 
-2. Web-Panel + interne API
-
-- Implementiert in [web_logs/app.py](./web_logs/app.py).
-- Läuft im selben Prozess parallel zum Bot in einem eigenen Thread über einen lokalen Flask-Server.
-- Hat zwei Rollen:
-  - Web-Oberfläche für Moderation, Konfiguration und Ticket-Ansicht
-  - interne REST-API für den Bot
-
 3. Datenhaltung
 
 - MySQL/MariaDB-Datenbank, konfiguriert über `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
-- Schema in [web_logs/models_mysql.sql](./web_logs/models_mysql.sql)
-- Zugriff über [web_logs/db.py](./web_logs/db.py)
+- Schema in der PumpeBot_Next-Migration
+- Zugriff über [src/pumbot/storage/db.py](./src/pumbot/storage/db.py)
 
 Der Bot arbeitet fachlich gegen die interne API in [src/pumbot/services/api_client.py](./src/pumbot/services/api_client.py), statt direkt in die Datenbank zu schreiben. Dadurch bleibt die Datenlogik an einer Stelle gebündelt.
 
@@ -40,7 +32,6 @@ Beim Start passiert im Wesentlichen Folgendes:
 
 - `.env` wird geladen.
 - Der Discord-Bot wird initialisiert.
-- Parallel dazu startet ein lokaler Flask-Server auf `127.0.0.1:<PORT>`.
 - Der Bot lädt alle Cogs aus `src/pumbot/commands`.
 - Der Bot spricht die Flask-API über `API_BASE_URL` und `LOG_API_KEY` an.
 
@@ -62,7 +53,6 @@ Das bedeutet: Bot und Panel gehören logisch zusammen und sind auf einen gemeins
 Wichtige Dateien:
 
 - [src/pumbot/commands/TicketSystemCommand.py](./src/pumbot/commands/TicketSystemCommand.py)
-- [web_logs/app.py](./web_logs/app.py)
 - [web_logs/templates/tickets.html](./web_logs/templates/tickets.html)
 - [web_logs/templates/ticket_detail.html](./web_logs/templates/ticket_detail.html)
 
@@ -76,7 +66,7 @@ Wichtige Dateien:
 Wichtige Dateien:
 
 - [src/pumbot/commands/selfrolesCommand.py](./src/pumbot/commands/selfrolesCommand.py)
-- [web_logs/db.py](./web_logs/db.py)
+- [src/pumbot/storage/db.py](./src/pumbot/storage/db.py)
 
 ### Geburtstage
 
@@ -241,7 +231,6 @@ Das Web-Panel arbeitet mit einem zweistufigen Rechtekonzept:
 - In der Tabelle `roles` werden Discord-Rollen internen Rechten zugeordnet.
 - Die vollständige Liste der aktuell definierten Rechte liegt in `web_logs/db.py` als `ALL_PERMISSIONS`.
 
-Die Rechteprüfung erfolgt in [web_logs/auth.py](./web_logs/auth.py) und [web_logs/app.py](./web_logs/app.py).
 
 ### Permission-Tabelle
 

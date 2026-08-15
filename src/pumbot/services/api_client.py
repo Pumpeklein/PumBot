@@ -1,137 +1,129 @@
 from __future__ import annotations
 
+import asyncio
+import html
 import logging
-import os
+import re
 from typing import Any
 
-import aiohttp
+from src.pumbot.storage import db
+from src.pumbot.storage.config import TRANSCRIPTS_DIR, ensure_dirs
+from src.pumbot.utils.datetime_format import format_berlin_datetime
 
 logger = logging.getLogger("discord_bot.api_client")
 
+_TRANSCRIPT_DATETIME = re.compile(
+    r"\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?"
+)
+
+
+def _format_transcript_dates(markup: str) -> str:
+    return _TRANSCRIPT_DATETIME.sub(
+        lambda match: format_berlin_datetime(match.group(0), fallback=match.group(0)),
+        markup,
+    )
+
+
+def _render_transcript_html(data: dict[str, Any]) -> str:
+    markup = (data.get("transcript_html") or "").strip()
+    if markup:
+        return _format_transcript_dates(markup)
+    text = data.get("transcript_text") or ""
+    if text:
+        return _format_transcript_dates(f"<pre>{html.escape(text)}</pre>")
+    return ""
+
 
 class ApiClient:
-    """Async HTTP client for the bot to talk to the Flask API."""
+    """Datenzugriff der Cogs.
 
-    def __init__(self) -> None:
-        self.base_url = os.getenv("API_BASE_URL", "http://127.0.0.1:3000")
-        self.api_key = os.getenv("LOG_API_KEY", "")
-        self._session: aiohttp.ClientSession | None = None
+    Früher lief das als HTTP-Client gegen das mitlaufende Flask-Panel. Das Panel
+    ist inzwischen ein eigener Next.js-Dienst, deshalb greifen die Methoden nun
+    direkt auf die Datenbank zu. Namen und Rückgabewerte bleiben unverändert,
+    damit die Cogs nichts merken.
 
-    async def _get_session(self) -> aiohttp.ClientSession:
-        if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession()
-        return self._session
+    pymysql blockiert, deshalb läuft jeder Aufruf über einen Worker-Thread.
+    """
 
-    def _headers(self) -> dict[str, str]:
-        return {"X-API-KEY": self.api_key, "Content-Type": "application/json"}
-
-    async def _request(self, method: str, path: str, **kwargs: Any) -> Any:
-        session = await self._get_session()
-        url = f"{self.base_url}{path}"
+    @staticmethod
+    async def _call(func: Any, *args: Any, **kwargs: Any) -> Any:
         try:
-            async with session.request(method, url, headers=self._headers(), **kwargs) as resp:
-                if resp.status == 404:
-                    return None
-                if resp.status >= 400:
-                    text = await resp.text()
-                    logger.error("API %s %s -> %d: %s", method, path, resp.status, text)
-                    return None
-                return await resp.json()
-        except Exception as e:
-            logger.error("API request failed: %s %s - %s", method, path, e)
+            return await asyncio.to_thread(func, *args, **kwargs)
+        except Exception as error:  # eine kaputte Abfrage darf den Bot nicht stoppen
+            logger.error("Datenbankaufruf %s fehlgeschlagen: %s", func.__name__, error)
             return None
 
-    async def get(self, path: str, **params: Any) -> Any:
-        return await self._request("GET", path, params=params)
-
-    async def post(self, path: str, data: dict | None = None) -> Any:
-        return await self._request("POST", path, json=data)
-
-    async def put(self, path: str, data: dict | None = None) -> Any:
-        return await self._request("PUT", path, json=data)
-
-    async def delete(self, path: str) -> Any:
-        return await self._request("DELETE", path)
-
     async def close(self) -> None:
-        if self._session and not self._session.closed:
-            await self._session.close()
+        """Kompatibilität: früher wurde hier die HTTP-Session geschlossen."""
 
     # ── Config ──
 
     async def get_config(self, guild_id: str, key: str) -> str | None:
-        result = await self.get(f"/api/guild/{guild_id}/config/{key}")
-        return result.get("value") if result else None
+        return await self._call(db.get_config, guild_id, key)
 
     async def set_config(self, guild_id: str, key: str, value: str) -> None:
-        await self.put(f"/api/guild/{guild_id}/config/{key}", {"value": value})
+        await self._call(db.set_config, guild_id, key, value)
+
+    # ── Mitglieder ──
 
     async def sync_guild_members(
         self, guild_id: str, members: list[dict], mark_missing_left: bool = True
     ) -> dict | None:
-        return await self.post(
-            f"/api/guild/{guild_id}/members/sync",
-            {"members": members, "mark_missing_left": mark_missing_left},
+        return await self._call(
+            db.sync_guild_members, guild_id, members, mark_missing_left=mark_missing_left
         )
 
     async def upsert_guild_member(
         self, guild_id: str, user_id: str, data: dict
     ) -> dict | None:
-        return await self.put(f"/api/guild/{guild_id}/members/{user_id}", data)
+        return await self._call(db.upsert_guild_member, guild_id, {**data, "user_id": user_id})
 
     async def mark_guild_member_left(self, guild_id: str, user_id: str) -> None:
-        await self.post(f"/api/guild/{guild_id}/members/{user_id}/left")
+        await self._call(db.mark_guild_member_left, guild_id, user_id)
+
+    # ── Nachrichten ──
 
     async def upsert_guild_message(self, guild_id: str, data: dict) -> dict | None:
-        return await self.post(f"/api/guild/{guild_id}/messages", data)
+        return await self._call(db.upsert_guild_message, guild_id, data)
 
     async def upsert_guild_messages(
         self, guild_id: str, messages: list[dict], *, insert_only: bool = False
     ) -> dict | None:
-        return await self.post(
-            f"/api/guild/{guild_id}/messages/bulk",
-            {"messages": messages, "insert_only": insert_only},
+        return await self._call(
+            db.upsert_guild_messages, guild_id, messages, insert_only=insert_only
         )
 
     async def mark_guild_message_deleted(
         self, guild_id: str, channel_id: str, message_id: str
     ) -> None:
-        await self.post(f"/api/guild/{guild_id}/messages/{channel_id}/{message_id}/delete")
+        await self._call(db.mark_guild_message_deleted, guild_id, channel_id, message_id)
 
-    # ── Birthdays ──
+    # ── Geburtstage ──
 
     async def get_birthdays(self, guild_id: str) -> list:
-        return await self.get(f"/api/guild/{guild_id}/birthdays") or []
+        return await self._call(db.get_birthdays, guild_id) or []
 
     async def get_birthday(self, guild_id: str, user_id: str) -> dict | None:
-        return await self.get(f"/api/guild/{guild_id}/birthdays/{user_id}")
+        return await self._call(db.get_birthday, guild_id, user_id)
 
     async def set_birthday(
         self, guild_id: str, user_id: str, day: int, month: int, year: int | None = None
     ) -> None:
-        await self.put(
-            f"/api/guild/{guild_id}/birthdays/{user_id}",
-            {"day": day, "month": month, "year": year},
-        )
+        await self._call(db.set_birthday, guild_id, user_id, day, month, year)
 
     async def delete_birthday(self, guild_id: str, user_id: str) -> None:
-        await self.delete(f"/api/guild/{guild_id}/birthdays/{user_id}")
+        await self._call(db.delete_birthday, guild_id, user_id)
 
     async def get_birthdays_today(self, guild_id: str) -> list:
-        return await self.get(f"/api/guild/{guild_id}/birthdays/today") or []
+        return await self._call(db.get_birthdays_today, guild_id) or []
 
     async def mark_birthday_congrats(self, guild_id: str, user_id: str) -> None:
-        await self.post(f"/api/guild/{guild_id}/birthdays/{user_id}/congrats")
+        await self._call(db.mark_birthday_congrats, guild_id, user_id)
 
-    # ── Warnings ──
+    # ── Bot-Nachrichten ──
 
-    async def get_bot_messages(
-        self, guild_id: str, message_type: str | None = None
-    ) -> list:
-        params: dict[str, Any] = {}
-        if message_type is not None:
-            params["message_type"] = message_type
-        return await self.get(f"/api/guild/{guild_id}/bot_messages", **params) or []
+    async def get_bot_messages(self, guild_id: str, message_type: str | None = None) -> list:
+        return await self._call(db.list_bot_messages, guild_id, message_type) or []
 
     async def upsert_bot_message(
         self,
@@ -141,168 +133,207 @@ class ApiClient:
         channel_id: str | None = None,
         meta_key: str | None = None,
     ) -> dict | None:
-        data: dict[str, Any] = {}
-        if channel_id is not None:
-            data["channel_id"] = channel_id
-        if meta_key is not None:
-            data["meta_key"] = meta_key
-        return await self.put(
-            f"/api/guild/{guild_id}/bot_messages/{message_type}/{message_id}",
-            data,
+        return await self._call(
+            db.upsert_bot_message,
+            guild_id,
+            message_type,
+            message_id,
+            channel_id=channel_id,
+            meta_key=meta_key,
         )
 
     async def delete_bot_message(
         self, guild_id: str, message_type: str, message_id: str
     ) -> None:
-        await self.delete(
-            f"/api/guild/{guild_id}/bot_messages/{message_type}/{message_id}"
-        )
+        await self._call(db.delete_bot_message, guild_id, message_type, message_id)
+
+    # ── Verwarnungen ──
 
     async def get_warnings(self, guild_id: str, user_id: str) -> list:
-        return await self.get(f"/api/guild/{guild_id}/warnings/{user_id}") or []
+        return await self._call(db.get_warnings, guild_id, user_id) or []
 
     async def add_warning(
         self, guild_id: str, user_id: str, moderator_id: str, reason: str
     ) -> dict | None:
-        return await self.post(
-            f"/api/guild/{guild_id}/warnings",
-            {"user_id": user_id, "moderator_id": moderator_id, "reason": reason},
-        )
+        return await self._call(db.add_warning, guild_id, user_id, moderator_id, reason)
 
     async def remove_warning(self, guild_id: str, warning_id: int) -> None:
-        await self.delete(f"/api/guild/{guild_id}/warnings/{warning_id}")
+        await self._call(db.remove_warning, warning_id)
 
     async def clear_warnings(self, guild_id: str, user_id: str) -> None:
-        await self.delete(f"/api/guild/{guild_id}/warnings/user/{user_id}")
+        await self._call(db.clear_warnings, guild_id, user_id)
 
     # ── Counting ──
 
     async def get_counting(self, guild_id: str) -> dict | None:
-        return await self.get(f"/api/guild/{guild_id}/counting")
+        return await self._call(db.get_counting, guild_id)
 
     async def set_counting(self, guild_id: str, **kwargs: Any) -> None:
-        await self.put(f"/api/guild/{guild_id}/counting", kwargs)
+        await self._call(db.set_counting, guild_id, **kwargs)
 
     async def get_counting_stats(self, guild_id: str, user_id: str) -> dict | None:
-        return await self.get(f"/api/guild/{guild_id}/counting/stats/{user_id}")
+        return await self._call(db.get_counting_stats, guild_id, user_id)
 
     async def set_counting_stats(self, guild_id: str, user_id: str, **kwargs: Any) -> None:
-        await self.put(f"/api/guild/{guild_id}/counting/stats/{user_id}", kwargs)
+        await self._call(db.set_counting_stats, guild_id, user_id, **kwargs)
 
     async def get_counting_leaderboard(self, guild_id: str, limit: int = 10) -> list:
-        return await self.get(f"/api/guild/{guild_id}/counting/leaderboard", limit=limit) or []
+        return await self._call(db.get_counting_leaderboard, guild_id, limit) or []
 
     # ── Auto Publisher ──
 
     async def get_auto_publisher_channels(self, guild_id: str) -> list:
-        return await self.get(f"/api/guild/{guild_id}/auto_publisher") or []
+        return await self._call(db.get_auto_publisher_channels, guild_id) or []
 
     async def add_auto_publisher_channel(self, guild_id: str, channel_id: str) -> None:
-        await self.post(f"/api/guild/{guild_id}/auto_publisher", {"channel_id": channel_id})
+        await self._call(db.add_auto_publisher_channel, guild_id, channel_id)
 
     async def remove_auto_publisher_channel(self, guild_id: str, channel_id: str) -> None:
-        await self.delete(f"/api/guild/{guild_id}/auto_publisher/{channel_id}")
+        await self._call(db.remove_auto_publisher_channel, guild_id, channel_id)
 
     # ── Selfroles ──
 
     async def get_selfrole_panel(self, guild_id: str, message_id: str) -> dict | None:
-        return await self.get(f"/api/guild/{guild_id}/selfroles/{message_id}")
+        return await self._call(db.get_selfrole_panel, message_id)
 
     async def get_all_selfrole_panels(self, guild_id: str) -> list:
-        return await self.get(f"/api/guild/{guild_id}/selfroles") or []
+        return await self._call(db.get_all_selfrole_panels, guild_id) or []
 
     async def create_selfrole_panel(
-        self, guild_id: str, message_id: str, channel_id: str,
-        title: str, max_roles: int, roles: dict,
+        self,
+        guild_id: str,
+        message_id: str,
+        channel_id: str,
+        title: str,
+        max_roles: int,
+        roles: dict,
     ) -> dict | None:
-        return await self.post(f"/api/guild/{guild_id}/selfroles", {
-            "message_id": message_id, "channel_id": channel_id,
-            "title": title, "max_roles": max_roles, "roles": roles,
-        })
+        return await self._call(
+            db.create_selfrole_panel, guild_id, message_id, channel_id, title, max_roles, roles
+        )
 
     async def add_selfrole_mapping(
         self, guild_id: str, message_id: str, emoji: str, role_id: str
     ) -> None:
-        await self.put(
-            f"/api/guild/{guild_id}/selfroles/{message_id}/roles",
-            {"emoji": emoji, "role_id": role_id},
-        )
+        await self._call(db.add_selfrole_mapping, message_id, emoji, role_id)
 
-    async def remove_selfrole_mapping(
-        self, guild_id: str, message_id: str, emoji: str
-    ) -> None:
-        await self.delete(f"/api/guild/{guild_id}/selfroles/{message_id}/roles/{emoji}")
+    async def remove_selfrole_mapping(self, guild_id: str, message_id: str, emoji: str) -> None:
+        await self._call(db.remove_selfrole_mapping, message_id, emoji)
 
     async def delete_selfrole_panel(self, guild_id: str, message_id: str) -> None:
-        await self.delete(f"/api/guild/{guild_id}/selfroles/{message_id}")
+        await self._call(db.delete_selfrole_panel, message_id)
 
-    # ── Server Stats ──
+    # ── Server-Statistiken ──
 
     async def get_server_stats(self, guild_id: str) -> dict:
-        return await self.get(f"/api/guild/{guild_id}/server_stats") or {}
+        return await self._call(db.get_server_stats, guild_id) or {}
 
     async def set_server_stats(self, guild_id: str, data: dict) -> None:
-        await self.put(f"/api/guild/{guild_id}/server_stats", data)
+        await self._call(db.set_server_stats, guild_id, **data)
 
-    # ── Log Channels ──
+    # ── Log-Kanäle ──
 
     async def get_log_channel(self, guild_id: str, log_type: str) -> str | None:
-        result = await self.get(f"/api/guild/{guild_id}/log_channels/{log_type}")
-        return result.get("channel_id") if result else None
+        return await self._call(db.get_log_channel, guild_id, log_type)
 
     async def set_log_channel(self, guild_id: str, log_type: str, channel_id: str) -> None:
-        await self.put(
-            f"/api/guild/{guild_id}/log_channels/{log_type}",
-            {"channel_id": channel_id},
-        )
+        await self._call(db.set_log_channel, guild_id, log_type, channel_id)
 
     async def get_all_log_channels(self, guild_id: str) -> dict:
-        return await self.get(f"/api/guild/{guild_id}/log_channels") or {}
+        return await self._call(db.get_all_log_channels, guild_id) or {}
 
-    # ── Twitch Config ──
+    # ── Twitch ──
 
     async def get_twitch_config(self, guild_id: str) -> dict | None:
-        return await self.get(f"/api/guild/{guild_id}/twitch_config")
+        return await self._call(db.get_twitch_config, guild_id)
 
     async def set_twitch_config(self, guild_id: str, **kwargs: Any) -> None:
-        await self.put(f"/api/guild/{guild_id}/twitch_config", kwargs)
+        await self._call(db.set_twitch_config, guild_id, **kwargs)
 
     async def remove_twitch_config(self, guild_id: str) -> None:
-        await self.delete(f"/api/guild/{guild_id}/twitch_config")
+        await self._call(db.remove_twitch_config, guild_id)
 
     # ── Tickets ──
 
     async def upsert_ticket(self, data: dict) -> dict | None:
-        return await self.post("/api/tickets", data)
+        if not data.get("ticket_id"):
+            logger.error("upsert_ticket ohne ticket_id")
+            return None
+        await self._call(db.upsert_ticket, data)
+        return {"ok": True, "ticket_id": data["ticket_id"]}
 
     async def get_ticket(self, ticket_id: str) -> dict | None:
-        return await self.get(f"/api/tickets/{ticket_id}")
+        return await self._call(db.get_ticket, ticket_id)
 
     async def list_tickets(self, q: str = "", limit: int = 200) -> list:
-        return await self.get("/api/tickets", q=q, limit=limit) or []
+        return await self._call(db.list_tickets, q=q, limit=limit) or []
 
     async def add_ticket_message(
-        self, ticket_id: str, author_id: str, author_name: str,
-        content: str, source: str = "discord", discord_message_id: str | None = None,
+        self,
+        ticket_id: str,
+        author_id: str,
+        author_name: str,
+        content: str,
+        source: str = "discord",
+        discord_message_id: str | None = None,
     ) -> dict | None:
-        return await self.post(f"/api/tickets/{ticket_id}/messages", {
-            "author_id": author_id, "author_name": author_name,
-            "content": content, "source": source,
-            "discord_message_id": discord_message_id,
-        })
+        return await self._call(
+            db.add_ticket_message,
+            ticket_id=ticket_id,
+            author_id=author_id,
+            author_name=author_name,
+            content=content,
+            source=source,
+            discord_message_id=discord_message_id,
+        )
 
     async def get_ticket_messages(self, ticket_id: str) -> list:
-        return await self.get(f"/api/tickets/{ticket_id}/messages") or []
-
-    # ── Ticket Logs (legacy compat) ──
+        return await self._call(db.get_ticket_messages, ticket_id) or []
 
     async def send_ticket_log(self, **kwargs: Any) -> None:
-        await self.post("/api/ticket_logs", kwargs)
+        if not kwargs.get("ticket_id"):
+            logger.error("send_ticket_log ohne ticket_id")
+            return
+        await self._call(db.insert_ticket_log, kwargs)
 
-    async def send_ticket_archive(self, **kwargs: Any) -> None:
-        await self.post("/api/tickets/close", kwargs)
+    async def send_ticket_archive(self, **data: Any) -> None:
+        """Schließt ein Ticket ab: Transkript sichern und Ticket fortschreiben."""
+        ticket_id = str(data.get("ticket_id") or "").strip()
+        if not ticket_id:
+            logger.error("send_ticket_archive ohne ticket_id")
+            return
 
-    # ── Close Reasons ──
+        transcript_rel = ""
+        markup = _render_transcript_html(data)
+        if markup:
+            ensure_dirs()
+            target = TRANSCRIPTS_DIR / f"{ticket_id}.html"
+            await asyncio.to_thread(target.write_text, markup, "utf-8")
+            transcript_rel = f"data/transcripts/{ticket_id}.html"
+
+        await self._call(
+            db.upsert_ticket,
+            {
+                "ticket_id": ticket_id,
+                "guild_id": data.get("guild_id"),
+                "channel_id": data.get("channel_id") or ticket_id,
+                "creator_user_id": str(
+                    data.get("creator_user_id") or data.get("creator_id") or ""
+                ),
+                "creator_username": data.get("creator_name") or data.get("creator_username"),
+                "status": data.get("status") or "closed",
+                "subject": data.get("subject") or data.get("category_label") or "",
+                "category": data.get("category") or data.get("category_label") or "",
+                "closed_at": data.get("closed_at") or "",
+                "closed_by_id": data.get("closed_by_id"),
+                "closed_by_name": data.get("closed_by_name"),
+                "close_reason": data.get("close_reason"),
+                "transcript_path": transcript_rel or None,
+                "transcript_url": data.get("transcript_url"),
+            },
+        )
+
+    # ── Schließungsgründe ──
 
     async def get_close_reasons(self, guild_id: str) -> list:
-        return await self.get(f"/api/guild/{guild_id}/close_reasons") or []
+        return await self._call(db.list_close_reasons, guild_id) or []

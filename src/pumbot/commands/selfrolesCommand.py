@@ -68,7 +68,7 @@ def split_emoji(text: str) -> Tuple[Optional[str], str]:
     match = EMOJI_PREFIX_RE.match(text or "")
     if not match:
         return None, (text or "").strip()
-    return match.group(1), (text or "")[match.end():].strip()
+    return match.group(1), (text or "")[match.end() :].strip()
 
 
 def placeholder_emoji(role_id: int) -> str:
@@ -79,7 +79,9 @@ def is_no_emoji(emoji: Optional[str]) -> bool:
     return not emoji or emoji.startswith(NO_EMOJI_MARKER)
 
 
-def display_emoji(emoji: Optional[str], fallback: Optional[str] = None) -> Optional[str]:
+def display_emoji(
+    emoji: Optional[str], fallback: Optional[str] = None
+) -> Optional[str]:
     return fallback if is_no_emoji(emoji) else emoji
 
 
@@ -119,7 +121,9 @@ def emoji_candidates(guild: discord.Guild, role: discord.Role) -> Iterator[str]:
     yield from iter_keyword_emojis(role_display_name(role))
 
 
-def auto_emoji(guild: discord.Guild, role: discord.Role, used: Set[str]) -> Optional[str]:
+def auto_emoji(
+    guild: discord.Guild, role: discord.Role, used: Set[str]
+) -> Optional[str]:
     """Kaskade: Rollen-Icon → Emoji im Namen → Server-Emoji → Stichwortliste."""
     for candidate in emoji_candidates(guild, role):
         if candidate not in used:
@@ -254,7 +258,7 @@ def render_message(blocks: Sequence[Tuple[Dict[str, Any], List[PanelEntry]]]) ->
         body = "\n\n".join(
             render_panel_block(panel, entries, chip_limit) for panel, entries in blocks
         )
-        content = f"{MESSAGE_HEADER}\n\n{body}"
+        content = f"{MESSAGE_HEADER}\n\n{body}\nㅤ\n"
         if len(content) <= MESSAGE_BUDGET:
             return content
     return content[:MESSAGE_BUDGET]
@@ -300,8 +304,12 @@ class SelfRoleSelect(discord.ui.Select):
 
 
 class SelfRoleClearButton(discord.ui.Button):
-    def __init__(self, cog: "SelfRolesCog", panel: Dict[str, Any], entries: List[PanelEntry]):
-        super().__init__(label="Alle entfernen", style=discord.ButtonStyle.danger, emoji="🗑️")
+    def __init__(
+        self, cog: "SelfRolesCog", panel: Dict[str, Any], entries: List[PanelEntry]
+    ):
+        super().__init__(
+            label="Alle entfernen", style=discord.ButtonStyle.danger, emoji="🗑️"
+        )
         self.cog = cog
         self.panel = panel
         self.entries = entries
@@ -324,7 +332,9 @@ class SelfRoleChooserView(discord.ui.View):
     ):
         super().__init__(timeout=180)
         if entries:
-            self.add_item(SelfRoleSelect(cog, panel, entries, held, with_emojis=with_emojis))
+            self.add_item(
+                SelfRoleSelect(cog, panel, entries, held, with_emojis=with_emojis)
+            )
             self.add_item(SelfRoleClearButton(cog, panel, entries))
 
 
@@ -334,7 +344,9 @@ class SelfRoleOpenButton(
 ):
     """Bleibt über Neustarts hinweg klickbar, weil die Panel-ID in der custom_id steht."""
 
-    def __init__(self, panel_id: int, label: str = "Rollen wählen", emoji: Optional[str] = None):
+    def __init__(
+        self, panel_id: int, label: str = "Rollen wählen", emoji: Optional[str] = None
+    ):
         self.panel_id = panel_id
         super().__init__(
             discord.ui.Button(
@@ -408,7 +420,9 @@ class SelfRolesCog(commands.Cog):
         for role_id in role_ids:
             state[role_id] = (has_role, now)
 
-    def held_panel_roles(self, member: discord.Member, panel_role_ids: Set[int]) -> Set[int]:
+    def held_panel_roles(
+        self, member: discord.Member, panel_role_ids: Set[int]
+    ) -> Set[int]:
         """Rollen aus diesem Panel, die der Member hat.
 
         Der Member-Cache hinkt hinter unseren eigenen Änderungen her, weil
@@ -440,7 +454,9 @@ class SelfRolesCog(commands.Cog):
 
     # ── Interaktionen ──
 
-    async def open_chooser(self, interaction: discord.Interaction, panel_id: int) -> None:
+    async def open_chooser(
+        self, interaction: discord.Interaction, panel_id: int
+    ) -> None:
         guild = interaction.guild
         member = interaction.user
         if guild is None or not isinstance(member, discord.Member):
@@ -459,7 +475,8 @@ class SelfRolesCog(commands.Cog):
         entries = resolve_entries(guild, panel)
         if not entries:
             await interaction.response.send_message(
-                "Für diese Kategorie sind aktuell keine Rollen hinterlegt.", ephemeral=True
+                "Für diese Kategorie sind aktuell keine Rollen hinterlegt.",
+                ephemeral=True,
             )
             return
 
@@ -467,7 +484,9 @@ class SelfRolesCog(commands.Cog):
         text = self._chooser_text(panel, entries, held)
 
         for with_emojis in (True, False):
-            view = SelfRoleChooserView(self, panel, entries, held, with_emojis=with_emojis)
+            view = SelfRoleChooserView(
+                self, panel, entries, held, with_emojis=with_emojis
+            )
             try:
                 await interaction.response.send_message(
                     content=text, view=view, ephemeral=True, allowed_mentions=NO_PING
@@ -489,7 +508,9 @@ class SelfRolesCog(commands.Cog):
         emoji, title = panel_title_parts(panel)
         active = [entry for entry in entries if entry.role.id in held]
         active_text = (
-            " · ".join(role_chip(entry, emoji) for entry in active) if active else "*keine*"
+            " · ".join(role_chip(entry, emoji) for entry in active)
+            if active
+            else "*keine*"
         )
         hint = (
             "Deine Auswahl ersetzt die bisherige Rolle aus dieser Kategorie."
@@ -535,7 +556,10 @@ class SelfRolesCog(commands.Cog):
                     blocked.append(f"**{role_display_name(role)}** ({blocker})")
                     logger.warning(
                         "Self-Role: %s kann nicht vergeben werden (%s). Panel %s, Guild %s.",
-                        role.name, blocker, panel.get("id"), guild.id,
+                        role.name,
+                        blocker,
+                        panel.get("id"),
+                        guild.id,
                     )
 
             if to_remove:
@@ -547,10 +571,16 @@ class SelfRolesCog(commands.Cog):
 
         text = self._chooser_text(panel, entries, held)
         if blocked:
-            text += "\n-# Nicht vergeben: " + ", ".join(blocked) + " – bitte melde dich beim Team."
+            text += (
+                "\n-# Nicht vergeben: "
+                + ", ".join(blocked)
+                + " – bitte melde dich beim Team."
+            )
 
         for with_emojis in (True, False):
-            view = SelfRoleChooserView(self, panel, entries, held, with_emojis=with_emojis)
+            view = SelfRoleChooserView(
+                self, panel, entries, held, with_emojis=with_emojis
+            )
             try:
                 await interaction.edit_original_response(
                     content=text, view=view, allowed_mentions=NO_PING
@@ -565,7 +595,9 @@ class SelfRolesCog(commands.Cog):
         self, member: discord.Member, roles: List[discord.Role], action: str
     ) -> bool:
         reason = (
-            "Self-Role über Panel gewählt" if action == "add" else "Self-Role über Panel abgewählt"
+            "Self-Role über Panel gewählt"
+            if action == "add"
+            else "Self-Role über Panel abgewählt"
         )
         try:
             if action == "add":
@@ -643,7 +675,9 @@ class SelfRolesCog(commands.Cog):
         async with lock:
             channel = await self._get_channel(guild)
             if channel is None:
-                return "", ["Es ist kein Self-Role Channel gesetzt (`/selfroles channel`)."]
+                return "", [
+                    "Es ist kein Self-Role Channel gesetzt (`/selfroles channel`)."
+                ]
 
             problems: List[str] = []
             panels = await self._sorted_panels(guild.id)
@@ -656,7 +690,9 @@ class SelfRolesCog(commands.Cog):
 
             blocks: List[Tuple[Dict[str, Any], List[PanelEntry]]] = []
             for panel in panels:
-                blocks.append((panel, await self._sync_panel_mappings(guild, panel, remap=remap)))
+                blocks.append(
+                    (panel, await self._sync_panel_mappings(guild, panel, remap=remap))
+                )
 
             content = render_message(blocks)
             panel_list = [panel for panel, _ in blocks]
@@ -698,7 +734,9 @@ class SelfRolesCog(commands.Cog):
                     logger.exception(
                         "Self-Role: Nachricht für Guild %s fehlgeschlagen.", guild.id
                     )
-                    problems.append("Discord hat die Nachricht abgelehnt, Details im Bot-Log.")
+                    problems.append(
+                        "Discord hat die Nachricht abgelehnt, Details im Bot-Log."
+                    )
                     break
             return "", problems
 
@@ -723,11 +761,14 @@ class SelfRolesCog(commands.Cog):
         description="Selfrole-Kategorien verwalten.",
     )
 
-    async def _staff_guard(self, interaction: discord.Interaction) -> Optional[discord.Guild]:
+    async def _staff_guard(
+        self, interaction: discord.Interaction
+    ) -> Optional[discord.Guild]:
         guild = interaction.guild
         if guild is None or not isinstance(interaction.user, discord.Member):
             await interaction.response.send_message(
-                "Dieser Befehl kann nur auf einem Server verwendet werden.", ephemeral=True
+                "Dieser Befehl kann nur auf einem Server verwendet werden.",
+                ephemeral=True,
             )
             return None
         if not is_selfrole_staff(interaction.user):
@@ -738,7 +779,8 @@ class SelfRolesCog(commands.Cog):
         return guild
 
     @selfroles_group.command(
-        name="channel", description="Legt den Channel fest, in dem die Rollen-Nachricht steht."
+        name="channel",
+        description="Legt den Channel fest, in dem die Rollen-Nachricht steht.",
     )
     @app_commands.describe(kanal="Textkanal für die Self-Role Nachricht")
     async def selfroles_channel(
@@ -847,7 +889,11 @@ class SelfRolesCog(commands.Cog):
             token = tokens[index].strip().strip(",")
             index += 1
 
-            candidate = token[3:-1] if token.startswith("<@&") and token.endswith(">") else token
+            candidate = (
+                token[3:-1]
+                if token.startswith("<@&") and token.endswith(">")
+                else token
+            )
             if not candidate.isdigit():
                 continue
 
@@ -875,7 +921,9 @@ class SelfRolesCog(commands.Cog):
                 break
 
             if emoji and emoji in used_emojis:
-                problems.append(f"-# {emoji} war doppelt, {role.name} bekommt ein anderes.")
+                problems.append(
+                    f"-# {emoji} war doppelt, {role.name} bekommt ein anderes."
+                )
                 emoji = None
             if emoji:
                 used_emojis.add(emoji)
@@ -886,7 +934,8 @@ class SelfRolesCog(commands.Cog):
         return wanted, problems
 
     @selfroles_group.command(
-        name="edit", description="Fügt einer Kategorie eine Rolle hinzu oder entfernt sie."
+        name="edit",
+        description="Fügt einer Kategorie eine Rolle hinzu oder entfernt sie.",
     )
     @app_commands.describe(
         kategorie="Titel der Kategorie",
@@ -936,7 +985,8 @@ class SelfRolesCog(commands.Cog):
             blocker = role_blocker(guild, rolle)
             if blocker is not None:
                 await interaction.response.send_message(
-                    f"{rolle.mention} kann nicht vergeben werden: {blocker}.", ephemeral=True
+                    f"{rolle.mention} kann nicht vergeben werden: {blocker}.",
+                    ephemeral=True,
                 )
                 return
             roles.append(rolle)
@@ -1016,7 +1066,8 @@ class SelfRolesCog(commands.Cog):
                 entry.emoji == wanted and entry.role.id != rolle.id for entry in entries
             ):
                 await interaction.response.send_message(
-                    f"{wanted} ist in **{panel['title']}** schon vergeben.", ephemeral=True
+                    f"{wanted} ist in **{panel['title']}** schon vergeben.",
+                    ephemeral=True,
                 )
                 return
 
@@ -1185,12 +1236,20 @@ class SelfRolesCog(commands.Cog):
             entries = resolve_entries(guild, panel)
             emoji, title = panel_title_parts(panel)
             max_roles = panel_max_roles(panel)
-            mode = "Einzelauswahl" if max_roles == 1 else (
-                "unbegrenzt" if max_roles == 0 else f"max. {max_roles}"
+            mode = (
+                "Einzelauswahl"
+                if max_roles == 1
+                else ("unbegrenzt" if max_roles == 0 else f"max. {max_roles}")
             )
-            lines.append(f"{emoji + ' ' if emoji else ''}**{title}** · {mode} · {len(entries)} Rolle(n)")
             lines.append(
-                "-# " + (" · ".join(role_chip(entry, emoji) for entry in entries) or "keine Rollen")
+                f"{emoji + ' ' if emoji else ''}**{title}** · {mode} · {len(entries)} Rolle(n)"
+            )
+            lines.append(
+                "-# "
+                + (
+                    " · ".join(role_chip(entry, emoji) for entry in entries)
+                    or "keine Rollen"
+                )
             )
 
         await interaction.response.send_message(
@@ -1232,10 +1291,14 @@ class SelfRolesCog(commands.Cog):
                 for problem in problems:
                     logger.warning("Self-Role: Guild %s – %s", guild.id, problem)
             except Exception:
-                logger.exception("Self-Role Startsync für Guild %s fehlgeschlagen", guild.id)
+                logger.exception(
+                    "Self-Role Startsync für Guild %s fehlgeschlagen", guild.id
+                )
 
     @commands.Cog.listener()
-    async def on_guild_role_update(self, before: discord.Role, after: discord.Role) -> None:
+    async def on_guild_role_update(
+        self, before: discord.Role, after: discord.Role
+    ) -> None:
         if before.name == after.name and before.unicode_emoji == after.unicode_emoji:
             return
         await self._refresh_if_used(after.guild, after.id)
@@ -1253,7 +1316,8 @@ class SelfRolesCog(commands.Cog):
                     return
         except Exception:
             logger.exception(
-                "Self-Role: Auto-Refresh nach Rollenänderung (%s) fehlgeschlagen", role_id
+                "Self-Role: Auto-Refresh nach Rollenänderung (%s) fehlgeschlagen",
+                role_id,
             )
 
 

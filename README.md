@@ -74,9 +74,14 @@ Rollenvergabe läuft über Buttons und Auswahlmenüs, nicht mehr über Reaktione
   entfernt, das Limit wird serverseitig erzwungen
 - Emoji-Kaskade: Rollen-Icon → Emoji im Rollennamen → Server-Emoji mit passendem
   Namen (`Valorant` → `:valorant:`) → Stichwortliste in
-  [selfroleEmojis.py](./src/pumbot/commands/selfroleEmojis.py) (Farben,
+  [selfroleEmojis.py](./src/pumbot/commands/selfroleEmojis.py) (Länder, Farben,
   Geschlecht, Alter, Spiele, Plattformen, Pings, Interessen) → Emoji der
   Kategorie
+- Kategorien bekommen ihr Emoji ebenfalls automatisch, wenn im Titel keins steht
+  (`Land` → 🌍, `Info` → ℹ️). Es erscheint in der Überschrift und auf dem Button
+- Die Rollen einer Kategorie stehen in der Reihenfolge der Discord-Rollen-
+  übersicht (höchste Rolle zuerst). Sammel-Rollen wie „Andere Länder",
+  „Sonstige" oder „Keine Angabe" rutschen immer ans Ende
 - Emojis lassen sich überschreiben – direkt beim `create` hinter der Rolle oder
   später per `/selfroles emoji`. Gesetzte Emojis überleben jeden Deploy, außer
   bei `deploy neu_mappen:True`

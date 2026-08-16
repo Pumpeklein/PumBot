@@ -11,7 +11,11 @@ from discord import app_commands
 from discord.ext import commands
 
 from src.pumbot.bot import logger
-from src.pumbot.commands.selfroleEmojis import KEYWORD_EMOJIS, normalize
+from src.pumbot.commands.selfroleEmojis import (
+    first_keyword_emoji,
+    iter_keyword_emojis,
+    normalize,
+)
 
 SELFROLE_STAFF_ROLES = {"Admin", "Team", "Twitch Moderator", "Discord Moderator"}
 SELFROLE_CHANNEL_CONFIG_KEY = "selfrole_channel_id"
@@ -103,16 +107,6 @@ def guild_emoji_for(guild: discord.Guild, role: discord.Role) -> Optional[str]:
     return partial
 
 
-def keyword_emojis(role: discord.Role) -> Iterator[str]:
-    """Emojis aus der Stichwortliste – Farben, Geschlecht, Spiele, Plattformen …"""
-    name = normalize(role_display_name(role))
-    if not name:
-        return
-    for keywords, emoji in KEYWORD_EMOJIS:
-        if any(keyword in name for keyword in keywords):
-            yield emoji
-
-
 def emoji_candidates(guild: discord.Guild, role: discord.Role) -> Iterator[str]:
     if role.unicode_emoji:
         yield role.unicode_emoji
@@ -122,7 +116,7 @@ def emoji_candidates(guild: discord.Guild, role: discord.Role) -> Iterator[str]:
     from_guild = guild_emoji_for(guild, role)
     if from_guild:
         yield from_guild
-    yield from keyword_emojis(role)
+    yield from iter_keyword_emojis(role_display_name(role))
 
 
 def auto_emoji(guild: discord.Guild, role: discord.Role, used: Set[str]) -> Optional[str]:
@@ -157,8 +151,25 @@ def panel_max_roles(panel: Dict[str, Any]) -> int:
 
 
 def panel_title_parts(panel: Dict[str, Any]) -> Tuple[Optional[str], str]:
+    """Emoji und Klartext-Titel einer Kategorie.
+
+    Steht kein Emoji im Titel, wird eins aus der Stichwortliste abgeleitet –
+    sonst stehen Überschrift und Button nackt da.
+    """
     emoji, rest = split_emoji(str(panel.get("title") or "Rollen"))
-    return emoji, rest or "Rollen"
+    title = rest or "Rollen"
+    return emoji or first_keyword_emoji(title), title
+
+
+# Sammel-Rollen wie „Andere Länder" gehören ans Ende, egal wo sie in der
+# Rollenhierarchie stehen.
+CATCHALL_RE = re.compile(r"^(andere|sonstige|weitere|rest|other|misc|keine|none)")
+
+
+def role_sort_key(role: discord.Role) -> Tuple[int, int, str]:
+    """Reihenfolge wie in der Discord-Rollenübersicht: höchste Rolle zuerst."""
+    is_catchall = 1 if CATCHALL_RE.match(normalize(role_display_name(role))) else 0
+    return (is_catchall, -getattr(role, "position", 0), role.name.lower())
 
 
 class PanelEntry:
@@ -183,6 +194,7 @@ def resolve_entries(guild: discord.Guild, panel: Dict[str, Any]) -> List[PanelEn
             continue
         seen_roles.add(role.id)
         entries.append(PanelEntry(str(emoji), role))
+    entries.sort(key=lambda entry: role_sort_key(entry.role))
     return entries[:MAX_ROLES_PER_PANEL]
 
 
@@ -196,7 +208,7 @@ def build_entries(
     used: Set[str] = {e for e in preset.values() if not is_no_emoji(e)}
 
     entries: List[PanelEntry] = []
-    for role in roles:
+    for role in sorted(roles, key=role_sort_key):
         emoji = preset.get(role.id)
         if is_no_emoji(emoji):
             emoji = auto_emoji(guild, role, used)

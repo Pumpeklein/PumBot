@@ -12,7 +12,7 @@ schnappt sich „auto" das Emoji von „Grand Theft Auto".
 from __future__ import annotations
 
 import re
-from typing import List, Tuple
+from typing import Iterator, List, Optional, Tuple
 
 # Umlaute vor dem Strippen falten, sonst wird aus „Weiße" ein „weie".
 UMLAUT_MAP = str.maketrans(
@@ -35,6 +35,42 @@ def normalize(text: str) -> str:
 
 
 KEYWORD_EMOJIS: List[Tuple[Tuple[str, ...], str]] = [
+    # ── Länder (vor allem anderen, sonst frisst „land" die Flaggen) ──
+    (("deutschland", "germany", "german"), "🇩🇪"),
+    (("oesterreich", "austria"), "🇦🇹"),
+    (("schweiz", "switzerland", "swiss"), "🇨🇭"),
+    (("niederlande", "netherlands", "holland"), "🇳🇱"),
+    (("belgien", "belgium"), "🇧🇪"),
+    (("luxemburg", "luxembourg"), "🇱🇺"),
+    (("frankreich", "france"), "🇫🇷"),
+    (("italien", "italy"), "🇮🇹"),
+    (("spanien", "spain"), "🇪🇸"),
+    (("portugal",), "🇵🇹"),
+    (("polen", "poland"), "🇵🇱"),
+    (("tschechien", "czech"), "🇨🇿"),
+    (("daenemark", "denmark"), "🇩🇰"),
+    (("schweden", "sweden"), "🇸🇪"),
+    (("norwegen", "norway"), "🇳🇴"),
+    (("finnland", "finland"), "🇫🇮"),
+    (("tuerkei", "turkey", "turkiye"), "🇹🇷"),
+    (("griechenland", "greece"), "🇬🇷"),
+    (("rumaenien", "romania"), "🇷🇴"),
+    (("kroatien", "croatia"), "🇭🇷"),
+    (("serbien", "serbia"), "🇷🇸"),
+    (("russland", "russia"), "🇷🇺"),
+    (("ukraine",), "🇺🇦"),
+    (("grossbritannien", "unitedkingdom", "england", "britain"), "🇬🇧"),
+    (("irland", "ireland"), "🇮🇪"),
+    (("usa", "unitedstates", "amerika"), "🇺🇸"),
+    (("kanada", "canada"), "🇨🇦"),
+    (("brasilien", "brazil"), "🇧🇷"),
+    (("japan", "nippon"), "🇯🇵"),
+    (("suedkorea", "korea"), "🇰🇷"),
+    (("china",), "🇨🇳"),
+    (("indien", "india"), "🇮🇳"),
+    (("australien", "australia"), "🇦🇺"),
+    (("anderelaender", "anderesland", "sonstigelaender", "restdwelt", "othercountries"), "🌍"),
+
     # ── Geschlecht / Pronomen ──
     (("maennlich", "male", "boy", "junge", "erihm", "hehim"), "♂️"),
     (("weiblich", "female", "girl", "maedchen", "sieihr", "sheher"), "♀️"),
@@ -113,6 +149,8 @@ KEYWORD_EMOJIS: List[Tuple[Tuple[str, ...], str]] = [
     (("giveaway", "gewinnspiel", "verlosung"), "🎁"),
     (("umfrage", "poll", "abstimmung"), "📊"),
     (("wartung", "status"), "🛠️"),
+    (("chatping", "chatbenachrichtigung"), "💬"),
+    (("infoping", "informationen"), "ℹ️"),
     (("alleping", "allepings", "everything"), "🔔"),
 
     # ── Interessen ──
@@ -136,8 +174,31 @@ KEYWORD_EMOJIS: List[Tuple[Tuple[str, ...], str]] = [
     (("memes", "meme", "humor"), "😂"),
 
     # ── Sonstiges ──
-    (("deutsch", "german", "deutschland"), "🇩🇪"),
-    (("english", "englisch"), "🇬🇧"),
     (("booster", "supporter", "spender"), "💎"),
-    (("gaming", "zocken", "spiele"), "🎮"),
+    (("deutsch", "englisch", "english", "sprache", "language"), "🗣️"),
+
+    # ── Kategorie-Titel (zuletzt: sehr allgemeine Begriffe) ──
+    (("chatfarbe", "farbe", "color", "colour"), "🎨"),
+    (("plattform", "platform", "konsole", "console", "geraet"), "🕹️"),
+    (("gaming", "zocken", "spiele", "games"), "🎮"),
+    (("geschlecht", "pronomen", "pronouns"), "⚧️"),
+    (("alter", "age"), "🎂"),
+    (("land", "laender", "country", "region", "herkunft"), "🌍"),
+    (("benachrichtigung", "ping", "notification"), "🔔"),
+    (("interessen", "hobby", "hobbys", "themen"), "✨"),
+    (("info", "sonstiges", "misc"), "ℹ️"),
 ]
+
+
+def iter_keyword_emojis(text: str) -> Iterator[str]:
+    """Alle passenden Emojis in Reihenfolge der Spezifität."""
+    name = normalize(text)
+    if not name:
+        return
+    for keywords, emoji in KEYWORD_EMOJIS:
+        if any(keyword in name for keyword in keywords):
+            yield emoji
+
+
+def first_keyword_emoji(text: str) -> Optional[str]:
+    return next(iter_keyword_emojis(text), None)

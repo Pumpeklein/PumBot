@@ -258,7 +258,7 @@ def render_message(blocks: Sequence[Tuple[Dict[str, Any], List[PanelEntry]]]) ->
         body = "\n\n".join(
             render_panel_block(panel, entries, chip_limit) for panel, entries in blocks
         )
-        content = f"{MESSAGE_HEADER}\n\n{body}\nㅤ\n\r"
+        content = f"{MESSAGE_HEADER}\n\n{body}\nㅤ\nㅤ\r"
         if len(content) <= MESSAGE_BUDGET:
             return content
     return content[:MESSAGE_BUDGET]

@@ -61,22 +61,30 @@ Wichtige Dateien:
 Rollenvergabe läuft über Buttons und Auswahlmenüs, nicht mehr über Reaktionen.
 
 - Ein fester Self-Role Channel wird per Command oder Web-Panel gesetzt
-  (Config-Key `selfrole_channel_id`)
-- Pro Kategorie eine eigene Nachricht ohne Embed: Überschrift und darunter alle
-  Rollen als Code-Chips in einer Zeile (`⛏️ \`Minecraft\` · 🔫 \`Call of Duty\``),
-  dazu ein Button
+  (Config-Keys `selfrole_channel_id` und `selfrole_message_id`)
+- **Eine** Nachricht ohne Embed für alle Kategorien: pro Kategorie eine fette
+  Überschrift und darunter die Rollen als Code-Chips
+  (`⛏️ \`Minecraft\` · 🔫 \`Call of Duty\``). Darunter eine Button-Reihe mit
+  einem Button je Kategorie, beschriftet mit deren Namen und Emoji
+- Passt eine Kategorie nicht ins 2000-Zeichen-Limit, wird der Rest zu `+N`
+  gekürzt – automatisch und nur so weit wie nötig
 - Der Button öffnet eine nur für den Nutzer sichtbare Auswahl: Mehrfachauswahl
   bei Limit 0, Einzelauswahl bei Limit 1, dazu ein „Alle entfernen“-Button
 - Die getroffene Auswahl ist der neue Endzustand; abgewählte Rollen werden
   entfernt, das Limit wird serverseitig erzwungen
-- Emojis werden automatisch zugeordnet: Rollen-Icon → Emoji im Rollennamen →
-  Server-Emoji mit passendem Namen (`Valorant` → `:valorant:`). Findet sich
-  nichts, bleibt die Rolle ohne Emoji statt einen Platzhalter zu bekommen
+- Emoji-Kaskade: Rollen-Icon → Emoji im Rollennamen → Server-Emoji mit passendem
+  Namen (`Valorant` → `:valorant:`) → Stichwortliste in
+  [selfroleEmojis.py](./src/pumbot/commands/selfroleEmojis.py) (Farben,
+  Geschlecht, Alter, Spiele, Plattformen, Pings, Interessen) → Emoji der
+  Kategorie
 - Emojis lassen sich überschreiben – direkt beim `create` hinter der Rolle oder
-  später per `/selfroles emoji`. Gesetzte Emojis überleben jeden Deploy
-- Die Nachrichten aktualisieren sich selbst: beim Bot-Start, bei Rollen-Umbenennung
+  später per `/selfroles emoji`. Gesetzte Emojis überleben jeden Deploy, außer
+  bei `deploy neu_mappen:True`
+- Die Nachricht aktualisiert sich selbst: beim Bot-Start, bei Rollen-Umbenennung
   oder -Löschung und nach jeder Änderung an einer Kategorie
 - Buttons überleben Neustarts, weil die Panel-ID in der `custom_id` steht
+- Da sich alle Kategorien eine Nachricht teilen, dient `selfrole_panels.message_id`
+  nur noch als eindeutiger Schlüssel; die echte Nachricht steht in `guild_config`
 
 Commands (`/selfroles`):
 
@@ -85,10 +93,11 @@ Commands (`/selfroles`):
 | `channel <kanal>` | Legt den Self-Role Channel fest |
 | `create <titel> <limit> <rollen>` | Neue Kategorie; je Rolle optional ein Emoji dahinter |
 | `edit <kategorie> <aktion> <rolle>` | Rolle hinzufügen oder entfernen |
-| `emoji <kategorie> <rolle> <emoji>` | Emoji setzen, `-` für keins |
+| `emoji <kategorie> <rolle> <emoji>` | Emoji setzen, `-` für das Kategorie-Emoji |
 | `limit <kategorie> <limit>` | Auswahl-Limit ändern |
-| `delete <kategorie>` | Kategorie samt Nachricht löschen |
-| `deploy [neu_senden]` | Alle Nachrichten erzeugen/aktualisieren |
+| `rename <kategorie> <titel>` | Kategorie umbenennen |
+| `delete <kategorie>` | Kategorie löschen |
+| `deploy [neu_senden] [neu_mappen]` | Nachricht erzeugen/aktualisieren |
 | `list` | Übersicht aller Kategorien |
 
 Wichtige Dateien:

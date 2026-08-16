@@ -3,24 +3,39 @@ from __future__ import annotations
 import asyncio
 import re
 import time
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+import uuid
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
 from src.pumbot.bot import logger
+from src.pumbot.commands.selfroleEmojis import KEYWORD_EMOJIS, normalize
 
 SELFROLE_STAFF_ROLES = {"Admin", "Team", "Twitch Moderator", "Discord Moderator"}
 SELFROLE_CHANNEL_CONFIG_KEY = "selfrole_channel_id"
+SELFROLE_MESSAGE_CONFIG_KEY = "selfrole_message_id"
 
-# Discord erlaubt maximal 25 Optionen pro Select-Menü.
+# Discord erlaubt 25 Optionen pro Select-Menü und 25 Buttons pro Nachricht.
 MAX_ROLES_PER_PANEL = 25
+MAX_PANELS = 25
+# Es werden so viele Rollen pro Kategorie gezeigt, wie ins Zeichenlimit passen –
+# erst wenn es eng wird, weicht der Rest einem "+N".
+CHIP_LIMIT_LADDER = (25, 20, 15, 12, 10, 8, 6, 5, 4, 3, 2, 1)
+# Discord erlaubt 2000 Zeichen, der Rest ist Puffer.
+MESSAGE_BUDGET = 1900
 # So lange gilt eine gerade angewandte Rollenänderung als Wahrheit, auch wenn
 # der Member-Cache das GUILD_MEMBER_UPDATE noch nicht gesehen hat.
 ROLE_STATE_TTL_SECONDS = 30.0
 
 NO_PING = discord.AllowedMentions.none()
+
+MESSAGE_HEADER = (
+    "## Wähle deine Rollen\n"
+    "Wähle aus, welche Rollen du erhalten möchtest. Deine Auswahl kannst du jederzeit ändern.\n"
+    "-# Klick auf eine Kategorie, um deine Rollen privat anzupassen."
+)
 
 EMOJI_PREFIX_RE = re.compile(
     r"^\s*("
@@ -32,20 +47,10 @@ EMOJI_PREFIX_RE = re.compile(
     r")\s*"
 )
 
-# Findet sich kein sinnvolles Emoji, bekommt die Rolle gar keins. Die Spalte
-# `emoji` ist zusammen mit dem Panel eindeutig, deshalb braucht auch "kein
-# Emoji" pro Rolle einen eigenen, unsichtbaren Wert.
+# Die Spalte `emoji` ist zusammen mit dem Panel eindeutig. Rollen ohne eigenes
+# Emoji brauchen deshalb trotzdem einen eigenen Wert – angezeigt wird dafür das
+# Emoji der Kategorie.
 NO_EMOJI_MARKER = "⁣"
-
-# Aus der ersten Version: sinnlose Farbklekse, die beim nächsten Deploy durch
-# ein echtes Emoji ersetzt werden dürfen.
-LEGACY_FALLBACK_EMOJIS = {
-    "🔹", "🔸", "🔶", "🔷", "🟠", "🟡", "🟢", "🔵", "🟣", "🟤",
-    "⚪", "⚫", "🟥", "🟧", "🟨", "🟩", "🟦", "🟪", "⭐", "✨",
-    "💠", "🔘", "◽", "◾", "🔺",
-}
-
-NORMALIZE_RE = re.compile(r"[^a-z0-9]+")
 
 
 def is_selfrole_staff(member: discord.Member) -> bool:
@@ -62,12 +67,6 @@ def split_emoji(text: str) -> Tuple[Optional[str], str]:
     return match.group(1), (text or "")[match.end():].strip()
 
 
-def role_display_name(role: discord.Role) -> str:
-    """Rollenname ohne führendes Emoji – das steht im Menü schon separat."""
-    _, rest = split_emoji(role.name)
-    return rest or role.name
-
-
 def placeholder_emoji(role_id: int) -> str:
     return f"{NO_EMOJI_MARKER}{role_id}"
 
@@ -76,17 +75,14 @@ def is_no_emoji(emoji: Optional[str]) -> bool:
     return not emoji or emoji.startswith(NO_EMOJI_MARKER)
 
 
-def keepable_emoji(emoji: Optional[str]) -> bool:
-    """Ein bewusst gesetztes oder sinnvoll erkanntes Emoji bleibt erhalten."""
-    return bool(emoji) and not is_no_emoji(emoji) and emoji not in LEGACY_FALLBACK_EMOJIS
+def display_emoji(emoji: Optional[str], fallback: Optional[str] = None) -> Optional[str]:
+    return fallback if is_no_emoji(emoji) else emoji
 
 
-def display_emoji(emoji: Optional[str]) -> Optional[str]:
-    return None if is_no_emoji(emoji) else emoji
-
-
-def normalize(text: str) -> str:
-    return NORMALIZE_RE.sub("", (text or "").lower())
+def role_display_name(role: discord.Role) -> str:
+    """Rollenname ohne führendes Emoji – das steht im Chip schon separat."""
+    _, rest = split_emoji(role.name)
+    return rest or role.name
 
 
 def guild_emoji_for(guild: discord.Guild, role: discord.Role) -> Optional[str]:
@@ -107,14 +103,32 @@ def guild_emoji_for(guild: discord.Guild, role: discord.Role) -> Optional[str]:
     return partial
 
 
+def keyword_emojis(role: discord.Role) -> Iterator[str]:
+    """Emojis aus der Stichwortliste – Farben, Geschlecht, Spiele, Plattformen …"""
+    name = normalize(role_display_name(role))
+    if not name:
+        return
+    for keywords, emoji in KEYWORD_EMOJIS:
+        if any(keyword in name for keyword in keywords):
+            yield emoji
+
+
+def emoji_candidates(guild: discord.Guild, role: discord.Role) -> Iterator[str]:
+    if role.unicode_emoji:
+        yield role.unicode_emoji
+    from_name = split_emoji(role.name)[0]
+    if from_name:
+        yield from_name
+    from_guild = guild_emoji_for(guild, role)
+    if from_guild:
+        yield from_guild
+    yield from keyword_emojis(role)
+
+
 def auto_emoji(guild: discord.Guild, role: discord.Role, used: Set[str]) -> Optional[str]:
-    """Kaskade: Rollen-Icon → Emoji im Rollennamen → passendes Server-Emoji."""
-    for candidate in (
-        role.unicode_emoji,
-        split_emoji(role.name)[0],
-        guild_emoji_for(guild, role),
-    ):
-        if candidate and candidate not in used:
+    """Kaskade: Rollen-Icon → Emoji im Namen → Server-Emoji → Stichwortliste."""
+    for candidate in emoji_candidates(guild, role):
+        if candidate not in used:
             return candidate
     return None
 
@@ -179,12 +193,12 @@ def build_entries(
 ) -> List[PanelEntry]:
     """Baut die Emoji/Rollen-Liste. Gesetzte Emojis aus `preset` bleiben stehen."""
     preset = preset or {}
-    used: Set[str] = {e for e in preset.values() if keepable_emoji(e)}
+    used: Set[str] = {e for e in preset.values() if not is_no_emoji(e)}
 
     entries: List[PanelEntry] = []
     for role in roles:
         emoji = preset.get(role.id)
-        if not keepable_emoji(emoji):
+        if is_no_emoji(emoji):
             emoji = auto_emoji(guild, role, used)
         if emoji:
             used.add(emoji)
@@ -192,28 +206,46 @@ def build_entries(
     return entries
 
 
-def role_chip(entry: PanelEntry) -> str:
-    emoji = display_emoji(entry.emoji)
+def role_chip(entry: PanelEntry, fallback: Optional[str] = None) -> str:
+    emoji = display_emoji(entry.emoji, fallback)
     name = f"`{role_display_name(entry.role)}`"
     return f"{emoji} {name}" if emoji else name
 
 
-def render_panel_message(panel: Dict[str, Any], entries: List[PanelEntry]) -> str:
+def render_panel_block(
+    panel: Dict[str, Any], entries: List[PanelEntry], chip_limit: int
+) -> str:
     emoji, title = panel_title_parts(panel)
-    header = f"## {emoji + ' ' if emoji else ''}{title}"
+    heading = f"{emoji + ' ' if emoji else ''}**{title}**"
 
     if not entries:
-        return f"{header}\n-# Für diese Kategorie sind noch keine Rollen hinterlegt."
+        return f"{heading}\n-# noch keine Rollen hinterlegt"
 
-    lines = [header, " · ".join(role_chip(entry) for entry in entries)]
+    shown = entries[:chip_limit]
+    chips = [role_chip(entry, emoji) for entry in shown]
+    hidden = len(entries) - len(shown)
+    if hidden > 0:
+        chips.append(f"`+{hidden}`")
 
-    max_roles = panel_max_roles(panel)
-    if max_roles == 1:
-        lines.append("-# Du kannst hier genau eine Rolle wählen.")
-    elif max_roles > 1:
-        lines.append(f"-# Du kannst hier bis zu {max_roles} Rollen wählen.")
+    return f"{heading}\n" + " · ".join(chips)
 
-    return "\n".join(lines)
+
+def render_message(blocks: Sequence[Tuple[Dict[str, Any], List[PanelEntry]]]) -> str:
+    """Baut die eine Übersichtsnachricht und kürzt, bis sie ins Limit passt."""
+    if not blocks:
+        return (
+            f"{MESSAGE_HEADER}\n\n"
+            "-# Es sind noch keine Kategorien angelegt (`/selfroles create`)."
+        )
+
+    for chip_limit in CHIP_LIMIT_LADDER:
+        body = "\n\n".join(
+            render_panel_block(panel, entries, chip_limit) for panel, entries in blocks
+        )
+        content = f"{MESSAGE_HEADER}\n\n{body}"
+        if len(content) <= MESSAGE_BUDGET:
+            return content
+    return content[:MESSAGE_BUDGET]
 
 
 class SelfRoleSelect(discord.ui.Select):
@@ -223,11 +255,12 @@ class SelfRoleSelect(discord.ui.Select):
         self.entries = entries
 
         max_roles = panel_max_roles(panel)
+        fallback, _ = panel_title_parts(panel)
         options = [
             discord.SelectOption(
                 label=role_display_name(entry.role)[:100],
                 value=str(entry.role.id),
-                emoji=display_emoji(entry.emoji),
+                emoji=display_emoji(entry.emoji, fallback),
                 default=entry.role.id in held,
             )
             for entry in entries
@@ -277,8 +310,8 @@ class SelfRoleOpenButton(
         self.panel_id = panel_id
         super().__init__(
             discord.ui.Button(
-                label=label,
-                style=discord.ButtonStyle.primary,
+                label=label[:80],
+                style=discord.ButtonStyle.secondary,
                 emoji=emoji,
                 custom_id=f"selfroles:open:{panel_id}",
             )
@@ -298,10 +331,12 @@ class SelfRoleOpenButton(
         await cog.open_chooser(interaction, self.panel_id)
 
 
-def panel_view(panel: Dict[str, Any]) -> discord.ui.View:
-    emoji, _ = panel_title_parts(panel)
+def build_view(panels: Sequence[Dict[str, Any]]) -> discord.ui.View:
+    """Pro Kategorie ein Button, beschriftet mit dem Kategorie-Namen."""
     view = discord.ui.View(timeout=None)
-    view.add_item(SelfRoleOpenButton(int(panel["id"]), emoji=emoji))
+    for panel in panels[:MAX_PANELS]:
+        emoji, title = panel_title_parts(panel)
+        view.add_item(SelfRoleOpenButton(int(panel["id"]), label=title, emoji=emoji))
     return view
 
 
@@ -327,7 +362,7 @@ class SelfRolesCog(commands.Cog):
         return self._member_locks.setdefault((guild_id, member_id), asyncio.Lock())
 
     def _remember_role_state(
-        self, guild_id: int, member_id: int, role_ids: Iterable[int], has_role: bool
+        self, guild_id: int, member_id: int, role_ids: Sequence[int], has_role: bool
     ) -> None:
         state = self._pending_roles.setdefault((guild_id, member_id), {})
         now = time.monotonic()
@@ -403,7 +438,7 @@ class SelfRolesCog(commands.Cog):
         emoji, title = panel_title_parts(panel)
         active = [entry for entry in entries if entry.role.id in held]
         active_text = (
-            " · ".join(role_chip(entry) for entry in active) if active else "*keine*"
+            " · ".join(role_chip(entry, emoji) for entry in active) if active else "*keine*"
         )
         hint = (
             "Deine Auswahl ersetzt die bisherige Rolle aus dieser Kategorie."
@@ -432,6 +467,7 @@ class SelfRolesCog(commands.Cog):
 
         panel_role_ids = {entry.role.id for entry in entries}
         by_id = {entry.role.id: entry for entry in entries}
+        blocked: List[str] = []
 
         async with self._member_lock(guild.id, member.id):
             held = self.held_panel_roles(member, panel_role_ids)
@@ -439,7 +475,6 @@ class SelfRolesCog(commands.Cog):
             to_add = [by_id[rid].role for rid in selected - held if rid in by_id]
             to_remove = [by_id[rid].role for rid in held - selected if rid in by_id]
 
-            blocked: List[str] = []
             addable: List[discord.Role] = []
             for role in to_add:
                 blocker = role_blocker(guild, role)
@@ -523,15 +558,15 @@ class SelfRolesCog(commands.Cog):
         )
 
     async def _sync_panel_mappings(
-        self, guild: discord.Guild, panel: Dict[str, Any]
+        self, guild: discord.Guild, panel: Dict[str, Any], *, remap: bool = False
     ) -> List[PanelEntry]:
         """Verschwundene Rollen entfernen und offene Emojis nachziehen.
 
-        Gesetzte Emojis bleiben unangetastet – nur Platzhalter und die
-        Farbklekse aus der ersten Version werden neu bestimmt.
+        Gesetzte Emojis bleiben unangetastet, es sei denn `remap` erzwingt eine
+        komplette Neuvergabe.
         """
         entries = resolve_entries(guild, panel)
-        preset = {entry.role.id: entry.emoji for entry in entries}
+        preset = {} if remap else {entry.role.id: entry.emoji for entry in entries}
         remapped = build_entries(guild, [entry.role for entry in entries], preset)
 
         after = [(entry.emoji, str(entry.role.id)) for entry in remapped]
@@ -543,64 +578,60 @@ class SelfRolesCog(commands.Cog):
 
         return remapped
 
-    async def deploy_panels(
-        self, guild: discord.Guild, *, repost: bool = False
-    ) -> Tuple[int, int, List[str]]:
-        """Erzeugt oder aktualisiert alle Panel-Nachrichten. (neu, aktualisiert, Fehler)"""
+    async def publish(
+        self, guild: discord.Guild, *, repost: bool = False, remap: bool = False
+    ) -> Tuple[str, List[str]]:
+        """Schreibt die eine Übersichtsnachricht. Gibt (Status, Probleme) zurück."""
         lock = self._deploy_locks.setdefault(guild.id, asyncio.Lock())
         async with lock:
             channel = await self._get_channel(guild)
             if channel is None:
-                return 0, 0, ["Es ist kein Self-Role Channel gesetzt (`/selfroles channel`)."]
+                return "", ["Es ist kein Self-Role Channel gesetzt (`/selfroles channel`)."]
 
-            created = 0
-            updated = 0
             problems: List[str] = []
+            panels = await self._sorted_panels(guild.id)
+            if len(panels) > MAX_PANELS:
+                problems.append(
+                    f"Nur {MAX_PANELS} Kategorien passen in eine Nachricht, "
+                    f"{len(panels) - MAX_PANELS} werden nicht angezeigt."
+                )
+                panels = panels[:MAX_PANELS]
 
-            for panel in await self._sorted_panels(guild.id):
-                try:
-                    entries = await self._sync_panel_mappings(guild, panel)
-                    content = render_panel_message(panel, entries)
-                    view = panel_view(panel)
+            blocks: List[Tuple[Dict[str, Any], List[PanelEntry]]] = []
+            for panel in panels:
+                blocks.append((panel, await self._sync_panel_mappings(guild, panel, remap=remap)))
 
-                    message = None
-                    if not repost:
-                        message = await self._existing_message(guild, channel, panel)
+            content = render_message(blocks)
+            view = build_view([panel for panel, _ in blocks])
 
-                    if message is not None:
-                        await message.edit(
-                            content=content, view=view, allowed_mentions=NO_PING
-                        )
-                        updated += 1
-                    else:
-                        message = await channel.send(
-                            content=content, view=view, allowed_mentions=NO_PING
-                        )
-                        await self.api.set_selfrole_panel_message(
-                            int(panel["id"]), str(message.id), str(channel.id)
-                        )
-                        created += 1
-                except discord.Forbidden:
-                    problems.append(
-                        f"**{panel.get('title')}**: mir fehlen Rechte in {channel.mention}."
-                    )
-                except discord.HTTPException:
-                    logger.exception(
-                        "Self-Role Deploy für Panel %s fehlgeschlagen.", panel.get("id")
-                    )
-                    problems.append(f"**{panel.get('title')}**: Discord-Fehler beim Senden.")
+            message = None if repost else await self._existing_message(guild, channel)
+            try:
+                if message is not None:
+                    await message.edit(content=content, view=view, allowed_mentions=NO_PING)
+                    return "aktualisiert", problems
 
-            return created, updated, problems
+                message = await channel.send(
+                    content=content, view=view, allowed_mentions=NO_PING
+                )
+                await self.api.set_config(
+                    str(guild.id), SELFROLE_MESSAGE_CONFIG_KEY, str(message.id)
+                )
+                return "neu gepostet", problems
+            except discord.Forbidden:
+                problems.append(f"Mir fehlen Rechte in {channel.mention}.")
+            except discord.HTTPException:
+                logger.exception("Self-Role: Nachricht für Guild %s fehlgeschlagen.", guild.id)
+                problems.append("Discord hat die Nachricht abgelehnt, Details im Bot-Log.")
+            return "", problems
 
     async def _existing_message(
-        self, guild: discord.Guild, channel: discord.TextChannel, panel: Dict[str, Any]
+        self, guild: discord.Guild, channel: discord.TextChannel
     ) -> Optional[discord.Message]:
-        message_id = panel.get("message_id")
-        stored_channel = str(panel.get("channel_id") or "")
-        if not message_id or stored_channel != str(channel.id):
+        raw = await self.api.get_config(str(guild.id), SELFROLE_MESSAGE_CONFIG_KEY)
+        if not raw:
             return None
         try:
-            message = await channel.fetch_message(int(message_id))
+            message = await channel.fetch_message(int(raw))
         except (discord.NotFound, discord.Forbidden, discord.HTTPException, ValueError):
             return None
         if self.bot.user is None or message.author.id != self.bot.user.id:
@@ -629,9 +660,9 @@ class SelfRolesCog(commands.Cog):
         return guild
 
     @selfroles_group.command(
-        name="channel", description="Legt den Channel fest, in dem die Rollen-Nachrichten stehen."
+        name="channel", description="Legt den Channel fest, in dem die Rollen-Nachricht steht."
     )
-    @app_commands.describe(kanal="Textkanal für die Self-Role Nachrichten")
+    @app_commands.describe(kanal="Textkanal für die Self-Role Nachricht")
     async def selfroles_channel(
         self, interaction: discord.Interaction, kanal: discord.TextChannel
     ):
@@ -644,7 +675,7 @@ class SelfRolesCog(commands.Cog):
         )
         await interaction.response.send_message(
             f"Self-Role Channel ist jetzt {kanal.mention}.\n"
-            "Mit `/selfroles deploy` erzeugst du dort die Nachrichten.",
+            "Mit `/selfroles deploy neu_senden:True` postest du die Nachricht dort neu.",
             ephemeral=True,
         )
 
@@ -696,38 +727,30 @@ class SelfRolesCog(commands.Cog):
             [role for role, _ in wanted],
             {role.id: emoji for role, emoji in wanted if emoji},
         )
-        panel: Dict[str, Any] = {"id": 0, "title": titel, "max_roles": limit}
 
-        message = await channel.send(
-            content=render_panel_message(panel, entries),
-            allowed_mentions=NO_PING,
-        )
-
+        # Alle Kategorien teilen sich eine Nachricht, die Spalte `message_id`
+        # bleibt aber eindeutig – deshalb hier ein eigener, stabiler Schlüssel.
         stored = await self.api.create_selfrole_panel(
             str(guild.id),
-            str(message.id),
+            uuid.uuid4().hex,
             str(channel.id),
             titel,
             limit,
             {entry.emoji: str(entry.role.id) for entry in entries},
         )
         if not stored:
-            await message.delete()
             await interaction.followup.send(
                 "Die Kategorie konnte nicht gespeichert werden. Details stehen im Bot-Log.",
                 ephemeral=True,
             )
             return
 
-        await message.edit(
-            content=render_panel_message(stored, entries),
-            view=panel_view(stored),
-            allowed_mentions=NO_PING,
-        )
-
-        note = "\n" + "\n".join(problems) if problems else ""
+        status, deploy_problems = await self.publish(guild)
+        note = "\n".join(problems + deploy_problems)
         await interaction.followup.send(
-            f"Kategorie **{titel}** mit {len(entries)} Rolle(n) in {channel.mention} angelegt.{note}",
+            f"Kategorie **{titel}** mit {len(entries)} Rolle(n) angelegt, "
+            f"Übersicht {status or 'nicht aktualisiert'}."
+            + (f"\n{note}" if note else ""),
             ephemeral=True,
         )
 
@@ -851,9 +874,8 @@ class SelfRolesCog(commands.Cog):
         await interaction.response.defer(ephemeral=True, thinking=True)
 
         preset = {entry.role.id: entry.emoji for entry in entries}
-        remapped = build_entries(guild, roles, preset)
-        await self._store_entries(panel, remapped)
-        await self._refresh_panel_message(guild, panel, remapped)
+        await self._store_entries(panel, build_entries(guild, roles, preset))
+        await self.publish(guild)
 
         verb = "hinzugefügt" if aktion.value == "add" else "entfernt"
         await interaction.followup.send(
@@ -873,7 +895,7 @@ class SelfRolesCog(commands.Cog):
     @app_commands.describe(
         kategorie="Titel der Kategorie",
         rolle="Die Rolle",
-        emoji="Emoji, oder `-` für kein Emoji",
+        emoji="Emoji, oder `-` für das Kategorie-Emoji",
     )
     async def selfroles_emoji(
         self,
@@ -908,7 +930,7 @@ class SelfRolesCog(commands.Cog):
             if not EMOJI_PREFIX_RE.fullmatch(wanted):
                 await interaction.response.send_message(
                     f"`{wanted}` sieht nicht nach einem Emoji aus. "
-                    "Nutze ein Standard-Emoji, ein Server-Emoji oder `-` für keins.",
+                    "Nutze ein Standard-Emoji, ein Server-Emoji oder `-` für das Kategorie-Emoji.",
                     ephemeral=True,
                 )
                 return
@@ -927,18 +949,20 @@ class SelfRolesCog(commands.Cog):
         remapped = build_entries(guild, [entry.role for entry in entries], preset)
 
         if clear:
-            # build_entries würde für einen Platzhalter wieder automatisch
-            # nachbessern – hier ist "kein Emoji" aber ausdrücklich gewollt.
+            # build_entries würde automatisch nachbessern – hier ist "kein
+            # eigenes Emoji" aber ausdrücklich gewollt.
             for entry in remapped:
                 if entry.role.id == rolle.id:
                     entry.emoji = placeholder_emoji(rolle.id)
 
         await self._store_entries(panel, remapped)
-        await self._refresh_panel_message(guild, panel, remapped)
+        await self.publish(guild)
 
         target = next(e for e in remapped if e.role.id == rolle.id)
+        panel_emoji, _ = panel_title_parts(panel)
         await interaction.followup.send(
-            f"**{panel['title']}**: {rolle.mention} → {role_chip(target)}", ephemeral=True
+            f"**{panel['title']}**: {rolle.mention} → {role_chip(target, panel_emoji)}",
+            ephemeral=True,
         )
 
     @selfroles_group.command(
@@ -972,12 +996,41 @@ class SelfRolesCog(commands.Cog):
 
         await self.api.update_selfrole_panel(int(panel["id"]), max_roles=limit)
         panel["max_roles"] = limit
-        await self._refresh_panel_message(guild, panel, resolve_entries(guild, panel))
+        await self.publish(guild)
 
         await interaction.followup.send(
             f"**{panel['title']}**: Limit auf "
             f"{'unbegrenzt' if limit == 0 else limit} gesetzt.",
             ephemeral=True,
+        )
+
+    @selfroles_group.command(
+        name="rename", description="Benennt eine Kategorie um (Emoji davor erlaubt)."
+    )
+    @app_commands.describe(kategorie="Aktueller Titel", titel="Neuer Titel")
+    async def selfroles_rename(
+        self, interaction: discord.Interaction, kategorie: str, titel: str
+    ):
+        guild = await self._staff_guard(interaction)
+        if guild is None:
+            return
+
+        panel = await self._find_panel(guild, kategorie)
+        if panel is None:
+            await interaction.response.send_message(
+                await self._unknown_panel_text(guild, kategorie), ephemeral=True
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+        old = panel["title"]
+        await self.api.update_selfrole_panel(int(panel["id"]), title=titel)
+        panel["title"] = titel
+        await self.publish(guild)
+
+        await interaction.followup.send(
+            f"**{old}** heißt jetzt **{titel}**.", ephemeral=True
         )
 
     @selfroles_group.command(name="delete", description="Löscht eine Rollen-Kategorie.")
@@ -996,46 +1049,41 @@ class SelfRolesCog(commands.Cog):
 
         await interaction.response.defer(ephemeral=True, thinking=True)
 
-        channel = await self._get_channel(guild)
-        if channel is not None:
-            message = await self._existing_message(guild, channel, panel)
-            if message is not None:
-                try:
-                    await message.delete()
-                except discord.HTTPException:
-                    pass
-
         await self.api.delete_selfrole_panel_by_id(int(panel["id"]))
+        await self.publish(guild)
+
         await interaction.followup.send(
             f"Kategorie **{panel['title']}** wurde gelöscht.", ephemeral=True
         )
 
     @selfroles_group.command(
         name="deploy",
-        description="Erzeugt bzw. aktualisiert alle Rollen-Nachrichten im Self-Role Channel.",
+        description="Erzeugt bzw. aktualisiert die Rollen-Nachricht im Self-Role Channel.",
     )
     @app_commands.describe(
-        neu_senden="Alte Nachrichten ignorieren und alles neu posten (z. B. nach Channel-Wechsel)."
+        neu_senden="Nachricht neu posten statt bearbeiten (z. B. nach Channel-Wechsel).",
+        neu_mappen="Alle Emojis komplett neu bestimmen und gesetzte überschreiben.",
     )
     async def selfroles_deploy(
-        self, interaction: discord.Interaction, neu_senden: bool = False
+        self,
+        interaction: discord.Interaction,
+        neu_senden: bool = False,
+        neu_mappen: bool = False,
     ):
         guild = await self._staff_guard(interaction)
         if guild is None:
             return
 
         await interaction.response.defer(ephemeral=True, thinking=True)
-        created, updated, problems = await self.deploy_panels(guild, repost=neu_senden)
-
-        parts = []
-        if created:
-            parts.append(f"{created} neu gepostet")
-        if updated:
-            parts.append(f"{updated} aktualisiert")
-        summary = ", ".join(parts) if parts else "Keine Kategorien vorhanden"
+        status, problems = await self.publish(
+            guild, repost=neu_senden, remap=neu_mappen
+        )
 
         note = "\n" + "\n".join(problems) if problems else ""
-        await interaction.followup.send(f"Deploy fertig: {summary}.{note}", ephemeral=True)
+        await interaction.followup.send(
+            f"Rollen-Nachricht {status or 'konnte nicht geschrieben werden'}.{note}",
+            ephemeral=True,
+        )
 
     @selfroles_group.command(name="list", description="Zeigt alle Rollen-Kategorien.")
     async def selfroles_list(self, interaction: discord.Interaction):
@@ -1057,13 +1105,14 @@ class SelfRolesCog(commands.Cog):
         ]
         for panel in panels:
             entries = resolve_entries(guild, panel)
+            emoji, title = panel_title_parts(panel)
             max_roles = panel_max_roles(panel)
             mode = "Einzelauswahl" if max_roles == 1 else (
                 "unbegrenzt" if max_roles == 0 else f"max. {max_roles}"
             )
-            lines.append(f"**{panel.get('title')}** · {mode} · {len(entries)} Rolle(n)")
+            lines.append(f"{emoji + ' ' if emoji else ''}**{title}** · {mode} · {len(entries)} Rolle(n)")
             lines.append(
-                "-# " + (" · ".join(role_chip(entry) for entry in entries) or "keine Rollen")
+                "-# " + (" · ".join(role_chip(entry, emoji) for entry in entries) or "keine Rollen")
             )
 
         await interaction.response.send_message(
@@ -1088,50 +1137,22 @@ class SelfRolesCog(commands.Cog):
             f"Vorhanden: {available or 'keine'}"
         )
 
-    async def _refresh_panel_message(
-        self,
-        guild: discord.Guild,
-        panel: Dict[str, Any],
-        entries: List[PanelEntry],
-    ) -> None:
-        channel = await self._get_channel(guild)
-        if channel is None:
-            return
-        message = await self._existing_message(guild, channel, panel)
-        if message is None:
-            return
-        try:
-            await message.edit(
-                content=render_panel_message(panel, entries),
-                view=panel_view(panel),
-                allowed_mentions=NO_PING,
-            )
-        except discord.HTTPException:
-            logger.exception(
-                "Self-Role: Nachricht für Panel %s konnte nicht aktualisiert werden.",
-                panel.get("id"),
-            )
-
     # ── Selbstheilung ──
 
     @commands.Cog.listener()
     async def on_ready(self) -> None:
-        # on_ready feuert bei jedem Reconnect – ohne Guard würden die Panels
+        # on_ready feuert bei jedem Reconnect – ohne Guard würde die Nachricht
         # bei jedem Netzwerkhänger neu durch die API geschickt.
         for guild in self.bot.guilds:
             if guild.id in self._startup_synced:
                 continue
             try:
-                created, updated, problems = await self.deploy_panels(guild)
-                if created or updated:
-                    logger.info(
-                        "Self-Role: Guild %s – %s neu, %s aktualisiert.",
-                        guild.id, created, updated,
-                    )
+                status, problems = await self.publish(guild)
+                if status:
+                    logger.info("Self-Role: Guild %s – Nachricht %s.", guild.id, status)
+                    self._startup_synced.add(guild.id)
                 for problem in problems:
                     logger.warning("Self-Role: Guild %s – %s", guild.id, problem)
-                if not problems:
-                    self._startup_synced.add(guild.id)
             except Exception:
                 logger.exception("Self-Role Startsync für Guild %s fehlgeschlagen", guild.id)
 
@@ -1139,20 +1160,19 @@ class SelfRolesCog(commands.Cog):
     async def on_guild_role_update(self, before: discord.Role, after: discord.Role) -> None:
         if before.name == after.name and before.unicode_emoji == after.unicode_emoji:
             return
-        await self._refresh_panels_with_role(after.guild, after.id)
+        await self._refresh_if_used(after.guild, after.id)
 
     @commands.Cog.listener()
     async def on_guild_role_delete(self, role: discord.Role) -> None:
-        await self._refresh_panels_with_role(role.guild, role.id)
+        await self._refresh_if_used(role.guild, role.id)
 
-    async def _refresh_panels_with_role(self, guild: discord.Guild, role_id: int) -> None:
+    async def _refresh_if_used(self, guild: discord.Guild, role_id: int) -> None:
         try:
             for panel in await self._sorted_panels(guild.id):
                 stored_ids = {str(rid) for rid in (panel.get("roles") or {}).values()}
-                if str(role_id) not in stored_ids:
-                    continue
-                entries = await self._sync_panel_mappings(guild, panel)
-                await self._refresh_panel_message(guild, panel, entries)
+                if str(role_id) in stored_ids:
+                    await self.publish(guild)
+                    return
         except Exception:
             logger.exception(
                 "Self-Role: Auto-Refresh nach Rollenänderung (%s) fehlgeschlagen", role_id

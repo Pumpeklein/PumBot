@@ -10,6 +10,7 @@ from src.pumbot.bot import logger
 
 ALLOWED_ROLES = {"Admin", "Team", "Twitch Moderator", "Discord Moderator"}
 DELETE_CHANNEL_TYPES = (discord.TextChannel, discord.VoiceChannel)
+BULK_DELETE_CHUNK = 100
 
 
 def is_delete_staff(member: discord.Member) -> bool:
@@ -186,18 +187,27 @@ class DeleteCog(commands.Cog):
             )
             return
 
-        try:
-            await channel.delete_messages(to_delete)
+        # Discord erlaubt maximal 100 Nachrichten pro Bulk-Delete.
+        bulk_deleted = 0
+        leftovers: List[discord.Message] = []
+        for start in range(0, len(to_delete), BULK_DELETE_CHUNK):
+            chunk = to_delete[start : start + BULK_DELETE_CHUNK]
+            try:
+                await channel.delete_messages(chunk)
+                bulk_deleted += len(chunk)
+            except (discord.HTTPException, discord.ClientException) as e:
+                logger.exception("clear_user bulk delete failed: %r", e)
+                leftovers.extend(chunk)
+
+        if not leftovers:
             await interaction.followup.send(
-                f"✅ {len(to_delete)} Nachricht(en) von {user.mention} gelöscht.",
+                f"✅ {bulk_deleted} Nachricht(en) von {user.mention} gelöscht.",
                 ephemeral=True,
             )
             return
-        except discord.HTTPException as e:
-            logger.exception("clear_user bulk delete HTTPException: %r", e)
 
         deleted_count = 0
-        for m in to_delete:
+        for m in leftovers:
             try:
                 await m.delete()
                 deleted_count += 1
@@ -207,7 +217,8 @@ class DeleteCog(commands.Cog):
                 logger.exception("clear_user single delete unexpected error")
 
         await interaction.followup.send(
-            f"Es konnten nicht alle Nachrichten per Bulk-Delete entfernt werden. {deleted_count} Nachricht(en) wurden einzeln gelöscht.",
+            f"{bulk_deleted + deleted_count} von {len(to_delete)} Nachricht(en) gelöscht. "
+            f"Nachrichten, die älter als 14 Tage sind, kann Discord nur einzeln entfernen.",
             ephemeral=True,
         )
 

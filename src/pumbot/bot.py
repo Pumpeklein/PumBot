@@ -27,7 +27,12 @@ from src.pumbot.storage.db import (
 )
 
 
-LOGS_DIR = Path("logs")
+BASE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BASE_DIR.parent.parent
+
+# An die Projektwurzel gebunden, sonst landet das Log dort, wo der Bot
+# zufällig gestartet wurde.
+LOGS_DIR = PROJECT_ROOT / "logs"
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 logger = logging.getLogger("discord_bot")
@@ -52,8 +57,6 @@ logger.addHandler(console_handler)
 
 logging.getLogger("discord.app_commands").setLevel(logging.INFO)
 
-BASE_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = BASE_DIR.parent.parent
 load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
 
 TOKEN_ENV_NAME = getattr(config, "DISCORD_TOKEN_ENV", "DISCORD_TOKEN")
@@ -478,15 +481,22 @@ class PumpeBot(commands.Bot):
             logger.warning("User-Sync uebersprungen: Bot ist in keiner Guild.")
             return
         logger.info("Starte User-Sync fuer Guild(s): %s", ", ".join(guild_ids))
-        for attempt in range(1, 4):
+        attempts = 3
+        for attempt in range(1, attempts + 1):
             results = [await self._sync_guild_members(guild) for guild in self.guilds]
             if results and all(results):
                 self._member_sync_done = True
                 return
+            if attempt == attempts:
+                logger.warning(
+                    "User-Sync nach %s Versuchen nicht vollstaendig.", attempts
+                )
+                return
             wait_seconds = attempt * 5
             logger.warning(
-                "User-Sync nicht vollstaendig. Neuer Versuch %s/3 in %s Sekunden.",
+                "User-Sync nicht vollstaendig. Neuer Versuch %s/%s in %s Sekunden.",
                 attempt + 1,
+                attempts,
                 wait_seconds,
             )
             await asyncio.sleep(wait_seconds)

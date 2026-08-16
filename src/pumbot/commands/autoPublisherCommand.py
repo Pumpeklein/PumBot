@@ -6,7 +6,6 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 
-from src.pumbot import config
 from src.pumbot.bot import logger
 
 
@@ -171,8 +170,7 @@ class AutoPublisherCog(commands.Cog):
 
 
 async def setup(bot: commands.Bot):
-    cog = AutoPublisherCog(bot)
-    await bot.add_cog(cog)
-
-    guild_obj = discord.Object(id=config.GUILD_ID)
-    bot.tree.add_command(cog.autopublisher, guild=guild_obj)
+    # Die Gruppe hängt am Cog und wird beim add_cog global registriert.
+    # setup_hook kopiert danach alles in die Guild – eine zweite Registrierung
+    # hier erzeugt nur einen Eintrag für Guild 0, wenn DISCORD_GUILD_ID fehlt.
+    await bot.add_cog(AutoPublisherCog(bot))

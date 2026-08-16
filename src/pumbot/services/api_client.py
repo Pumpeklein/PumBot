@@ -229,7 +229,8 @@ class ApiClient:
         return await self._call(db.get_server_stats, guild_id) or {}
 
     async def set_server_stats(self, guild_id: str, data: dict) -> None:
-        await self._call(db.set_server_stats, guild_id, **data)
+        stats = {key: value for key, value in data.items() if key != "category_id"}
+        await self._call(db.set_server_stats, guild_id, data.get("category_id"), stats)
 
     # ── Log-Kanäle ──
 

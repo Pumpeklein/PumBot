@@ -495,7 +495,9 @@ class BirthdayCog(commands.Cog):
 
     @birthday_check_loop.error
     async def birthday_check_loop_error(self, error: Exception):
-        return
+        # Ohne Neustart bleibt der Loop nach dem ersten Fehler für immer tot.
+        logger.exception("Fehler im birthday_check_loop: %r", error)
+        self.birthday_check_loop.restart()
 
 
 async def setup(bot: commands.Bot):

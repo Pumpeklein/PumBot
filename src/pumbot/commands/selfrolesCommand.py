@@ -32,12 +32,20 @@ EMOJI_PREFIX_RE = re.compile(
     r")\s*"
 )
 
-# Neutrale Rückfallebene, wenn eine Rolle weder Icon noch Emoji im Namen hat.
-FALLBACK_EMOJIS = [
+# Findet sich kein sinnvolles Emoji, bekommt die Rolle gar keins. Die Spalte
+# `emoji` ist zusammen mit dem Panel eindeutig, deshalb braucht auch "kein
+# Emoji" pro Rolle einen eigenen, unsichtbaren Wert.
+NO_EMOJI_MARKER = "⁣"
+
+# Aus der ersten Version: sinnlose Farbklekse, die beim nächsten Deploy durch
+# ein echtes Emoji ersetzt werden dürfen.
+LEGACY_FALLBACK_EMOJIS = {
     "🔹", "🔸", "🔶", "🔷", "🟠", "🟡", "🟢", "🔵", "🟣", "🟤",
     "⚪", "⚫", "🟥", "🟧", "🟨", "🟩", "🟦", "🟪", "⭐", "✨",
     "💠", "🔘", "◽", "◾", "🔺",
-]
+}
+
+NORMALIZE_RE = re.compile(r"[^a-z0-9]+")
 
 
 def is_selfrole_staff(member: discord.Member) -> bool:
@@ -54,25 +62,61 @@ def split_emoji(text: str) -> Tuple[Optional[str], str]:
     return match.group(1), (text or "")[match.end():].strip()
 
 
-def auto_emoji(role: discord.Role, used: Set[str], index: int) -> str:
-    """Emoji-Kaskade: Rollen-Icon → Emoji im Namen → feste Palette."""
-    if role.unicode_emoji and role.unicode_emoji not in used:
-        return role.unicode_emoji
-
-    from_name, _ = split_emoji(role.name)
-    if from_name and from_name not in used:
-        return from_name
-
-    for candidate in FALLBACK_EMOJIS:
-        if candidate not in used:
-            return candidate
-    return FALLBACK_EMOJIS[index % len(FALLBACK_EMOJIS)]
-
-
 def role_display_name(role: discord.Role) -> str:
     """Rollenname ohne führendes Emoji – das steht im Menü schon separat."""
     _, rest = split_emoji(role.name)
     return rest or role.name
+
+
+def placeholder_emoji(role_id: int) -> str:
+    return f"{NO_EMOJI_MARKER}{role_id}"
+
+
+def is_no_emoji(emoji: Optional[str]) -> bool:
+    return not emoji or emoji.startswith(NO_EMOJI_MARKER)
+
+
+def keepable_emoji(emoji: Optional[str]) -> bool:
+    """Ein bewusst gesetztes oder sinnvoll erkanntes Emoji bleibt erhalten."""
+    return bool(emoji) and not is_no_emoji(emoji) and emoji not in LEGACY_FALLBACK_EMOJIS
+
+
+def display_emoji(emoji: Optional[str]) -> Optional[str]:
+    return None if is_no_emoji(emoji) else emoji
+
+
+def normalize(text: str) -> str:
+    return NORMALIZE_RE.sub("", (text or "").lower())
+
+
+def guild_emoji_for(guild: discord.Guild, role: discord.Role) -> Optional[str]:
+    """Sucht ein Server-Emoji, dessen Name zur Rolle passt (z. B. :valorant:)."""
+    target = normalize(role_display_name(role))
+    if len(target) < 3:
+        return None
+
+    partial: Optional[str] = None
+    for emoji in getattr(guild, "emojis", []):
+        name = normalize(emoji.name)
+        if not name:
+            continue
+        if name == target:
+            return str(emoji)
+        if partial is None and len(name) >= 4 and (name in target or target in name):
+            partial = str(emoji)
+    return partial
+
+
+def auto_emoji(guild: discord.Guild, role: discord.Role, used: Set[str]) -> Optional[str]:
+    """Kaskade: Rollen-Icon → Emoji im Rollennamen → passendes Server-Emoji."""
+    for candidate in (
+        role.unicode_emoji,
+        split_emoji(role.name)[0],
+        guild_emoji_for(guild, role),
+    ):
+        if candidate and candidate not in used:
+            return candidate
+    return None
 
 
 def role_blocker(guild: discord.Guild, role: discord.Role) -> Optional[str]:
@@ -128,36 +172,48 @@ def resolve_entries(guild: discord.Guild, panel: Dict[str, Any]) -> List[PanelEn
     return entries[:MAX_ROLES_PER_PANEL]
 
 
-def remap_entries(guild: discord.Guild, roles: Sequence[discord.Role]) -> List[PanelEntry]:
-    """Vergibt die Emojis für eine Rollenliste deterministisch neu."""
-    used: Set[str] = set()
+def build_entries(
+    guild: discord.Guild,
+    roles: Sequence[discord.Role],
+    preset: Optional[Dict[int, str]] = None,
+) -> List[PanelEntry]:
+    """Baut die Emoji/Rollen-Liste. Gesetzte Emojis aus `preset` bleiben stehen."""
+    preset = preset or {}
+    used: Set[str] = {e for e in preset.values() if keepable_emoji(e)}
+
     entries: List[PanelEntry] = []
-    for index, role in enumerate(roles):
-        emoji = auto_emoji(role, used, index)
-        used.add(emoji)
-        entries.append(PanelEntry(emoji, role))
+    for role in roles:
+        emoji = preset.get(role.id)
+        if not keepable_emoji(emoji):
+            emoji = auto_emoji(guild, role, used)
+        if emoji:
+            used.add(emoji)
+        entries.append(PanelEntry(emoji or placeholder_emoji(role.id), role))
     return entries
+
+
+def role_chip(entry: PanelEntry) -> str:
+    emoji = display_emoji(entry.emoji)
+    name = f"`{role_display_name(entry.role)}`"
+    return f"{emoji} {name}" if emoji else name
 
 
 def render_panel_message(panel: Dict[str, Any], entries: List[PanelEntry]) -> str:
     emoji, title = panel_title_parts(panel)
-    max_roles = panel_max_roles(panel)
-
-    if max_roles == 1:
-        mode = "Einzelauswahl"
-    elif max_roles > 1:
-        mode = f"Mehrfachauswahl · max. {max_roles}"
-    else:
-        mode = "Mehrfachauswahl"
-
     header = f"## {emoji + ' ' if emoji else ''}{title}"
-    count = f"-# {mode} · {len(entries)} Rolle{'n' if len(entries) != 1 else ''}"
 
     if not entries:
         return f"{header}\n-# Für diese Kategorie sind noch keine Rollen hinterlegt."
 
-    lines = [f"{entry.emoji} {entry.role.mention}" for entry in entries]
-    return f"{header}\n{count}\n\n" + "\n".join(lines)
+    lines = [header, " · ".join(role_chip(entry) for entry in entries)]
+
+    max_roles = panel_max_roles(panel)
+    if max_roles == 1:
+        lines.append("-# Du kannst hier genau eine Rolle wählen.")
+    elif max_roles > 1:
+        lines.append(f"-# Du kannst hier bis zu {max_roles} Rollen wählen.")
+
+    return "\n".join(lines)
 
 
 class SelfRoleSelect(discord.ui.Select):
@@ -171,7 +227,7 @@ class SelfRoleSelect(discord.ui.Select):
             discord.SelectOption(
                 label=role_display_name(entry.role)[:100],
                 value=str(entry.role.id),
-                emoji=entry.emoji,
+                emoji=display_emoji(entry.emoji),
                 default=entry.role.id in held,
             )
             for entry in entries
@@ -347,18 +403,16 @@ class SelfRolesCog(commands.Cog):
         emoji, title = panel_title_parts(panel)
         active = [entry for entry in entries if entry.role.id in held]
         active_text = (
-            ", ".join(f"{entry.emoji} {role_display_name(entry.role)}" for entry in active)
-            if active
-            else "keine"
+            " · ".join(role_chip(entry) for entry in active) if active else "*keine*"
         )
         hint = (
-            "Wähle eine Rolle aus der Liste – deine Auswahl ersetzt die bisherige aus dieser Kategorie."
+            "Deine Auswahl ersetzt die bisherige Rolle aus dieser Kategorie."
             if panel_max_roles(panel) == 1
-            else "Wähle deine gewünschten Rollen aus der Liste – deine Auswahl ist der neue Endzustand."
+            else "Deine Auswahl ist der neue Endzustand – abgewählte Rollen werden entfernt."
         )
         return (
             f"### {emoji + ' ' if emoji else ''}{title}\n"
-            f"Deine aktiven Rollen: {active_text}\n"
+            f"Aktiv: {active_text}\n"
             f"-# {hint}"
         )
 
@@ -471,15 +525,19 @@ class SelfRolesCog(commands.Cog):
     async def _sync_panel_mappings(
         self, guild: discord.Guild, panel: Dict[str, Any]
     ) -> List[PanelEntry]:
-        """Emojis neu ableiten und verschwundene Rollen aus dem Panel werfen."""
-        entries = resolve_entries(guild, panel)
-        remapped = remap_entries(guild, [entry.role for entry in entries])
+        """Verschwundene Rollen entfernen und offene Emojis nachziehen.
 
-        before = [(entry.emoji, str(entry.role.id)) for entry in entries]
+        Gesetzte Emojis bleiben unangetastet – nur Platzhalter und die
+        Farbklekse aus der ersten Version werden neu bestimmt.
+        """
+        entries = resolve_entries(guild, panel)
+        preset = {entry.role.id: entry.emoji for entry in entries}
+        remapped = build_entries(guild, [entry.role for entry in entries], preset)
+
         after = [(entry.emoji, str(entry.role.id)) for entry in remapped]
         stored = [(str(e), str(r)) for e, r in (panel.get("roles") or {}).items()]
 
-        if after != before or after != stored:
+        if after != stored:
             await self.api.replace_selfrole_mappings(int(panel["id"]), after)
             panel["roles"] = {emoji: role_id for emoji, role_id in after}
 
@@ -596,7 +654,7 @@ class SelfRolesCog(commands.Cog):
     @app_commands.describe(
         titel="Titel der Kategorie, gern mit Emoji davor (z. B. 🎮 Gaming)",
         limit="Max. Rollen aus dieser Kategorie (0 = unbegrenzt, 1 = Einzelauswahl)",
-        rollen="Die Rollen, einfach hintereinander erwähnt. Emojis werden automatisch vergeben.",
+        rollen="Rollen hintereinander erwähnen. Optional je Rolle ein Emoji dahinter, sonst automatisch.",
     )
     async def selfroles_create(
         self,
@@ -623,8 +681,8 @@ class SelfRolesCog(commands.Cog):
             )
             return
 
-        roles, problems = self._parse_roles(guild, rollen)
-        if not roles:
+        wanted, problems = self._parse_roles(guild, rollen)
+        if not wanted:
             hint = "\n" + "\n".join(problems) if problems else ""
             await interaction.response.send_message(
                 f"Ich konnte keine nutzbaren Rollen erkennen.{hint}", ephemeral=True
@@ -633,7 +691,11 @@ class SelfRolesCog(commands.Cog):
 
         await interaction.response.defer(ephemeral=True, thinking=True)
 
-        entries = remap_entries(guild, roles)
+        entries = build_entries(
+            guild,
+            [role for role, _ in wanted],
+            {role.id: emoji for role, emoji in wanted if emoji},
+        )
         panel: Dict[str, Any] = {"id": 0, "title": titel, "max_roles": limit}
 
         message = await channel.send(
@@ -671,17 +733,27 @@ class SelfRolesCog(commands.Cog):
 
     def _parse_roles(
         self, guild: discord.Guild, raw: str
-    ) -> Tuple[List[discord.Role], List[str]]:
-        roles: List[discord.Role] = []
+    ) -> Tuple[List[Tuple[discord.Role, Optional[str]]], List[str]]:
+        """Liest `@Rolle [Emoji] @Rolle [Emoji] …` – das Emoji ist überall optional."""
+        wanted: List[Tuple[discord.Role, Optional[str]]] = []
         problems: List[str] = []
         seen: Set[int] = set()
+        used_emojis: Set[str] = set()
 
-        for token in raw.split():
-            candidate = token.strip().strip(",")
-            if candidate.startswith("<@&") and candidate.endswith(">"):
-                candidate = candidate[3:-1]
+        tokens = raw.split()
+        index = 0
+        while index < len(tokens):
+            token = tokens[index].strip().strip(",")
+            index += 1
+
+            candidate = token[3:-1] if token.startswith("<@&") and token.endswith(">") else token
             if not candidate.isdigit():
                 continue
+
+            emoji: Optional[str] = None
+            if index < len(tokens) and EMOJI_PREFIX_RE.fullmatch(tokens[index]):
+                emoji = tokens[index].strip()
+                index += 1
 
             role = guild.get_role(int(candidate))
             if role is None:
@@ -695,16 +767,22 @@ class SelfRolesCog(commands.Cog):
                 problems.append(f"-# {role.name}: {blocker}.")
                 continue
 
-            if len(roles) >= MAX_ROLES_PER_PANEL:
+            if len(wanted) >= MAX_ROLES_PER_PANEL:
                 problems.append(
                     f"-# Nur {MAX_ROLES_PER_PANEL} Rollen pro Kategorie möglich, Rest ignoriert."
                 )
                 break
 
-            seen.add(role.id)
-            roles.append(role)
+            if emoji and emoji in used_emojis:
+                problems.append(f"-# {emoji} war doppelt, {role.name} bekommt ein anderes.")
+                emoji = None
+            if emoji:
+                used_emojis.add(emoji)
 
-        return roles, problems
+            seen.add(role.id)
+            wanted.append((role, emoji))
+
+        return wanted, problems
 
     @selfroles_group.command(
         name="edit", description="Fügt einer Kategorie eine Rolle hinzu oder entfernt sie."
@@ -772,17 +850,95 @@ class SelfRolesCog(commands.Cog):
 
         await interaction.response.defer(ephemeral=True, thinking=True)
 
-        remapped = remap_entries(guild, roles)
-        await self.api.replace_selfrole_mappings(
-            int(panel["id"]), [(entry.emoji, str(entry.role.id)) for entry in remapped]
-        )
-        panel["roles"] = {entry.emoji: str(entry.role.id) for entry in remapped}
-
+        preset = {entry.role.id: entry.emoji for entry in entries}
+        remapped = build_entries(guild, roles, preset)
+        await self._store_entries(panel, remapped)
         await self._refresh_panel_message(guild, panel, remapped)
 
         verb = "hinzugefügt" if aktion.value == "add" else "entfernt"
         await interaction.followup.send(
             f"**{panel['title']}**: {rolle.mention} {verb}.", ephemeral=True
+        )
+
+    async def _store_entries(
+        self, panel: Dict[str, Any], entries: List[PanelEntry]
+    ) -> None:
+        pairs = [(entry.emoji, str(entry.role.id)) for entry in entries]
+        await self.api.replace_selfrole_mappings(int(panel["id"]), pairs)
+        panel["roles"] = {emoji: role_id for emoji, role_id in pairs}
+
+    @selfroles_group.command(
+        name="emoji", description="Setzt das Emoji einer Rolle in einer Kategorie."
+    )
+    @app_commands.describe(
+        kategorie="Titel der Kategorie",
+        rolle="Die Rolle",
+        emoji="Emoji, oder `-` für kein Emoji",
+    )
+    async def selfroles_emoji(
+        self,
+        interaction: discord.Interaction,
+        kategorie: str,
+        rolle: discord.Role,
+        emoji: str,
+    ):
+        guild = await self._staff_guard(interaction)
+        if guild is None:
+            return
+
+        panel = await self._find_panel(guild, kategorie)
+        if panel is None:
+            await interaction.response.send_message(
+                await self._unknown_panel_text(guild, kategorie), ephemeral=True
+            )
+            return
+
+        entries = resolve_entries(guild, panel)
+        if rolle.id not in {entry.role.id for entry in entries}:
+            await interaction.response.send_message(
+                f"{rolle.mention} ist in **{panel['title']}** nicht enthalten.",
+                ephemeral=True,
+            )
+            return
+
+        wanted = emoji.strip()
+        clear = wanted in {"-", "–", "none", "kein"}
+
+        if not clear:
+            if not EMOJI_PREFIX_RE.fullmatch(wanted):
+                await interaction.response.send_message(
+                    f"`{wanted}` sieht nicht nach einem Emoji aus. "
+                    "Nutze ein Standard-Emoji, ein Server-Emoji oder `-` für keins.",
+                    ephemeral=True,
+                )
+                return
+            if any(
+                entry.emoji == wanted and entry.role.id != rolle.id for entry in entries
+            ):
+                await interaction.response.send_message(
+                    f"{wanted} ist in **{panel['title']}** schon vergeben.", ephemeral=True
+                )
+                return
+
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+        preset = {entry.role.id: entry.emoji for entry in entries}
+        preset[rolle.id] = wanted
+        remapped = build_entries(guild, [entry.role for entry in entries], preset)
+
+        if clear:
+            # build_entries würde für einen Platzhalter wieder automatisch
+            # nachbessern – hier ist "kein Emoji" aber ausdrücklich gewollt.
+            for entry in remapped:
+                if entry.role.id == rolle.id:
+                    entry.emoji = placeholder_emoji(rolle.id)
+
+        await self._store_entries(panel, remapped)
+        await self._refresh_panel_message(guild, panel, remapped)
+
+        target = next(e for e in remapped if e.role.id == rolle.id)
+        await interaction.followup.send(
+            f"**{panel['title']}**: {rolle.mention} → {role_chip(target)}", ephemeral=True
         )
 
     @selfroles_group.command(
@@ -907,7 +1063,7 @@ class SelfRolesCog(commands.Cog):
             )
             lines.append(f"**{panel.get('title')}** · {mode} · {len(entries)} Rolle(n)")
             lines.append(
-                "-# " + (", ".join(f"{e.emoji} {role_display_name(e.role)}" for e in entries) or "keine Rollen")
+                "-# " + (" · ".join(role_chip(entry) for entry in entries) or "keine Rollen")
             )
 
         await interaction.response.send_message(

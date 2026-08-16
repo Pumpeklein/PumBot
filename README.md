@@ -62,14 +62,18 @@ Rollenvergabe läuft über Buttons und Auswahlmenüs, nicht mehr über Reaktione
 
 - Ein fester Self-Role Channel wird per Command oder Web-Panel gesetzt
   (Config-Key `selfrole_channel_id`)
-- Pro Kategorie eine eigene Nachricht ohne Embed, mit Rollen-Mentions
-  (Mentions lösen keinen Ping aus) und einem Button
+- Pro Kategorie eine eigene Nachricht ohne Embed: Überschrift und darunter alle
+  Rollen als Code-Chips in einer Zeile (`⛏️ \`Minecraft\` · 🔫 \`Call of Duty\``),
+  dazu ein Button
 - Der Button öffnet eine nur für den Nutzer sichtbare Auswahl: Mehrfachauswahl
   bei Limit 0, Einzelauswahl bei Limit 1, dazu ein „Alle entfernen“-Button
 - Die getroffene Auswahl ist der neue Endzustand; abgewählte Rollen werden
   entfernt, das Limit wird serverseitig erzwungen
 - Emojis werden automatisch zugeordnet: Rollen-Icon → Emoji im Rollennamen →
-  neutrale Fallback-Palette, immer eindeutig innerhalb einer Kategorie
+  Server-Emoji mit passendem Namen (`Valorant` → `:valorant:`). Findet sich
+  nichts, bleibt die Rolle ohne Emoji statt einen Platzhalter zu bekommen
+- Emojis lassen sich überschreiben – direkt beim `create` hinter der Rolle oder
+  später per `/selfroles emoji`. Gesetzte Emojis überleben jeden Deploy
 - Die Nachrichten aktualisieren sich selbst: beim Bot-Start, bei Rollen-Umbenennung
   oder -Löschung und nach jeder Änderung an einer Kategorie
 - Buttons überleben Neustarts, weil die Panel-ID in der `custom_id` steht
@@ -79,8 +83,9 @@ Commands (`/selfroles`):
 | Command | Zweck |
 | --- | --- |
 | `channel <kanal>` | Legt den Self-Role Channel fest |
-| `create <titel> <limit> <rollen>` | Neue Kategorie, Emojis automatisch |
+| `create <titel> <limit> <rollen>` | Neue Kategorie; je Rolle optional ein Emoji dahinter |
 | `edit <kategorie> <aktion> <rolle>` | Rolle hinzufügen oder entfernen |
+| `emoji <kategorie> <rolle> <emoji>` | Emoji setzen, `-` für keins |
 | `limit <kategorie> <limit>` | Auswahl-Limit ändern |
 | `delete <kategorie>` | Kategorie samt Nachricht löschen |
 | `deploy [neu_senden]` | Alle Nachrichten erzeugen/aktualisieren |

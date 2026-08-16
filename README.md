@@ -58,10 +58,33 @@ Wichtige Dateien:
 
 ### Selfroles
 
-- Erstellen und Bearbeiten von Selfrole-Panels
-- Emoji-zu-Rolle-Zuordnung
-- Rollenvergabe und -entfernung über Reaktionen
-- Speicherung der Panel-Konfiguration im Backend
+Rollenvergabe läuft über Buttons und Auswahlmenüs, nicht mehr über Reaktionen.
+
+- Ein fester Self-Role Channel wird per Command oder Web-Panel gesetzt
+  (Config-Key `selfrole_channel_id`)
+- Pro Kategorie eine eigene Nachricht ohne Embed, mit Rollen-Mentions
+  (Mentions lösen keinen Ping aus) und einem Button
+- Der Button öffnet eine nur für den Nutzer sichtbare Auswahl: Mehrfachauswahl
+  bei Limit 0, Einzelauswahl bei Limit 1, dazu ein „Alle entfernen“-Button
+- Die getroffene Auswahl ist der neue Endzustand; abgewählte Rollen werden
+  entfernt, das Limit wird serverseitig erzwungen
+- Emojis werden automatisch zugeordnet: Rollen-Icon → Emoji im Rollennamen →
+  neutrale Fallback-Palette, immer eindeutig innerhalb einer Kategorie
+- Die Nachrichten aktualisieren sich selbst: beim Bot-Start, bei Rollen-Umbenennung
+  oder -Löschung und nach jeder Änderung an einer Kategorie
+- Buttons überleben Neustarts, weil die Panel-ID in der `custom_id` steht
+
+Commands (`/selfroles`):
+
+| Command | Zweck |
+| --- | --- |
+| `channel <kanal>` | Legt den Self-Role Channel fest |
+| `create <titel> <limit> <rollen>` | Neue Kategorie, Emojis automatisch |
+| `edit <kategorie> <aktion> <rolle>` | Rolle hinzufügen oder entfernen |
+| `limit <kategorie> <limit>` | Auswahl-Limit ändern |
+| `delete <kategorie>` | Kategorie samt Nachricht löschen |
+| `deploy [neu_senden]` | Alle Nachrichten erzeugen/aktualisieren |
+| `list` | Übersicht aller Kategorien |
 
 Wichtige Dateien:
 

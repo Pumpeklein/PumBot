@@ -223,6 +223,27 @@ class ApiClient:
     async def delete_selfrole_panel(self, guild_id: str, message_id: str) -> None:
         await self._call(db.delete_selfrole_panel, message_id)
 
+    async def get_selfrole_panel_by_id(self, panel_id: int) -> dict | None:
+        return await self._call(db.get_selfrole_panel_by_id, panel_id)
+
+    async def set_selfrole_panel_message(
+        self, panel_id: int, message_id: str, channel_id: str
+    ) -> None:
+        await self._call(db.set_selfrole_panel_message, panel_id, message_id, channel_id)
+
+    async def update_selfrole_panel(
+        self, panel_id: int, title: str | None = None, max_roles: int | None = None
+    ) -> None:
+        await self._call(db.update_selfrole_panel, panel_id, title, max_roles)
+
+    async def delete_selfrole_panel_by_id(self, panel_id: int) -> None:
+        await self._call(db.delete_selfrole_panel_by_id, panel_id)
+
+    async def replace_selfrole_mappings(
+        self, panel_id: int, pairs: list[tuple[str, str]]
+    ) -> None:
+        await self._call(db.replace_selfrole_mappings, panel_id, pairs)
+
     # ── Server-Statistiken ──
 
     async def get_server_stats(self, guild_id: str) -> dict:

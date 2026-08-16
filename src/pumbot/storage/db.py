@@ -2416,6 +2416,73 @@ def delete_selfrole_panel(message_id: str) -> None:
         conn.commit()
 
 
+def get_selfrole_panel_by_id(panel_id: int) -> dict | None:
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM selfrole_panels WHERE id = ?", (panel_id,)
+        ).fetchone()
+        if not row:
+            return None
+        panel = dict(row)
+        mappings = conn.execute(
+            "SELECT emoji, role_id FROM selfrole_mappings WHERE panel_id = ? ORDER BY id ASC",
+            (panel["id"],),
+        ).fetchall()
+        panel["roles"] = {m["emoji"]: m["role_id"] for m in mappings}
+        return panel
+
+
+def set_selfrole_panel_message(panel_id: int, message_id: str, channel_id: str) -> None:
+    """Nach einem Deploy zeigt das Panel auf die neue Nachricht."""
+    with _connect() as conn:
+        conn.execute(
+            "UPDATE selfrole_panels SET message_id = ?, channel_id = ? WHERE id = ?",
+            (message_id, channel_id, panel_id),
+        )
+        conn.commit()
+
+
+def update_selfrole_panel(
+    panel_id: int, title: str | None = None, max_roles: int | None = None
+) -> None:
+    updates: list[str] = []
+    params: list[Any] = []
+    if title is not None:
+        updates.append("title = ?")
+        params.append(title)
+    if max_roles is not None:
+        updates.append("max_roles = ?")
+        params.append(max_roles)
+    if not updates:
+        return
+    params.append(panel_id)
+    with _connect() as conn:
+        conn.execute(
+            f"UPDATE selfrole_panels SET {', '.join(updates)} WHERE id = ?",
+            tuple(params),
+        )
+        conn.commit()
+
+
+def delete_selfrole_panel_by_id(panel_id: int) -> None:
+    with _connect() as conn:
+        conn.execute("DELETE FROM selfrole_mappings WHERE panel_id = ?", (panel_id,))
+        conn.execute("DELETE FROM selfrole_panels WHERE id = ?", (panel_id,))
+        conn.commit()
+
+
+def replace_selfrole_mappings(panel_id: int, pairs: list[tuple[str, str]]) -> None:
+    """Setzt die Emoji/Rollen-Zuordnung eines Panels neu (Reihenfolge bleibt erhalten)."""
+    with _connect() as conn:
+        conn.execute("DELETE FROM selfrole_mappings WHERE panel_id = ?", (panel_id,))
+        for emoji, role_id in pairs:
+            conn.execute(
+                "INSERT INTO selfrole_mappings (panel_id, emoji, role_id) VALUES (?, ?, ?)",
+                (panel_id, emoji, str(role_id)),
+            )
+        conn.commit()
+
+
 # ══════════ Server Stats ══════════
 
 

@@ -261,7 +261,15 @@ def render_message(blocks: Sequence[Tuple[Dict[str, Any], List[PanelEntry]]]) ->
 
 
 class SelfRoleSelect(discord.ui.Select):
-    def __init__(self, cog: "SelfRolesCog", panel: Dict[str, Any], entries: List[PanelEntry], held: Set[int]):
+    def __init__(
+        self,
+        cog: "SelfRolesCog",
+        panel: Dict[str, Any],
+        entries: List[PanelEntry],
+        held: Set[int],
+        *,
+        with_emojis: bool = True,
+    ):
         self.cog = cog
         self.panel = panel
         self.entries = entries
@@ -272,7 +280,7 @@ class SelfRoleSelect(discord.ui.Select):
             discord.SelectOption(
                 label=role_display_name(entry.role)[:100],
                 value=str(entry.role.id),
-                emoji=display_emoji(entry.emoji, fallback),
+                emoji=display_emoji(entry.emoji, fallback) if with_emojis else None,
                 default=entry.role.id in held,
             )
             for entry in entries
@@ -305,10 +313,18 @@ class SelfRoleClearButton(discord.ui.Button):
 class SelfRoleChooserView(discord.ui.View):
     """Ephemere Auswahl, die nur für einen Klick lebt."""
 
-    def __init__(self, cog: "SelfRolesCog", panel: Dict[str, Any], entries: List[PanelEntry], held: Set[int]):
+    def __init__(
+        self,
+        cog: "SelfRolesCog",
+        panel: Dict[str, Any],
+        entries: List[PanelEntry],
+        held: Set[int],
+        *,
+        with_emojis: bool = True,
+    ):
         super().__init__(timeout=180)
         if entries:
-            self.add_item(SelfRoleSelect(cog, panel, entries, held))
+            self.add_item(SelfRoleSelect(cog, panel, entries, held, with_emojis=with_emojis))
             self.add_item(SelfRoleClearButton(cog, panel, entries))
 
 
@@ -343,13 +359,24 @@ class SelfRoleOpenButton(
         await cog.open_chooser(interaction, self.panel_id)
 
 
-def build_view(panels: Sequence[Dict[str, Any]]) -> discord.ui.View:
+def build_view(
+    panels: Sequence[Dict[str, Any]], *, with_emojis: bool = True
+) -> discord.ui.View:
     """Pro Kategorie ein Button, beschriftet mit dem Kategorie-Namen."""
     view = discord.ui.View(timeout=None)
     for panel in panels[:MAX_PANELS]:
         emoji, title = panel_title_parts(panel)
-        view.add_item(SelfRoleOpenButton(int(panel["id"]), label=title, emoji=emoji))
+        view.add_item(
+            SelfRoleOpenButton(
+                int(panel["id"]), label=title, emoji=emoji if with_emojis else None
+            )
+        )
     return view
+
+
+def is_invalid_emoji_error(error: discord.HTTPException) -> bool:
+    """Discord lehnt in Komponenten Emojis ab, die es im Picker längst kennt."""
+    return error.code == 50035 and "emoji" in str(error).lower()
 
 
 class SelfRolesCog(commands.Cog):
@@ -437,12 +464,24 @@ class SelfRolesCog(commands.Cog):
             return
 
         held = self.held_panel_roles(member, {entry.role.id for entry in entries})
-        await interaction.response.send_message(
-            content=self._chooser_text(panel, entries, held),
-            view=SelfRoleChooserView(self, panel, entries, held),
-            ephemeral=True,
-            allowed_mentions=NO_PING,
-        )
+        text = self._chooser_text(panel, entries, held)
+
+        for with_emojis in (True, False):
+            view = SelfRoleChooserView(self, panel, entries, held, with_emojis=with_emojis)
+            try:
+                await interaction.response.send_message(
+                    content=text, view=view, ephemeral=True, allowed_mentions=NO_PING
+                )
+                return
+            except discord.HTTPException as error:
+                if with_emojis and is_invalid_emoji_error(error):
+                    logger.warning(
+                        "Self-Role: Discord lehnt ein Rollen-Emoji in Panel %s ab (%s).",
+                        panel.get("id"),
+                        error,
+                    )
+                    continue
+                raise
 
     def _chooser_text(
         self, panel: Dict[str, Any], entries: List[PanelEntry], held: Set[int]
@@ -510,11 +549,17 @@ class SelfRolesCog(commands.Cog):
         if blocked:
             text += "\n-# Nicht vergeben: " + ", ".join(blocked) + " – bitte melde dich beim Team."
 
-        await interaction.edit_original_response(
-            content=text,
-            view=SelfRoleChooserView(self, panel, entries, held),
-            allowed_mentions=NO_PING,
-        )
+        for with_emojis in (True, False):
+            view = SelfRoleChooserView(self, panel, entries, held, with_emojis=with_emojis)
+            try:
+                await interaction.edit_original_response(
+                    content=text, view=view, allowed_mentions=NO_PING
+                )
+                return
+            except discord.HTTPException as error:
+                if with_emojis and is_invalid_emoji_error(error):
+                    continue
+                raise
 
     async def _change_roles(
         self, member: discord.Member, roles: List[discord.Role], action: str
@@ -614,26 +659,47 @@ class SelfRolesCog(commands.Cog):
                 blocks.append((panel, await self._sync_panel_mappings(guild, panel, remap=remap)))
 
             content = render_message(blocks)
-            view = build_view([panel for panel, _ in blocks])
-
+            panel_list = [panel for panel, _ in blocks]
             message = None if repost else await self._existing_message(guild, channel)
-            try:
-                if message is not None:
-                    await message.edit(content=content, view=view, allowed_mentions=NO_PING)
-                    return "aktualisiert", problems
 
-                message = await channel.send(
-                    content=content, view=view, allowed_mentions=NO_PING
-                )
-                await self.api.set_config(
-                    str(guild.id), SELFROLE_MESSAGE_CONFIG_KEY, str(message.id)
-                )
-                return "neu gepostet", problems
-            except discord.Forbidden:
-                problems.append(f"Mir fehlen Rechte in {channel.mention}.")
-            except discord.HTTPException:
-                logger.exception("Self-Role: Nachricht für Guild %s fehlgeschlagen.", guild.id)
-                problems.append("Discord hat die Nachricht abgelehnt, Details im Bot-Log.")
+            # Lehnt Discord ein Kategorie-Emoji ab, wird lieber ohne Icons
+            # gepostet als gar nicht.
+            for with_emojis in (True, False):
+                view = build_view(panel_list, with_emojis=with_emojis)
+                try:
+                    if message is not None:
+                        await message.edit(
+                            content=content, view=view, allowed_mentions=NO_PING
+                        )
+                        return "aktualisiert", problems
+
+                    sent = await channel.send(
+                        content=content, view=view, allowed_mentions=NO_PING
+                    )
+                    await self.api.set_config(
+                        str(guild.id), SELFROLE_MESSAGE_CONFIG_KEY, str(sent.id)
+                    )
+                    return "neu gepostet", problems
+                except discord.Forbidden:
+                    problems.append(f"Mir fehlen Rechte in {channel.mention}.")
+                    break
+                except discord.HTTPException as error:
+                    if with_emojis and is_invalid_emoji_error(error):
+                        logger.warning(
+                            "Self-Role: Discord lehnt ein Kategorie-Emoji ab (%s). "
+                            "Buttons werden ohne Icon gepostet.",
+                            error,
+                        )
+                        problems.append(
+                            "Discord hat ein Kategorie-Emoji abgelehnt – die Buttons "
+                            "bleiben ohne Icon. Setze ein anderes Emoji im Titel."
+                        )
+                        continue
+                    logger.exception(
+                        "Self-Role: Nachricht für Guild %s fehlgeschlagen.", guild.id
+                    )
+                    problems.append("Discord hat die Nachricht abgelehnt, Details im Bot-Log.")
+                    break
             return "", problems
 
     async def _existing_message(

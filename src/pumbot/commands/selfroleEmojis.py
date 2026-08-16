@@ -7,6 +7,10 @@ Liste geprüft – der erste Treffer, dessen Emoji im Panel noch frei ist, gewin
 
 Die Reihenfolge ist wichtig: spezifische Begriffe stehen vor allgemeinen, sonst
 schnappt sich „auto" das Emoji von „Grand Theft Auto".
+
+Bei der Auswahl der Emojis gilt: nichts neuer als Unicode 11 (2018). Discord
+prüft Emojis in Buttons und Select-Menüs gegen eine ältere Liste als im
+Emoji-Picker und antwortet sonst mit `50035 Invalid emoji`.
 """
 
 from __future__ import annotations
@@ -74,7 +78,8 @@ KEYWORD_EMOJIS: List[Tuple[Tuple[str, ...], str]] = [
     # ── Geschlecht / Pronomen ──
     (("maennlich", "male", "boy", "junge", "erihm", "hehim"), "♂️"),
     (("weiblich", "female", "girl", "maedchen", "sieihr", "sheher"), "♀️"),
-    (("divers", "nonbinaer", "nonbinary", "enby", "theythem"), "⚧️"),
+    # ⚧️ (U+26A7) wird von Discord in Buttons/Selects abgelehnt – 🌈 ist alt genug.
+    (("divers", "nonbinaer", "nonbinary", "enby", "theythem"), "🌈"),
     (("keineangabe", "geheim", "privat"), "🤐"),
 
     # ── Alter ──
@@ -107,7 +112,7 @@ KEYWORD_EMOJIS: List[Tuple[Tuple[str, ...], str]] = [
     (("grandtheftauto", "gta"), "🚙"),
     (("rocketleague",), "🚀"),
     (("apexlegends", "apex"), "🔺"),
-    (("deadbydaylight", "dbd"), "🩸"),
+    (("deadbydaylight", "dbd"), "🔦"),
     (("clashroyale",), "👑"),
     (("clashofclans", "clash"), "🏹"),
     (("amongus",), "🔪"),
@@ -117,7 +122,7 @@ KEYWORD_EMOJIS: List[Tuple[Tuple[str, ...], str]] = [
     (("roblox",), "🟥"),
     (("terraria",), "🌳"),
     (("stardew",), "🌱"),
-    (("fallguys",), "🫘"),
+    (("fallguys",), "🏃"),
     (("palworld",), "🐣"),
     (("brawlstars", "brawl"), "💥"),
     (("overwatch",), "🧡"),
@@ -181,7 +186,7 @@ KEYWORD_EMOJIS: List[Tuple[Tuple[str, ...], str]] = [
     (("chatfarbe", "farbe", "color", "colour"), "🎨"),
     (("plattform", "platform", "konsole", "console", "geraet"), "🕹️"),
     (("gaming", "zocken", "spiele", "games"), "🎮"),
-    (("geschlecht", "pronomen", "pronouns"), "⚧️"),
+    (("geschlecht", "pronomen", "pronouns"), "🚻"),
     (("alter", "age"), "🎂"),
     (("land", "laender", "country", "region", "herkunft"), "🌍"),
     (("benachrichtigung", "ping", "notification"), "🔔"),

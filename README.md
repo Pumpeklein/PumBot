@@ -79,6 +79,11 @@ Rollenvergabe läuft über Buttons und Auswahlmenüs, nicht mehr über Reaktione
   Kategorie
 - Kategorien bekommen ihr Emoji ebenfalls automatisch, wenn im Titel keins steht
   (`Land` → 🌍, `Info` → ℹ️). Es erscheint in der Überschrift und auf dem Button
+- Discord prüft Emojis in Buttons und Select-Menüs gegen eine ältere Liste als
+  im Picker und lehnt neuere mit `50035 Invalid emoji` ab (z. B. ⚧️, U+26A7).
+  Die Stichwortliste hält sich deshalb an Emoji ≤ 12.0; lehnt Discord trotzdem
+  eins ab, geht die Nachricht ohne Button-Icons raus statt gar nicht, und
+  `/selfroles deploy` meldet es
 - Die Rollen einer Kategorie stehen in der Reihenfolge der Discord-Rollen-
   übersicht (höchste Rolle zuerst). Sammel-Rollen wie „Andere Länder",
   „Sonstige" oder „Keine Angabe" rutschen immer ans Ende

@@ -30,13 +30,25 @@ def _extract_counting_number(content: str) -> Optional[int]:
 
 
 class CountingCog(commands.Cog):
-    CONFIRM_REACTION_DELAY_SECONDS = 0.5
-
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.api = bot.api
         self._channel_cache: dict[int, Optional[int]] = {}
         self._state_cache: dict[int, dict] = {}
+        self._stats_cache: dict[tuple[int, int], Dict[str, int]] = {}
+        # Bewertungs-Lock pro Guild: haelt die Nachrichten in Eingangsreihenfolge.
+        self._eval_locks: dict[int, asyncio.Lock] = {}
+        # Schreib-Lock pro Guild: die DB-Writes duerfen sich nicht ueberholen.
+        self._write_locks: dict[int, asyncio.Lock] = {}
+        self._pending_writes: set[asyncio.Task] = set()
+
+    @staticmethod
+    def _lock_for(locks: dict[int, asyncio.Lock], guild_id: int) -> asyncio.Lock:
+        lock = locks.get(guild_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            locks[guild_id] = lock
+        return lock
 
     async def _get_state(self, guild_id: int) -> dict:
         if guild_id in self._state_cache:
@@ -51,11 +63,16 @@ class CountingCog(commands.Cog):
         self._state_cache[guild_id] = state
         return state
 
-    async def _save_state(self, guild_id: int, **kwargs: Any) -> None:
-        state = await self._get_state(guild_id)
+    def _apply_state(self, state: dict, guild_id: int, **kwargs: Any) -> dict:
+        """Aktualisiert nur den Cache; der DB-Write laeuft getrennt davon."""
         state.update(kwargs)
         self._state_cache[guild_id] = state
-        await self.api.set_counting(str(guild_id), **kwargs)
+        return state
+
+    async def _save_state(self, guild_id: int, **kwargs: Any) -> None:
+        self._apply_state(await self._get_state(guild_id), guild_id, **kwargs)
+        async with self._lock_for(self._write_locks, guild_id):
+            await self.api.set_counting(str(guild_id), **kwargs)
 
     async def _get_channel_id(self, guild_id: int) -> Optional[int]:
         if guild_id in self._channel_cache:
@@ -66,32 +83,36 @@ class CountingCog(commands.Cog):
         return ch
 
     async def _get_user_stats(self, guild_id: int, user_id: int) -> Dict[str, int]:
+        cached = self._stats_cache.get((guild_id, user_id))
+        if cached is not None:
+            return cached
         raw = await self.api.get_counting_stats(str(guild_id), str(user_id))
-        if not raw:
-            return _default_user_stats()
         stats = _default_user_stats()
-        for k in stats:
-            if k in raw:
-                stats[k] = int(raw[k])
+        if raw:
+            for k in stats:
+                if k in raw:
+                    stats[k] = int(raw[k])
+        self._stats_cache[(guild_id, user_id)] = stats
         return stats
 
     async def _save_user_stats(
         self, guild_id: int, user_id: int, stats: Dict[str, int]
     ) -> None:
+        self._stats_cache[(guild_id, user_id)] = stats
         await self.api.set_counting_stats(str(guild_id), str(user_id), **stats)
 
-    async def _update_user_correct(self, guild_id: int, user_id: int) -> None:
+    async def _update_user_stats(
+        self, guild_id: int, user_id: int, correct: bool
+    ) -> None:
         stats = await self._get_user_stats(guild_id, user_id)
-        stats["correct"] += 1
-        stats["current_streak"] += 1
-        if stats["current_streak"] > stats["best_streak"]:
-            stats["best_streak"] = stats["current_streak"]
-        await self._save_user_stats(guild_id, user_id, stats)
-
-    async def _update_user_fail(self, guild_id: int, user_id: int) -> None:
-        stats = await self._get_user_stats(guild_id, user_id)
-        stats["fails"] += 1
-        stats["current_streak"] = 0
+        if correct:
+            stats["correct"] += 1
+            stats["current_streak"] += 1
+            if stats["current_streak"] > stats["best_streak"]:
+                stats["best_streak"] = stats["current_streak"]
+        else:
+            stats["fails"] += 1
+            stats["current_streak"] = 0
         await self._save_user_stats(guild_id, user_id, stats)
 
     def _is_allowed_staff(self, interaction: discord.Interaction) -> bool:
@@ -106,33 +127,38 @@ class CountingCog(commands.Cog):
         role_names = {"Twitch Moderator", "Discord Moderator", "Team", "Admin"}
         return any(r.name in role_names for r in user.roles)
 
-    async def _handle_correct_number(
-        self, message: discord.Message, current_number: int
+    def _queue_persist(
+        self, guild_id: int, user_id: int, state: dict, correct: bool
     ) -> None:
-        try:
-            guild_id = message.guild.id
-            state = await self._get_state(guild_id)
-            highscore = int(state.get("highscore", 0))
-            new_hs = max(highscore, current_number)
-            await self._save_state(
-                guild_id,
-                last_number=current_number,
-                last_user_id=message.author.id,
-                highscore=new_hs,
-            )
-            await self._update_user_correct(guild_id, message.author.id)
-            await asyncio.sleep(self.CONFIRM_REACTION_DELAY_SECONDS)
-            await message.add_reaction("\u2705")
-        except Exception:
-            logger.exception("Fehler beim Verarbeiten einer korrekten Zahl")
+        """Schreibt den bereits gefaellten Beschluss nach, ohne die naechste Zahl auszubremsen."""
+        snapshot = {
+            key: state.get(key) for key in ("last_number", "last_user_id", "highscore")
+        }
+        task = asyncio.create_task(self._persist(guild_id, user_id, snapshot, correct))
+        self._pending_writes.add(task)
+        task.add_done_callback(self._pending_writes.discard)
 
-    async def _handle_wrong_number(
-        self, message: discord.Message, expected: int, reason: str
+    async def _persist(
+        self, guild_id: int, user_id: int, snapshot: dict, correct: bool
     ) -> None:
+        async with self._lock_for(self._write_locks, guild_id):
+            try:
+                await self.api.set_counting(str(guild_id), **snapshot)
+                await self._update_user_stats(guild_id, user_id, correct)
+            except Exception:
+                logger.exception(
+                    "Counting-Stand fuer Guild %s konnte nicht gespeichert werden",
+                    guild_id,
+                )
+
+    async def _confirm_number(self, message: discord.Message) -> None:
         try:
-            guild_id = message.guild.id
-            await self._update_user_fail(guild_id, message.author.id)
-            await self._save_state(guild_id, last_number=0, last_user_id=None)
+            await message.add_reaction("✅")
+        except Exception:
+            logger.exception("Bestätigungs-Reaktion konnte nicht gesetzt werden")
+
+    async def _announce_fail(self, message: discord.Message, reason: str) -> None:
+        try:
             await message.reply(
                 f"{message.author.mention} hat verkackt!\n"
                 f"Grund: **{reason}**\n"
@@ -140,7 +166,7 @@ class CountingCog(commands.Cog):
                 mention_author=False,
             )
         except Exception:
-            logger.exception("Fehler beim Verarbeiten einer falschen Zahl")
+            logger.exception("Fail-Meldung konnte nicht gesendet werden")
 
     counting = app_commands.Group(
         name="counting",
@@ -197,8 +223,11 @@ class CountingCog(commands.Cog):
                 ephemeral=True,
             )
 
-        await self._save_state(guild.id, last_number=0, last_user_id=None)
-        self._state_cache.pop(guild.id, None)
+        # Der Reset muss auch laufende Bewertungen abwarten, sonst schreibt eine
+        # Nachricht von eben den alten Stand direkt wieder zurueck.
+        async with self._lock_for(self._eval_locks, guild.id):
+            await self._save_state(guild.id, last_number=0, last_user_id=None)
+            self._state_cache.pop(guild.id, None)
 
         await interaction.response.send_message(
             "Der Zähler wurde zurückgesetzt. Nächste Zahl ist **1**.",
@@ -222,9 +251,9 @@ class CountingCog(commands.Cog):
                 ephemeral=True,
             )
 
-        last = int(state.get("last_number", 0))
+        last = int(state.get("last_number") or 0)
         last_uid = state.get("last_user_id")
-        highscore = int(state.get("highscore", 0))
+        highscore = int(state.get("highscore") or 0)
         channel = guild.get_channel(channel_id)
         last_user_display = f"<@{last_uid}>" if last_uid else chr(8212)
         your_stats = await self._get_user_stats(guild.id, interaction.user.id)
@@ -269,11 +298,11 @@ class CountingCog(commands.Cog):
         for rank, e in enumerate(entries, start=1):
             name = f"<@{e['user_id']}>"
             lines.append(
-                f"**#{rank}** {name} \u2013 \u2705 {e.get('correct', 0)} | Best-Streak: {e.get('best_streak', 0)}"
+                f"**#{rank}** {name} – ✅ {e.get('correct', 0)} | Best-Streak: {e.get('best_streak', 0)}"
             )
 
         embed.add_field(
-            name="Top 10 \u2013 Korrekte Zahlen", value="\n".join(lines), inline=False
+            name="Top 10 – Korrekte Zahlen", value="\n".join(lines), inline=False
         )
         await interaction.response.send_message(embed=embed)
 
@@ -284,38 +313,58 @@ class CountingCog(commands.Cog):
                 return
 
             guild_id = message.guild.id
-            channel_id = await self._get_channel_id(guild_id)
+            # Erst der Cache, damit fremde Channels ohne await rausfallen: sonst
+            # verschiebt schon diese Pruefung die Reihenfolge der Nachrichten.
+            if guild_id in self._channel_cache:
+                channel_id = self._channel_cache[guild_id]
+            else:
+                channel_id = await self._get_channel_id(guild_id)
             if channel_id is None or message.channel.id != channel_id:
                 return
 
-            content = message.content.strip()
-            state = await self._get_state(guild_id)
-            last_number = int(state.get("last_number", 0))
-            expected = last_number + 1
+            # Ab hier ist der Lock die erste Wartestelle. Nachrichten werden damit
+            # in Eingangsreihenfolge gewertet, statt sich ueber langsame DB-Calls
+            # gegenseitig zu ueberholen.
+            async with self._lock_for(self._eval_locks, guild_id):
+                state = await self._get_state(guild_id)
+                last_number = int(state.get("last_number") or 0)
+                last_user_id = state.get("last_user_id")
+                expected = last_number + 1
 
-            number = _extract_counting_number(content)
-            if number is None:
-                await self._handle_wrong_number(message, expected, "Keine gültige Zahl")
-                return
+                number = _extract_counting_number(message.content.strip())
+                if number is None:
+                    reason = "Keine gültige Zahl"
+                elif number <= 0:
+                    reason = "Zahl muss positiv sein"
+                elif last_user_id and int(last_user_id) == message.author.id:
+                    reason = "Du darfst nicht zweimal hintereinander zählen"
+                elif number != expected:
+                    reason = "Falsche Zahl"
+                else:
+                    reason = None
 
-            if number <= 0:
-                await self._handle_wrong_number(
-                    message, expected, "Zahl muss positiv sein"
+                if reason is None:
+                    state = self._apply_state(
+                        state,
+                        guild_id,
+                        last_number=number,
+                        last_user_id=message.author.id,
+                        highscore=max(int(state.get("highscore") or 0), number),
+                    )
+                else:
+                    state = self._apply_state(
+                        state, guild_id, last_number=0, last_user_id=None
+                    )
+                self._queue_persist(
+                    guild_id, message.author.id, state, correct=reason is None
                 )
-                return
 
-            last_user_id = state.get("last_user_id")
-            if last_user_id and int(last_user_id) == message.author.id:
-                await self._handle_wrong_number(
-                    message, expected, "Du darfst nicht zweimal hintereinander zählen"
-                )
-                return
-
-            if number != expected:
-                await self._handle_wrong_number(message, expected, "Falsche Zahl")
-                return
-
-            await self._handle_correct_number(message, number)
+            # Discord-Antwort ausserhalb des Locks: die naechste Zahl wartet nicht
+            # auf Reaktion oder Reply.
+            if reason is None:
+                await self._confirm_number(message)
+            else:
+                await self._announce_fail(message, reason)
 
         except Exception:
             logger.exception("Fehler im Counting-System")

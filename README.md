@@ -121,12 +121,12 @@ Wichtige Dateien:
 - Staff kann Geburtstage für andere setzen
 - Hintergrundjob prüft regelmäßig anstehende Geburtstage
 - Gratulationen und Geburtstagsdaten werden zentral gespeichert
-- Web-Panel zeigt alle Geburtstage und den konfigurierten Geburtstags-Channel
+- Web-Panel zeigt alle Geburtstage, trägt ein, setzt den Gratulationskanal und verknüpft Listen-Nachrichten
+- Ändert das Panel Einträge oder Listen-Nachrichten, bemerkt der Minutenjob das und aktualisiert die Liste
 
 Wichtige Dateien:
 
 - [src/pumbot/commands/birthdayCommand.py](./src/pumbot/commands/birthdayCommand.py)
-- [web_logs/templates/birthdays.html](./web_logs/templates/birthdays.html)
 
 ### Counting
 
@@ -134,6 +134,11 @@ Wichtige Dateien:
 - Validierung der Zählregeln direkt über `on_message`
 - Speicherung von aktuellem Stand, Highscore und User-Statistiken
 - Leaderboard im Bot und im Web-Panel
+- Reset und Kanalwechsel aus dem Web-Panel: Das Panel hinterlegt einen Auftrag unter
+  `counting_panel_command` in `guild_config`, der Bot übernimmt ihn binnen 15 Sekunden
+  über denselben Weg wie `/counting reset` bzw. `/counting setchannel`. Direkt in
+  `counting_state` zu schreiben hilft nicht — der Bot hält den Stand im Speicher und
+  überschriebe ihn.
 
 Wichtige Dateien:
 

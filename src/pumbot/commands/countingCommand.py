@@ -1,14 +1,19 @@
 ﻿from __future__ import annotations
 
 import asyncio
+import json
 import re
 from typing import Any, Dict, Optional
 
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from src.pumbot.bot import logger
+
+# Auftrag aus dem Web Panel in `guild_config`. Das Panel schreibt den Zaehlerstand
+# nicht selbst: der Cache hier wuerde ihn sonst beim naechsten Speichern ueberschreiben.
+PANEL_COMMAND_KEY = "counting_panel_command"
 
 
 def _default_user_stats() -> Dict[str, int]:
@@ -41,6 +46,52 @@ class CountingCog(commands.Cog):
         # Schreib-Lock pro Guild: die DB-Writes duerfen sich nicht ueberholen.
         self._write_locks: dict[int, asyncio.Lock] = {}
         self._pending_writes: set[asyncio.Task] = set()
+        self.panel_commands.start()
+
+    def cog_unload(self) -> None:
+        self.panel_commands.cancel()
+
+    @tasks.loop(seconds=15)
+    async def panel_commands(self) -> None:
+        """Uebernimmt Reset und Kanalwechsel aus dem Web Panel ueber denselben Weg wie die Befehle."""
+        for guild in self.bot.guilds:
+            guild_id = str(guild.id)
+            raw = await self.api.get_config(guild_id, PANEL_COMMAND_KEY)
+            if not raw:
+                continue
+            try:
+                await self._apply_panel_command(guild.id, json.loads(raw))
+            except (ValueError, TypeError):
+                logger.warning("Ungueltiger Counting-Auftrag aus dem Panel: %r", raw)
+            except Exception:
+                logger.exception("Counting-Auftrag aus dem Panel fehlgeschlagen")
+                continue
+            # Nur loeschen, was bearbeitet wurde — ein neuer Auftrag bleibt fuer den naechsten Lauf.
+            if await self.api.get_config(guild_id, PANEL_COMMAND_KEY) == raw:
+                await self.api.delete_config(guild_id, PANEL_COMMAND_KEY)
+
+    @panel_commands.before_loop
+    async def _before_panel_commands(self) -> None:
+        await self.bot.wait_until_ready()
+
+    async def _apply_panel_command(self, guild_id: int, command: dict) -> None:
+        action = command.get("action")
+        channel_id = str(command.get("channel_id") or "")
+        if action not in ("reset", "channel") or (action == "channel" and not channel_id.isdigit()):
+            raise ValueError(action)
+
+        # Wie /counting reset und /counting setchannel: laufende Bewertungen abwarten,
+        # der Highscore bleibt stehen.
+        async with self._lock_for(self._eval_locks, guild_id):
+            if action == "channel":
+                await self._save_state(
+                    guild_id, channel_id=channel_id, last_number=0, last_user_id=None
+                )
+                self._channel_cache[guild_id] = int(channel_id)
+            else:
+                await self._save_state(guild_id, last_number=0, last_user_id=None)
+            self._state_cache.pop(guild_id, None)
+        logger.info("Counting-Auftrag %s aus dem Panel fuer Guild %s uebernommen.", action, guild_id)
 
     @staticmethod
     def _lock_for(locks: dict[int, asyncio.Lock], guild_id: int) -> asyncio.Lock:

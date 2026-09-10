@@ -84,6 +84,7 @@ class BirthdayCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.api = bot.api
+        self._list_signatures: Dict[str, str] = {}
         logger.info("BirthdayCog initialisiert aus %s", __file__)
         self.birthday_check_loop.start()
 
@@ -160,6 +161,20 @@ class BirthdayCog(commands.Cog):
             embed.add_field(name=MONTH_NAMES_DE.get(month, f"Monat {month}"), value=value, inline=False)
 
         return embed
+
+    async def _refresh_list_if_changed(self, guild: discord.Guild) -> None:
+        """Übernimmt Einträge und Listen-Nachrichten, die das Panel an den Befehlen vorbei ändert."""
+        g_id = str(guild.id)
+        birthdays = await self.api.get_birthdays(g_id)
+        rows = await self.api.get_bot_messages(g_id, "birthday_list") or []
+        signature = repr((
+            sorted((str(b["user_id"]), b["day"], b["month"], b.get("year") or 0) for b in birthdays),
+            sorted((str(r.get("message_id") or ""), str(r.get("channel_id") or "")) for r in rows),
+        ))
+        previous = self._list_signatures.get(g_id)
+        self._list_signatures[g_id] = signature
+        if previous is not None and previous != signature:
+            await self._update_birthday_list_message(guild)
 
     async def _update_birthday_list_message(self, guild: discord.Guild) -> None:
         g_id = str(guild.id)
@@ -456,6 +471,7 @@ class BirthdayCog(commands.Cog):
 
         for guild in self.bot.guilds:
             g_id = str(guild.id)
+            await self._refresh_list_if_changed(guild)
 
             channel_id_str = await self.api.get_config(g_id, "birthday_channel_id")
             if not channel_id_str:

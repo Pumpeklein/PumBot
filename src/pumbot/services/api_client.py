@@ -64,6 +64,9 @@ class ApiClient:
     async def set_config(self, guild_id: str, key: str, value: str) -> None:
         await self._call(db.set_config, guild_id, key, value)
 
+    async def delete_config(self, guild_id: str, key: str) -> None:
+        await self._call(db.delete_config, guild_id, key)
+
     # ── Mitglieder ──
 
     async def sync_guild_members(

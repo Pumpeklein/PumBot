@@ -172,6 +172,7 @@ Wichtige Dateien:
 
 - Verwaltung von Channels, in denen neue Inhalte automatisch veröffentlicht werden
 - Speicherung der Ziel-Channels im Backend
+- Die Liste wird 60 Sekunden zwischengespeichert, damit Änderungen aus dem Web-Panel ohne Neustart greifen
 
 Wichtige Dateien:
 

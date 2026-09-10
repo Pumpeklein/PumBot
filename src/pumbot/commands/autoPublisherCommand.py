@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import time
 from typing import List
 
 import discord
@@ -8,6 +9,8 @@ from discord import app_commands
 
 from src.pumbot.bot import logger
 
+CACHE_SECONDS = 60
+
 
 class AutoPublisherCog(commands.Cog):
     """Automatisches Veröffentlichen von Nachrichten in Announcement-Channels."""
@@ -15,14 +18,16 @@ class AutoPublisherCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.api = bot.api
-        self._cache: dict[int, list[int]] = {}
+        self._cache: dict[int, tuple[float, list[int]]] = {}
 
     async def _get_channels(self, guild_id: int) -> List[int]:
-        if guild_id in self._cache:
-            return self._cache[guild_id]
+        # Das Web-Panel ändert die Liste an den Befehlen vorbei; nach CACHE_SECONDS gilt sie.
+        cached = self._cache.get(guild_id)
+        if cached and time.monotonic() - cached[0] < CACHE_SECONDS:
+            return cached[1]
         raw = await self.api.get_auto_publisher_channels(str(guild_id))
         channels = [int(c) for c in raw] if raw else []
-        self._cache[guild_id] = channels
+        self._cache[guild_id] = (time.monotonic(), channels)
         return channels
 
     def _invalidate_cache(self, guild_id: int) -> None:
